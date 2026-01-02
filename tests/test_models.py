@@ -16,12 +16,7 @@ from coreason_identity.models import UserContext
 
 def test_user_context_valid() -> None:
     """Test creating a valid UserContext."""
-    user = UserContext(
-        sub="user123",
-        email="test@example.com",
-        project_context="proj1",
-        permissions=["read"]
-    )
+    user = UserContext(sub="user123", email="test@example.com", project_context="proj1", permissions=["read"])
     assert user.sub == "user123"
     assert user.email == "test@example.com"
     assert user.project_context == "proj1"

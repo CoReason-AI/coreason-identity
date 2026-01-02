@@ -14,23 +14,29 @@ from unittest.mock import patch
 from coreason_identity.config import CoreasonIdentityConfig
 
 
-def test_config_loading():
+def test_config_loading() -> None:
     """Test loading configuration from environment variables."""
-    with patch.dict(os.environ, {
-        "COREASON_AUTH_DOMAIN": "test.auth0.com",
-        "COREASON_AUTH_AUDIENCE": "api://test",
-    }):
-        config = CoreasonIdentityConfig()
+    with patch.dict(
+        os.environ,
+        {
+            "COREASON_AUTH_DOMAIN": "test.auth0.com",
+            "COREASON_AUTH_AUDIENCE": "api://test",
+        },
+    ):
+        config = CoreasonIdentityConfig()  # type: ignore[call-arg]
         assert config.domain == "test.auth0.com"
         assert config.audience == "api://test"
 
 
-def test_config_case_insensitive():
+def test_config_case_insensitive() -> None:
     """Test that environment variables are case-insensitive (pydantic-settings default behavior)."""
-    with patch.dict(os.environ, {
-        "coreason_auth_domain": "lower.auth0.com",
-        "COREASON_AUTH_AUDIENCE": "api://lower",
-    }):
-        config = CoreasonIdentityConfig()
+    with patch.dict(
+        os.environ,
+        {
+            "coreason_auth_domain": "lower.auth0.com",
+            "COREASON_AUTH_AUDIENCE": "api://lower",
+        },
+    ):
+        config = CoreasonIdentityConfig()  # type: ignore[call-arg]
         assert config.domain == "lower.auth0.com"
         assert config.audience == "api://lower"

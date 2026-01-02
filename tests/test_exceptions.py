@@ -17,7 +17,7 @@ from coreason_identity.exceptions import (
 )
 
 
-def test_exception_hierarchy():
+def test_exception_hierarchy() -> None:
     """Test that all custom exceptions inherit from CoreasonIdentityError."""
     assert issubclass(TokenExpiredError, CoreasonIdentityError)
     assert issubclass(InvalidAudienceError, CoreasonIdentityError)
@@ -25,7 +25,7 @@ def test_exception_hierarchy():
     assert issubclass(InsufficientPermissionsError, CoreasonIdentityError)
 
 
-def test_exception_instantiation():
+def test_exception_instantiation() -> None:
     """Test that exceptions can be instantiated."""
     err = TokenExpiredError("Token expired")
     assert str(err) == "Token expired"
