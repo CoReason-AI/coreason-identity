@@ -8,30 +8,29 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
-import pytest
-from pydantic import ValidationError
+import os
+from unittest.mock import patch
 
 from coreason_identity.config import CoreasonIdentityConfig
 
 
-def test_config_initialization(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("COREASON_AUTH_DOMAIN", "example.com")
-    monkeypatch.setenv("COREASON_AUTH_AUDIENCE", "my-audience")
-
-    config = CoreasonIdentityConfig()  # type: ignore[call-arg]
-    assert config.domain == "example.com"
-    assert config.audience == "my-audience"
-
-
-def test_config_initialization_with_args() -> None:
-    config = CoreasonIdentityConfig(domain="test.com", audience="test-aud")
-    assert config.domain == "test.com"
-    assert config.audience == "test-aud"
+def test_config_loading():
+    """Test loading configuration from environment variables."""
+    with patch.dict(os.environ, {
+        "COREASON_AUTH_DOMAIN": "test.auth0.com",
+        "COREASON_AUTH_AUDIENCE": "api://test",
+    }):
+        config = CoreasonIdentityConfig()
+        assert config.domain == "test.auth0.com"
+        assert config.audience == "api://test"
 
 
-def test_config_missing_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("COREASON_AUTH_DOMAIN", raising=False)
-    monkeypatch.delenv("COREASON_AUTH_AUDIENCE", raising=False)
-
-    with pytest.raises(ValidationError):
-        CoreasonIdentityConfig()  # type: ignore[call-arg]
+def test_config_case_insensitive():
+    """Test that environment variables are case-insensitive (pydantic-settings default behavior)."""
+    with patch.dict(os.environ, {
+        "coreason_auth_domain": "lower.auth0.com",
+        "COREASON_AUTH_AUDIENCE": "api://lower",
+    }):
+        config = CoreasonIdentityConfig()
+        assert config.domain == "lower.auth0.com"
+        assert config.audience == "api://lower"

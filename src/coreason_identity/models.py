@@ -20,6 +20,12 @@ from pydantic import BaseModel, EmailStr, Field
 class UserContext(BaseModel):
     """
     Standardized User Context object to be available throughout the middleware stack.
+
+    Attributes:
+        sub (str): Immutable User ID.
+        email (EmailStr): User's email address (PII).
+        project_context (Optional[str]): Project/Tenant ID if available.
+        permissions (List[str]): List of permissions granted to the user.
     """
 
     sub: str
