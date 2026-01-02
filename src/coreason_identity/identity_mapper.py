@@ -26,6 +26,16 @@ class IdentityMapper:
     Maps validated IdP claims to the standardized internal UserContext.
     """
 
+    def _ensure_list(self, value: Any) -> List[str]:
+        """Helper to ensure value is a list of strings."""
+        if value is None:
+            return []
+        if isinstance(value, str):
+            return [value]
+        if isinstance(value, list):
+            return [str(v) for v in value]
+        return []
+
     def map_claims(self, claims: Dict[str, Any]) -> UserContext:
         """
         Transform raw IdP claims into a UserContext object.
@@ -51,9 +61,8 @@ class IdentityMapper:
 
             # 2. Resolve Groups (Standardize diverse claim names)
             # We look for https://coreason.com/groups, groups, or roles
-            groups: List[str] = (
-                claims.get("https://coreason.com/groups") or claims.get("groups") or claims.get("roles") or []
-            )
+            raw_groups = claims.get("https://coreason.com/groups") or claims.get("groups") or claims.get("roles") or []
+            groups = self._ensure_list(raw_groups)
 
             # 3. Resolve Project Context
             # Priority: https://coreason.com/project_id -> group pattern "project:<id>"
@@ -61,20 +70,23 @@ class IdentityMapper:
 
             if not project_context:
                 for group in groups:
-                    if group.startswith("project:"):
+                    if group.lower().startswith("project:"):
                         # Extract everything after "project:"
-                        project_context = group[8:]
-                        # Spec doesn't say what to do if multiple exist, assuming first match is sufficient
-                        break
+                        possible_id = group[8:].strip()
+                        if possible_id:
+                            project_context = possible_id
+                            # Spec doesn't say what to do if multiple exist, assuming first match is sufficient
+                            break
 
             # 4. Resolve Permissions
             # Priority: explicit 'permissions' claim -> group mapping
-            permissions: List[str] = claims.get("permissions", [])
+            raw_permissions = claims.get("permissions")
+            permissions: List[str] = self._ensure_list(raw_permissions) if raw_permissions else []
 
             if not permissions:
                 # Fallback: Map groups to permissions
-                # Rule: if group is "admin", assign ["*"]
-                if "admin" in groups:
+                # Rule: if group is "admin" (case-insensitive), assign ["*"]
+                if any(g.lower() == "admin" for g in groups):
                     permissions = ["*"]
 
             # 5. Construct UserContext
