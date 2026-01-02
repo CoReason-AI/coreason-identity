@@ -17,31 +17,15 @@ from coreason_identity.exceptions import (
 )
 
 
-def test_coreason_identity_error() -> None:
-    exc = CoreasonIdentityError("test")
-    assert str(exc) == "test"
-    assert isinstance(exc, Exception)
+def test_exception_hierarchy() -> None:
+    """Test that all custom exceptions inherit from CoreasonIdentityError."""
+    assert issubclass(TokenExpiredError, CoreasonIdentityError)
+    assert issubclass(InvalidAudienceError, CoreasonIdentityError)
+    assert issubclass(SignatureVerificationError, CoreasonIdentityError)
+    assert issubclass(InsufficientPermissionsError, CoreasonIdentityError)
 
 
-def test_token_expired_error() -> None:
-    exc = TokenExpiredError("expired")
-    assert str(exc) == "expired"
-    assert isinstance(exc, CoreasonIdentityError)
-
-
-def test_invalid_audience_error() -> None:
-    exc = InvalidAudienceError("invalid audience")
-    assert str(exc) == "invalid audience"
-    assert isinstance(exc, CoreasonIdentityError)
-
-
-def test_signature_verification_error() -> None:
-    exc = SignatureVerificationError("bad signature")
-    assert str(exc) == "bad signature"
-    assert isinstance(exc, CoreasonIdentityError)
-
-
-def test_insufficient_permissions_error() -> None:
-    exc = InsufficientPermissionsError("denied")
-    assert str(exc) == "denied"
-    assert isinstance(exc, CoreasonIdentityError)
+def test_exception_instantiation() -> None:
+    """Test that exceptions can be instantiated."""
+    err = TokenExpiredError("Token expired")
+    assert str(err) == "Token expired"

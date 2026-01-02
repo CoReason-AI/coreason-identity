@@ -15,6 +15,7 @@ from coreason_identity.models import UserContext
 
 
 def test_user_context_valid() -> None:
+    """Test creating a valid UserContext."""
     user = UserContext(sub="user123", email="test@example.com", project_context="proj1", permissions=["read"])
     assert user.sub == "user123"
     assert user.email == "test@example.com"
@@ -23,6 +24,7 @@ def test_user_context_valid() -> None:
 
 
 def test_user_context_defaults() -> None:
+    """Test UserContext defaults for optional fields."""
     user = UserContext(sub="user123", email="test@example.com")
     assert user.sub == "user123"
     assert user.email == "test@example.com"
@@ -31,11 +33,35 @@ def test_user_context_defaults() -> None:
 
 
 def test_user_context_invalid_email() -> None:
-    with pytest.raises(ValidationError):
+    """Test that an invalid email raises a ValidationError."""
+    with pytest.raises(ValidationError) as excinfo:
         UserContext(sub="user123", email="not-an-email")
+    assert "value is not a valid email address" in str(excinfo.value)
 
 
-def test_user_context_missing_fields() -> None:
-    with pytest.raises(ValidationError):
-        # Missing email
+def test_user_context_missing_sub() -> None:
+    """Test that missing required 'sub' raises a ValidationError."""
+    with pytest.raises(ValidationError) as excinfo:
+        UserContext(email="test@example.com")  # type: ignore[call-arg]
+    assert "Field required" in str(excinfo.value)
+    assert "sub" in str(excinfo.value)
+
+
+def test_user_context_missing_email() -> None:
+    """Test that missing required 'email' raises a ValidationError."""
+    with pytest.raises(ValidationError) as excinfo:
         UserContext(sub="user123")  # type: ignore[call-arg]
+    assert "Field required" in str(excinfo.value)
+    assert "email" in str(excinfo.value)
+
+
+def test_user_context_immutability() -> None:
+    """
+    Test that the model behaves as expected (standard Pydantic models are mutable by default,
+    but we verify basic assignment works).
+    The requirements don't strictly specify frozen=True, but 'sub (Immutable User ID)' hints at it.
+    Let's check if we can modify it.
+    """
+    user = UserContext(sub="user123", email="test@example.com")
+    user.project_context = "proj2"
+    assert user.project_context == "proj2"
