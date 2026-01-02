@@ -9,6 +9,7 @@
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
 from typing import Any, Dict
+from unittest.mock import patch
 
 import pytest
 
@@ -110,3 +111,18 @@ def test_map_claims_multiple_project_groups(mapper: IdentityMapper) -> None:
     }
     context = mapper.map_claims(claims)
     assert context.project_context == "FIRST"
+
+
+def test_map_claims_generic_exception(mapper: IdentityMapper) -> None:
+    """Test that a generic exception is caught and wrapped."""
+    claims: Dict[str, Any] = {
+        "sub": "user|123",
+        "email": "user@example.com",
+    }
+
+    # Mock UserContext to raise a generic exception
+    with patch("coreason_identity.identity_mapper.UserContext") as mock_user_context:
+        mock_user_context.side_effect = Exception("Unexpected failure")
+
+        with pytest.raises(CoreasonIdentityError, match="Identity mapping error: Unexpected failure"):
+            mapper.map_claims(claims)
