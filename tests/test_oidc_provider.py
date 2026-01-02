@@ -12,12 +12,13 @@ from unittest.mock import Mock, patch
 
 import httpx
 import pytest
-from coreason_identity.exceptions import CoreasonIdentityError
-from coreason_identity.oidc_provider import OIDCProvider
 from httpx import Response
 
+from coreason_identity.exceptions import CoreasonIdentityError
+from coreason_identity.oidc_provider import OIDCProvider
 
-@pytest.fixture
+
+@pytest.fixture  # type: ignore[misc]
 def oidc_provider() -> OIDCProvider:
     return OIDCProvider(discovery_url="https://test.auth0.com/.well-known/openid-configuration")
 
