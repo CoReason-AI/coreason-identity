@@ -25,7 +25,7 @@ class OIDCProvider:
     Fetches and caches the Identity Provider's configuration and JWKS.
     """
 
-    def __init__(self, discovery_url: str, cache_ttl: int = 3600) -> None:
+    def __init__(self, discovery_url: str, cache_ttl: float = 3600) -> None:
         """
         Initialize the OIDCProvider.
 
