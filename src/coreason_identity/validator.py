@@ -14,7 +14,7 @@ TokenValidator component for validating JWT signatures and claims.
 
 from typing import Any, Dict, Optional
 
-from authlib.jose import jwt
+from authlib.jose import JsonWebToken
 from authlib.jose.errors import (
     BadSignatureError,
     ExpiredTokenError,
@@ -50,6 +50,8 @@ class TokenValidator:
         self.oidc_provider = oidc_provider
         self.audience = audience
         self.issuer = issuer
+        # Use a specific JsonWebToken instance to enforce RS256 and reject 'none'
+        self.jwt = JsonWebToken(["RS256"])
 
     def validate_token(self, token: str) -> Dict[str, Any]:
         """
@@ -67,22 +69,33 @@ class TokenValidator:
             SignatureVerificationError: If the signature is invalid.
             CoreasonIdentityError: For other validation errors.
         """
+        # Sanitize input
+        token = token.strip()
+
+        # Define claim options
+        claims_options = {
+            "exp": {"essential": True},
+            "aud": {"essential": True, "value": self.audience},
+        }
+        if self.issuer:
+            claims_options["iss"] = {"essential": True, "value": self.issuer}
+
+        def _decode(jwks: Dict[str, Any]) -> Any:
+            claims = self.jwt.decode(token, jwks, claims_options=claims_options)
+            claims.validate()
+            return claims
+
         try:
-            # Fetch JWKS
+            # Fetch JWKS (cached)
             jwks = self.oidc_provider.get_jwks()
 
-            # Define claim options
-            claims_options = {
-                "exp": {"essential": True},
-                "aud": {"essential": True, "value": self.audience},
-            }
-            if self.issuer:
-                claims_options["iss"] = {"essential": True, "value": self.issuer}
-
-            # Decode and validate
-            # authlib.jose.jwt.decode handles signature verification and claim validation
-            claims = jwt.decode(token, jwks, claims_options=claims_options)
-            claims.validate()
+            try:
+                claims = _decode(jwks)
+            except (ValueError, BadSignatureError):
+                # If key is missing or signature is bad (potential key rotation), try refreshing keys
+                logger.info("Validation failed with cached keys, refreshing JWKS and retrying...")
+                jwks = self.oidc_provider.get_jwks(force_refresh=True)
+                claims = _decode(jwks)
 
             payload = dict(claims)
 
@@ -109,6 +122,10 @@ class TokenValidator:
         except JoseError as e:
             logger.error(f"Validation failed: JOSE error - {e}")
             raise CoreasonIdentityError(f"Token validation failed: {e}") from e
+        except ValueError as e:
+            # Authlib raises ValueError for "Invalid JSON Web Key Set" or "kid" not found sometimes
+            logger.error(f"Validation failed: Value error (likely key missing) - {e}")
+            raise SignatureVerificationError(f"Invalid signature or key not found: {e}") from e
         except Exception as e:
             logger.exception("Unexpected error during token validation")
             raise CoreasonIdentityError(f"Unexpected error during token validation: {e}") from e
