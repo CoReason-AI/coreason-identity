@@ -100,6 +100,7 @@ class TokenValidator:
                 except (ValueError, BadSignatureError):
                     # If key is missing or signature is bad (potential key rotation), try refreshing keys
                     logger.info("Validation failed with cached keys, refreshing JWKS and retrying...")
+                    span.add_event("refreshing_jwks")
                     jwks = self.oidc_provider.get_jwks(force_refresh=True)
                     claims = _decode(jwks)
 
