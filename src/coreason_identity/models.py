@@ -32,3 +32,28 @@ class UserContext(BaseModel):
     email: EmailStr
     project_context: Optional[str] = None
     permissions: List[str] = Field(default_factory=list)
+
+
+class DeviceFlowResponse(BaseModel):
+    """
+    Response from the Device Authorization Request.
+    """
+
+    device_code: str
+    user_code: str
+    verification_uri: str
+    verification_uri_complete: Optional[str] = None
+    expires_in: int
+    interval: int = 5
+
+
+class TokenResponse(BaseModel):
+    """
+    Response containing the tokens.
+    """
+
+    access_token: str
+    refresh_token: Optional[str] = None
+    id_token: Optional[str] = None
+    token_type: str
+    expires_in: int
