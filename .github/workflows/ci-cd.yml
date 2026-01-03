@@ -51,7 +51,7 @@ jobs:
             v1-${{ runner.os }}-python-${{ matrix.python-version }}-
 
       - name: Install Poetry
-        run: pipx install poetry==1.8.3
+        run: pipx install poetry
         shell: bash
 
       - name: Install dependencies
