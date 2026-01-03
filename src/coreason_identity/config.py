@@ -12,6 +12,8 @@
 Configuration for the coreason-identity package.
 """
 
+from typing import Optional
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -27,3 +29,4 @@ class CoreasonIdentityConfig(BaseSettings):
 
     domain: str
     audience: str
+    client_id: Optional[str] = None
