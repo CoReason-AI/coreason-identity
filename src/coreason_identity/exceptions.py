@@ -19,19 +19,28 @@ class CoreasonIdentityError(Exception):
     pass
 
 
-class TokenExpiredError(CoreasonIdentityError):
+class InvalidTokenError(CoreasonIdentityError):
+    """
+    Raised when the token is invalid (expired, bad signature, wrong audience, etc.).
+    Matches the example usage: `except InvalidTokenError:`.
+    """
+
+    pass
+
+
+class TokenExpiredError(InvalidTokenError):
     """Raised when the provided token has expired."""
 
     pass
 
 
-class InvalidAudienceError(CoreasonIdentityError):
+class InvalidAudienceError(InvalidTokenError):
     """Raised when the token's audience does not match the expected value."""
 
     pass
 
 
-class SignatureVerificationError(CoreasonIdentityError):
+class SignatureVerificationError(InvalidTokenError):
     """Raised when the token's signature cannot be verified."""
 
     pass

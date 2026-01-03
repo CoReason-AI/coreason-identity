@@ -16,6 +16,9 @@ __version__ = "0.1.0"
 __author__ = "Gowtham A Rao"
 __email__ = "gowtham.rao@coreason.ai"
 
+from .config import CoreasonIdentityConfig
+from .exceptions import InvalidTokenError
+from .manager import IdentityManager
 from .models import UserContext
 
-__all__ = ["UserContext"]
+__all__ = ["CoreasonIdentityConfig", "IdentityManager", "InvalidTokenError", "UserContext"]
