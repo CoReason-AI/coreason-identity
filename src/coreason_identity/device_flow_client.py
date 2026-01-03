@@ -140,6 +140,8 @@ class DeviceFlowClient:
                         try:
                             logger.info("Token retrieved successfully.")
                             return TokenResponse(**response.json())
+                        except ValidationError as e:
+                            raise CoreasonIdentityError(f"Received invalid token response structure: {e}") from e
                         except ValueError as e:
                             raise CoreasonIdentityError(f"Received invalid JSON response on 200 OK: {e}") from e
 
