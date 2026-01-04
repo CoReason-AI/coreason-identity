@@ -38,15 +38,23 @@ class IdentityManager:
         """
         self.config = config
 
+        # Normalize domain: strip protocol and trailing slashes
+        domain = self.config.domain.lower().strip()
+        if domain.startswith("https://"):
+            domain = domain[8:]
+        elif domain.startswith("http://"):
+            domain = domain[7:]
+        domain = domain.rstrip("/")
+
         # Construct OIDC Discovery URL
         # Assumption: Standard .well-known path
-        discovery_url = f"https://{self.config.domain}/.well-known/openid-configuration"
+        discovery_url = f"https://{domain}/.well-known/openid-configuration"
 
         self.oidc_provider = OIDCProvider(discovery_url)
         self.validator = TokenValidator(
             oidc_provider=self.oidc_provider,
             audience=self.config.audience,
-            issuer=f"https://{self.config.domain}/",
+            issuer=f"https://{domain}/",
         )
         self.identity_mapper = IdentityMapper()
         self.device_client: Optional[DeviceFlowClient] = None
