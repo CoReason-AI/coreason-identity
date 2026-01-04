@@ -195,3 +195,22 @@ def test_await_device_token_missing_client_id() -> None:
 
         with pytest.raises(CoreasonIdentityError, match="client_id is required"):
             mgr.await_device_token(mock_flow)
+
+
+def test_init_strict_issuer() -> None:
+    """Test that IdentityManager initializes TokenValidator with strict issuer check."""
+    config = CoreasonIdentityConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id=MOCK_CLIENT_ID)
+    expected_issuer = f"https://{MOCK_DOMAIN}/"
+
+    with (
+        patch("coreason_identity.manager.OIDCProvider") as MockOIDC,
+        patch("coreason_identity.manager.TokenValidator") as MockValidator,
+    ):
+        IdentityManager(config)
+
+        MockOIDC.assert_called_once_with(f"https://{MOCK_DOMAIN}/.well-known/openid-configuration")
+        MockValidator.assert_called_once_with(
+            oidc_provider=MockOIDC.return_value,
+            audience=MOCK_AUDIENCE,
+            issuer=expected_issuer,
+        )
