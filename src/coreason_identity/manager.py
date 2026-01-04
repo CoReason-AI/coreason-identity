@@ -46,8 +46,7 @@ class IdentityManager:
         self.validator = TokenValidator(
             oidc_provider=self.oidc_provider,
             audience=self.config.audience,
-            # We could enforce issuer here if we wanted strict checks against config.domain
-            # but sticking to basics for now.
+            issuer=f"https://{self.config.domain}/",
         )
         self.identity_mapper = IdentityMapper()
         self.device_client: Optional[DeviceFlowClient] = None
