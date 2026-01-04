@@ -143,5 +143,5 @@ def test_discovery_complex_failure(client: DeviceFlowClient, mock_httpx: Mock) -
     # Let's check _get_endpoints implementation.
     # It has try/except httpx.HTTPError. But json() raising ValueError is not HTTPError.
 
-    with pytest.raises(ValueError):  # Or whatever json() raises
+    with pytest.raises(CoreasonIdentityError, match="Invalid JSON response from OIDC discovery"):
         client._get_endpoints()
