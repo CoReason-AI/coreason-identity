@@ -12,19 +12,18 @@ from typing import Any, Generator, Optional
 from unittest.mock import Mock, patch
 
 import pytest
-from httpx import Request, Response
-
 from coreason_identity.device_flow_client import DeviceFlowClient
 from coreason_identity.exceptions import CoreasonIdentityError
 from coreason_identity.models import DeviceFlowResponse
+from httpx import Request, Response
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def client() -> DeviceFlowClient:
     return DeviceFlowClient(client_id="test-client", idp_url="https://test.auth0.com")
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def mock_httpx() -> Generator[Mock, None, None]:
     with patch("httpx.Client") as mock:
         yield mock

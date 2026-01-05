@@ -15,15 +15,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from authlib.jose.errors import ExpiredTokenError
-from opentelemetry.sdk.trace import Tracer, TracerProvider
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
-from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-from opentelemetry.trace import StatusCode
-
 from coreason_identity.exceptions import TokenExpiredError
 from coreason_identity.oidc_provider import OIDCProvider
 from coreason_identity.utils.logger import logger
 from coreason_identity.validator import TokenValidator
+from opentelemetry.sdk.trace import Tracer, TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+from opentelemetry.trace import StatusCode
 
 
 class MockClaims(dict[str, Any]):
@@ -33,7 +32,7 @@ class MockClaims(dict[str, Any]):
         pass
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def telemetry_setup() -> Tuple[InMemorySpanExporter, Tracer]:
     """Sets up an OpenTelemetry tracer with an in-memory exporter."""
     exporter = InMemorySpanExporter()
@@ -44,7 +43,7 @@ def telemetry_setup() -> Tuple[InMemorySpanExporter, Tracer]:
     return exporter, tracer
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def mock_oidc_provider() -> MagicMock:
     provider = MagicMock(spec=OIDCProvider)
     # Mock public key

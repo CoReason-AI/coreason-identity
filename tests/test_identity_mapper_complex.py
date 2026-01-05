@@ -11,11 +11,10 @@
 from typing import Any, Dict
 
 import pytest
-
 from coreason_identity.identity_mapper import IdentityMapper, RawIdPClaims
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def mapper() -> IdentityMapper:
     return IdentityMapper()
 

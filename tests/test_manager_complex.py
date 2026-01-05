@@ -12,7 +12,6 @@ from typing import Any, Generator
 from unittest.mock import patch
 
 import pytest
-
 from coreason_identity.config import CoreasonIdentityConfig
 from coreason_identity.exceptions import (
     CoreasonIdentityError,
@@ -29,12 +28,12 @@ MOCK_AUDIENCE = "test-audience"
 MOCK_CLIENT_ID = "test-client-id"
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def config() -> CoreasonIdentityConfig:
     return CoreasonIdentityConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id=MOCK_CLIENT_ID)
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def manager(config: CoreasonIdentityConfig) -> Generator[IdentityManager, Any, None]:
     with (
         patch("coreason_identity.manager.OIDCProvider"),
@@ -48,10 +47,10 @@ def manager(config: CoreasonIdentityConfig) -> Generator[IdentityManager, Any, N
 def test_validate_token_mapper_failure(manager: IdentityManager) -> None:
     """Test when Validator succeeds but Mapper fails (e.g., missing claims)."""
     # Validator returns a valid dictionary
-    manager.validator.validate_token.return_value = {"sub": "123"}  # type: ignore[attr-defined]
+    manager.validator.validate_token.return_value = {"sub": "123"}
 
     # Mapper raises error (e.g. missing 'email')
-    manager.identity_mapper.map_claims.side_effect = CoreasonIdentityError("Missing email")  # type: ignore[attr-defined]
+    manager.identity_mapper.map_claims.side_effect = CoreasonIdentityError("Missing email")
 
     with pytest.raises(CoreasonIdentityError, match="Missing email"):
         manager.validate_token("Bearer valid_token")
@@ -61,12 +60,12 @@ def test_validate_token_specific_exceptions(manager: IdentityManager) -> None:
     """Test that specific validation exceptions bubble up correctly."""
 
     # SignatureVerificationError
-    manager.validator.validate_token.side_effect = SignatureVerificationError("Bad sig")  # type: ignore[attr-defined]
+    manager.validator.validate_token.side_effect = SignatureVerificationError("Bad sig")
     with pytest.raises(SignatureVerificationError):
         manager.validate_token("Bearer bad_sig")
 
     # TokenExpiredError
-    manager.validator.validate_token.side_effect = TokenExpiredError("Expired")  # type: ignore[attr-defined]
+    manager.validator.validate_token.side_effect = TokenExpiredError("Expired")
     with pytest.raises(TokenExpiredError):
         manager.validate_token("Bearer expired")
 
@@ -88,7 +87,7 @@ def test_validate_token_header_edge_cases(manager: IdentityManager) -> None:
     # Validator logic: `token.strip()` then `jwt.decode`.
     # Let's see what happens if we pass empty string to validator mock.
 
-    manager.validator.validate_token.side_effect = InvalidTokenError("Empty token")  # type: ignore[attr-defined]
+    manager.validator.validate_token.side_effect = InvalidTokenError("Empty token")
     with pytest.raises(InvalidTokenError):
         manager.validate_token("Bearer ")
 

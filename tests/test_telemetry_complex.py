@@ -15,12 +15,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from authlib.jose.errors import BadSignatureError
+from coreason_identity.oidc_provider import OIDCProvider
+from coreason_identity.validator import TokenValidator
 from opentelemetry.sdk.trace import Tracer, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-
-from coreason_identity.oidc_provider import OIDCProvider
-from coreason_identity.validator import TokenValidator
 
 
 class MockClaims(dict[str, Any]):
@@ -28,7 +27,7 @@ class MockClaims(dict[str, Any]):
         pass
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def telemetry_setup() -> Tuple[InMemorySpanExporter, Tracer]:
     exporter = InMemorySpanExporter()
     provider = TracerProvider()
@@ -38,7 +37,7 @@ def telemetry_setup() -> Tuple[InMemorySpanExporter, Tracer]:
     return exporter, tracer
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def mock_oidc_provider() -> MagicMock:
     provider = MagicMock(spec=OIDCProvider)
     jwks = {"keys": [{"kty": "RSA", "kid": "123", "n": "abc", "e": "AQAB"}]}

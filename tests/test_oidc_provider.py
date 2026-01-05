@@ -12,13 +12,12 @@ from unittest.mock import Mock, patch
 
 import httpx
 import pytest
-from httpx import Response
-
 from coreason_identity.exceptions import CoreasonIdentityError
 from coreason_identity.oidc_provider import OIDCProvider
+from httpx import Response
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def oidc_provider() -> OIDCProvider:
     return OIDCProvider(discovery_url="https://test.auth0.com/.well-known/openid-configuration")
 
@@ -117,16 +116,17 @@ def test_get_jwks_cache_expiration(mock_get: Mock, oidc_provider: OIDCProvider) 
     mock_get.side_effect = [mock_config_response, mock_jwks_response, mock_config_response, mock_jwks_response]
 
     # Set a short TTL for testing
-    oidc_provider.cache_ttl = 0.1  # type: ignore[assignment]
+    oidc_provider.cache_ttl = 0.1
 
     # First call
     oidc_provider.get_jwks()
     assert mock_get.call_count == 2
 
-    # Wait for expiration
+    # Manually expire the cache
     import time
 
-    time.sleep(0.2)
+    oidc_provider._last_update = time.time() - 4000
+    oidc_provider.cache_ttl = 3600
 
     # Second call - should refetch
     oidc_provider.get_jwks()

@@ -23,7 +23,7 @@ def test_config_loading() -> None:
             "COREASON_AUTH_AUDIENCE": "api://test",
         },
     ):
-        config = CoreasonIdentityConfig()  # type: ignore[call-arg]
+        config = CoreasonIdentityConfig()
         assert config.domain == "test.auth0.com"
         assert config.audience == "api://test"
 
@@ -37,6 +37,6 @@ def test_config_case_insensitive() -> None:
             "COREASON_AUTH_AUDIENCE": "api://lower",
         },
     ):
-        config = CoreasonIdentityConfig()  # type: ignore[call-arg]
+        config = CoreasonIdentityConfig()
         assert config.domain == "lower.auth0.com"
         assert config.audience == "api://lower"

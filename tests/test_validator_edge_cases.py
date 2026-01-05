@@ -13,26 +13,25 @@ from unittest.mock import Mock
 
 import pytest
 from authlib.jose import JsonWebKey, jwt
-
 from coreason_identity.exceptions import CoreasonIdentityError
 from coreason_identity.oidc_provider import OIDCProvider
 from coreason_identity.validator import TokenValidator
 
 
 class TestTokenValidatorEdgeCases:
-    @pytest.fixture  # type: ignore[misc]
+    @pytest.fixture
     def mock_oidc_provider(self) -> Mock:
         return Mock(spec=OIDCProvider)
 
-    @pytest.fixture  # type: ignore[misc]
+    @pytest.fixture
     def key_pair(self) -> Any:
         return JsonWebKey.generate_key("RSA", 2048, is_private=True)
 
-    @pytest.fixture  # type: ignore[misc]
+    @pytest.fixture
     def jwks(self, key_pair: Any) -> Dict[str, Any]:
         return {"keys": [key_pair.as_dict(private=False)]}
 
-    @pytest.fixture  # type: ignore[misc]
+    @pytest.fixture
     def validator(self, mock_oidc_provider: Mock) -> TokenValidator:
         # Strict issuer validation
         return TokenValidator(
@@ -49,7 +48,7 @@ class TestTokenValidatorEdgeCases:
     ) -> str:
         if headers is None:
             headers = {"alg": "RS256", "kid": key.as_dict()["kid"]}
-        return jwt.encode(headers, claims, key).decode("utf-8")  # type: ignore[no-any-return]
+        return jwt.encode(headers, claims, key).decode("utf-8")
 
     def test_malformed_token_structure(self, validator: TokenValidator) -> None:
         """Test that a completely malformed token string raises CoreasonIdentityError."""

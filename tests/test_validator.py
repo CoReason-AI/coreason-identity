@@ -14,7 +14,6 @@ from unittest.mock import Mock
 
 import pytest
 from authlib.jose import JsonWebKey, jwt
-
 from coreason_identity.exceptions import (
     CoreasonIdentityError,
     InvalidAudienceError,
@@ -26,29 +25,29 @@ from coreason_identity.validator import TokenValidator
 
 
 class TestTokenValidator:
-    @pytest.fixture  # type: ignore[misc]
+    @pytest.fixture
     def mock_oidc_provider(self) -> Mock:
         return Mock(spec=OIDCProvider)
 
-    @pytest.fixture  # type: ignore[misc]
+    @pytest.fixture
     def key_pair(self) -> Any:
         # Generate a key pair for testing
         key = JsonWebKey.generate_key("RSA", 2048, is_private=True)
         return key
 
-    @pytest.fixture  # type: ignore[misc]
+    @pytest.fixture
     def jwks(self, key_pair: Any) -> Dict[str, Any]:
         # Return public key in JWKS format
         return {"keys": [key_pair.as_dict(private=False)]}
 
-    @pytest.fixture  # type: ignore[misc]
+    @pytest.fixture
     def validator(self, mock_oidc_provider: Mock) -> TokenValidator:
         return TokenValidator(oidc_provider=mock_oidc_provider, audience="my-audience")
 
     def create_token(self, key: Any, claims: Dict[str, Any], headers: Dict[str, Any] | None = None) -> bytes:
         if headers is None:
             headers = {"alg": "RS256", "kid": key.as_dict()["kid"]}
-        return jwt.encode(headers, claims, key)  # type: ignore[no-any-return]
+        return jwt.encode(headers, claims, key)
 
     def test_validate_token_success(
         self, validator: TokenValidator, mock_oidc_provider: Mock, key_pair: Any, jwks: Dict[str, Any]

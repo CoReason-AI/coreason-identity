@@ -18,18 +18,17 @@ from unittest.mock import patch
 
 import pytest
 from authlib.jose import JsonWebKey, jwt
-
 from coreason_identity.config import CoreasonIdentityConfig
 from coreason_identity.exceptions import CoreasonIdentityError
 from coreason_identity.manager import IdentityManager
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def key_pair() -> Any:
     return JsonWebKey.generate_key("RSA", 2048, is_private=True)
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def jwks(key_pair: Any) -> Dict[str, Any]:
     return {"keys": [key_pair.as_dict(private=False)]}
 
@@ -37,7 +36,7 @@ def jwks(key_pair: Any) -> Dict[str, Any]:
 def create_token(key: Any, claims: Dict[str, Any], headers: Dict[str, Any] | None = None) -> bytes:
     if headers is None:
         headers = {"alg": "RS256", "kid": key.as_dict()["kid"]}
-    return jwt.encode(headers, claims, key)  # type: ignore[no-any-return]
+    return jwt.encode(headers, claims, key)
 
 
 def test_init_with_trailing_slash_in_domain() -> None:
