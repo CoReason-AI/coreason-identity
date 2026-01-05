@@ -14,6 +14,7 @@ DeviceFlowClient component for handling OAuth 2.0 Device Authorization Grant.
 
 import time
 from typing import Dict, Optional
+from urllib.parse import urljoin
 
 import httpx
 from pydantic import ValidationError
@@ -38,6 +39,8 @@ class DeviceFlowClient:
             scope: The scopes to request (default: "openid profile email").
         """
         self.client_id = client_id
+        # Ensure idp_url does not end with a slash for consistent joining,
+        # although urljoin handles some cases, strict base is better.
         self.idp_url = idp_url.rstrip("/")
         self.scope = scope
         self._endpoints: Optional[Dict[str, str]] = None
@@ -49,7 +52,13 @@ class DeviceFlowClient:
         if self._endpoints:
             return self._endpoints
 
+        # Use urljoin, but note that urljoin behavior depends on trailing slashes.
+        # We ensured self.idp_url has no trailing slash.
+        # So we append a slash before joining relative path .well-known/...
+        # Actually, simpler to just use f-string with verified structure or just ensure the path starts with /
+
         discovery_url = f"{self.idp_url}/.well-known/openid-configuration"
+
         try:
             with httpx.Client() as client:
                 response = client.get(discovery_url)
@@ -59,9 +68,13 @@ class DeviceFlowClient:
                 except ValueError as e:
                     raise CoreasonIdentityError(f"Invalid JSON response from OIDC discovery: {e}") from e
 
-                # Fallback to standard Auth0 paths if not in config (though they should be)
-                device_endpoint = config.get("device_authorization_endpoint", f"{self.idp_url}/oauth/device/code")
-                token_endpoint = config.get("token_endpoint", f"{self.idp_url}/oauth/token")
+                # Fallback to standard Auth0 paths if not in config
+                # urljoin is good for constructing absolute URLs from a base
+
+                device_endpoint = config.get(
+                    "device_authorization_endpoint", urljoin(f"{self.idp_url}/", "oauth/device/code")
+                )
+                token_endpoint = config.get("token_endpoint", urljoin(f"{self.idp_url}/", "oauth/token"))
 
                 self._endpoints = {
                     "device_authorization_endpoint": device_endpoint,

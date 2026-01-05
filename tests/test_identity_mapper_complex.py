@@ -12,7 +12,7 @@ from typing import Any, Dict
 
 import pytest
 
-from coreason_identity.identity_mapper import IdentityMapper
+from coreason_identity.identity_mapper import IdentityMapper, RawIdPClaims
 
 
 @pytest.fixture  # type: ignore[misc]
@@ -104,11 +104,16 @@ def test_complex_mixed_types_in_list(mapper: IdentityMapper) -> None:
 
 
 def test_complex_invalid_type_input(mapper: IdentityMapper) -> None:
-    """Test _ensure_list with unsupported type (e.g. dict or int directly)."""
-    # Direct int input for groups
+    """Test _ensure_list logic via Pydantic validator with unsupported type."""
+    # Direct int input for groups -> Validator handles it (fallback to [])?
+    # Actually, verify our ensure_list_of_strings behavior:
+    # if isinstance(v, (list, tuple)) -> str conversion.
+    # if str -> [v].
+    # else -> [].
+
     claims1: Dict[str, Any] = {"sub": "u1", "email": "u@e.com", "groups": 123}
     context1 = mapper.map_claims(claims1)
-    # _ensure_list(123) -> fallback to []
+    # 123 is not list, tuple, or str -> []
     assert context1.permissions == []
     assert context1.project_context is None
 
@@ -119,15 +124,17 @@ def test_complex_invalid_type_input(mapper: IdentityMapper) -> None:
     assert context2.permissions == []
 
 
-def test_ensure_list_direct_coverage(mapper: IdentityMapper) -> None:
-    """Directly test _ensure_list to guarantee coverage of all branches."""
+def test_ensure_list_of_strings_direct() -> None:
+    """Directly test RawIdPClaims.ensure_list_of_strings to guarantee coverage."""
     # Test None
-    assert mapper._ensure_list(None) == []
-    # Test str (Line 32 coverage)
-    assert mapper._ensure_list("valid_string") == ["valid_string"]
+    assert RawIdPClaims.ensure_list_of_strings(None) == []
+    # Test str
+    assert RawIdPClaims.ensure_list_of_strings("valid_string") == ["valid_string"]
     # Test list
-    assert mapper._ensure_list(["a", "b"]) == ["a", "b"]
+    assert RawIdPClaims.ensure_list_of_strings(["a", "b"]) == ["a", "b"]
     # Test mixed list
-    assert mapper._ensure_list(["a", 1]) == ["a", "1"]
-    # Test other type
-    assert mapper._ensure_list(123) == []
+    assert RawIdPClaims.ensure_list_of_strings(["a", 1]) == ["a", "1"]
+    # Test tuple
+    assert RawIdPClaims.ensure_list_of_strings(("a", "b")) == ["a", "b"]
+    # Test other type (e.g. int)
+    assert RawIdPClaims.ensure_list_of_strings(123) == []
