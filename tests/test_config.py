@@ -40,3 +40,22 @@ def test_config_case_insensitive() -> None:
         config = CoreasonIdentityConfig()
         assert config.domain == "lower.auth0.com"
         assert config.audience == "api://lower"
+
+
+def test_config_domain_normalization() -> None:
+    """Test that domain is normalized to hostname only."""
+    # Simple hostname
+    c1 = CoreasonIdentityConfig(domain="test.com", audience="aud")
+    assert c1.domain == "test.com"
+
+    # With https://
+    c2 = CoreasonIdentityConfig(domain="https://test.com", audience="aud")
+    assert c2.domain == "test.com"
+
+    # With trailing slash
+    c3 = CoreasonIdentityConfig(domain="test.com/", audience="aud")
+    assert c3.domain == "test.com"
+
+    # With path (should strip path)
+    c4 = CoreasonIdentityConfig(domain="https://test.com/auth", audience="aud")
+    assert c4.domain == "test.com"
