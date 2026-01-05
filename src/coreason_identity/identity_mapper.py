@@ -42,13 +42,13 @@ class RawIdPClaims(BaseModel):
     @field_validator("groups", "permissions", mode="before")
     @classmethod
     def ensure_list_of_strings(cls, v: Any) -> List[str]:
-        """Ensures the value is a list of strings."""
+        """Ensures the value is a list of strings, filtering out None values."""
         if v is None:
             return []
         if isinstance(v, str):
             return [v]
         if isinstance(v, (list, tuple)):
-            return [str(item) for item in v]
+            return [str(item) for item in v if item is not None]
         return []
 
     def __init__(self, **data: Any) -> None:
