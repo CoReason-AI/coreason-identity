@@ -12,10 +12,11 @@ from typing import Any, Generator, Optional
 from unittest.mock import Mock, patch
 
 import pytest
+from httpx import Request, Response
+
 from coreason_identity.device_flow_client import DeviceFlowClient
 from coreason_identity.exceptions import CoreasonIdentityError
 from coreason_identity.models import DeviceFlowResponse
-from httpx import Request, Response
 
 
 @pytest.fixture

@@ -13,6 +13,7 @@ from unittest.mock import Mock
 
 import pytest
 from authlib.jose import JsonWebKey, jwt
+
 from coreason_identity.exceptions import CoreasonIdentityError
 from coreason_identity.oidc_provider import OIDCProvider
 from coreason_identity.validator import TokenValidator
@@ -48,7 +49,7 @@ class TestTokenValidatorEdgeCases:
     ) -> str:
         if headers is None:
             headers = {"alg": "RS256", "kid": key.as_dict()["kid"]}
-        return jwt.encode(headers, claims, key).decode("utf-8")
+        return jwt.encode(headers, claims, key).decode("utf-8")  # type: ignore[no-any-return]
 
     def test_malformed_token_structure(self, validator: TokenValidator) -> None:
         """Test that a completely malformed token string raises CoreasonIdentityError."""

@@ -19,6 +19,7 @@ from unittest.mock import patch
 
 import pytest
 from authlib.jose import JsonWebKey, jwt
+
 from coreason_identity.config import CoreasonIdentityConfig
 from coreason_identity.exceptions import InvalidTokenError
 from coreason_identity.manager import IdentityManager
@@ -36,7 +37,7 @@ def jwks(key_pair: Any) -> Dict[str, Any]:
 
 def create_token(key: Any, claims: Dict[str, Any]) -> str:
     headers = {"alg": "RS256", "kid": key.as_dict()["kid"]}
-    return jwt.encode(headers, claims, key).decode("utf-8")
+    return jwt.encode(headers, claims, key).decode("utf-8")  # type: ignore[no-any-return]
 
 
 def test_missing_claim_raises_invalid_token_error(key_pair: Any, jwks: Dict[str, Any]) -> None:

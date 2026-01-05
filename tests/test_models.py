@@ -9,8 +9,9 @@
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
 import pytest
-from coreason_identity.models import UserContext
 from pydantic import ValidationError
+
+from coreason_identity.models import UserContext
 
 
 def test_user_context_valid() -> None:

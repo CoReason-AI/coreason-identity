@@ -12,6 +12,7 @@ from typing import Any, Generator
 from unittest.mock import patch
 
 import pytest
+
 from coreason_identity.config import CoreasonIdentityConfig
 from coreason_identity.exceptions import CoreasonIdentityError, InvalidTokenError
 from coreason_identity.manager import IdentityManager
@@ -59,13 +60,13 @@ def test_validate_token_success(manager: IdentityManager) -> None:
     mock_claims = {"sub": "user123", "email": "test@example.com"}
     mock_user_context = UserContext(sub="user123", email="test@example.com")
 
-    manager.validator.validate_token.return_value = mock_claims
-    manager.identity_mapper.map_claims.return_value = mock_user_context
+    manager.validator.validate_token.return_value = mock_claims  # type: ignore[attr-defined]
+    manager.identity_mapper.map_claims.return_value = mock_user_context  # type: ignore[attr-defined]
 
     result = manager.validate_token(MOCK_AUTH_HEADER)
 
-    manager.validator.validate_token.assert_called_once_with(MOCK_TOKEN)
-    manager.identity_mapper.map_claims.assert_called_once_with(mock_claims)
+    manager.validator.validate_token.assert_called_once_with(MOCK_TOKEN)  # type: ignore[attr-defined]
+    manager.identity_mapper.map_claims.assert_called_once_with(mock_claims)  # type: ignore[attr-defined]
     assert result == mock_user_context
 
 
@@ -78,7 +79,7 @@ def test_validate_token_invalid_header_format(manager: IdentityManager) -> None:
 
 
 def test_validate_token_delegates_exceptions(manager: IdentityManager) -> None:
-    manager.validator.validate_token.side_effect = InvalidTokenError("Token invalid")
+    manager.validator.validate_token.side_effect = InvalidTokenError("Token invalid")  # type: ignore[attr-defined]
 
     with pytest.raises(InvalidTokenError):
         manager.validate_token(MOCK_AUTH_HEADER)

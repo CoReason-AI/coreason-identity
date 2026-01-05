@@ -12,6 +12,7 @@ from typing import Any, Dict
 from unittest.mock import patch
 
 import pytest
+
 from coreason_identity.exceptions import CoreasonIdentityError
 from coreason_identity.identity_mapper import IdentityMapper
 from coreason_identity.models import UserContext

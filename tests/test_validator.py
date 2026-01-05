@@ -14,6 +14,7 @@ from unittest.mock import Mock
 
 import pytest
 from authlib.jose import JsonWebKey, jwt
+
 from coreason_identity.exceptions import (
     CoreasonIdentityError,
     InvalidAudienceError,
@@ -47,7 +48,7 @@ class TestTokenValidator:
     def create_token(self, key: Any, claims: Dict[str, Any], headers: Dict[str, Any] | None = None) -> bytes:
         if headers is None:
             headers = {"alg": "RS256", "kid": key.as_dict()["kid"]}
-        return jwt.encode(headers, claims, key)
+        return jwt.encode(headers, claims, key)  # type: ignore[no-any-return]
 
     def test_validate_token_success(
         self, validator: TokenValidator, mock_oidc_provider: Mock, key_pair: Any, jwks: Dict[str, Any]
