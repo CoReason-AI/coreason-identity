@@ -14,27 +14,62 @@ IdentityMapper component for mapping IdP claims to internal UserContext.
 
 from typing import Any, Dict, List, Optional
 
-from pydantic import ValidationError
+from pydantic import BaseModel, EmailStr, Field, ValidationError, field_validator
 
-from coreason_identity.exceptions import CoreasonIdentityError
+from coreason_identity.exceptions import CoreasonIdentityError, InvalidTokenError
 from coreason_identity.models import UserContext
 from coreason_identity.utils.logger import logger
+
+
+class RawIdPClaims(BaseModel):
+    """
+    Internal model to parse and normalize incoming IdP claims.
+    Validates structure and normalizes types (e.g., ensuring lists) before business logic.
+    """
+
+    sub: str
+    email: EmailStr
+
+    # Optional raw fields
+    project_id_claim: Optional[str] = Field(default=None, alias="https://coreason.com/project_id")
+
+    # Normalized lists from potentially diverse keys
+    # We will use a root validator or specific field validators to populate these
+    groups: List[str] = Field(default_factory=list)
+    permissions: List[str] = Field(default_factory=list)
+
+    @field_validator("groups", "permissions", mode="before")
+    @classmethod
+    def ensure_list_of_strings(cls, v: Any) -> List[str]:
+        """Ensures the value is a list of strings."""
+        if v is None:
+            return []
+        if isinstance(v, str):
+            return [v]
+        if isinstance(v, (list, tuple)):
+            return [str(item) for item in v]
+        return []
+
+    def __init__(self, **data: Any) -> None:
+        # Pre-process groups from multiple possible sources
+        # Logic: If 'groups' is missing OR empty, try other sources.
+
+        # Check if 'groups' is present and truthy in data
+        groups_val = data.get("groups")
+
+        if not groups_val:
+            # If groups is missing or empty, try the others in order
+            raw_groups = data.get("https://coreason.com/groups") or data.get("groups") or data.get("roles") or []
+            # Assign back to 'groups' so Pydantic picks it up
+            data["groups"] = raw_groups
+
+        super().__init__(**data)
 
 
 class IdentityMapper:
     """
     Maps validated IdP claims to the standardized internal UserContext.
     """
-
-    def _ensure_list(self, value: Any) -> List[str]:
-        """Helper to ensure value is a list of strings."""
-        if value is None:
-            return []
-        if isinstance(value, str):
-            return [value]
-        if isinstance(value, list):
-            return [str(v) for v in value]
-        return []
 
     def map_claims(self, claims: Dict[str, Any]) -> UserContext:
         """
@@ -47,26 +82,27 @@ class IdentityMapper:
             A populated UserContext object.
 
         Raises:
-            CoreasonIdentityError: If required claims are missing or validation fails.
+            InvalidTokenError: If required claims are missing or validation fails.
+            CoreasonIdentityError: For unexpected errors.
         """
         try:
-            # 1. Extract Basic Identity
-            sub = claims.get("sub")
-            email = claims.get("email")
+            # 1. Parse and Normalize Inputs using Pydantic
+            try:
+                raw_claims = RawIdPClaims(**claims)
+            except ValidationError as e:
+                # Map missing required fields (sub, email) to InvalidTokenError
+                # because it means the token payload is insufficient for the app.
+                raise InvalidTokenError(f"UserContext validation failed: {e}") from e
 
-            if not sub:
-                raise CoreasonIdentityError("Missing required claim: 'sub'")
-            if not email:
-                raise CoreasonIdentityError("Missing required claim: 'email'")
-
-            # 2. Resolve Groups (Standardize diverse claim names)
-            # We look for https://coreason.com/groups, groups, or roles
-            raw_groups = claims.get("https://coreason.com/groups") or claims.get("groups") or claims.get("roles") or []
-            groups = self._ensure_list(raw_groups)
+            # 2. Extract Basic Identity
+            sub = raw_claims.sub
+            email = raw_claims.email
+            groups = raw_claims.groups
+            permissions = raw_claims.permissions
 
             # 3. Resolve Project Context
             # Priority: https://coreason.com/project_id -> group pattern "project:<id>"
-            project_context: Optional[str] = claims.get("https://coreason.com/project_id")
+            project_context = raw_claims.project_id_claim
 
             if not project_context:
                 for group in groups:
@@ -75,14 +111,10 @@ class IdentityMapper:
                         possible_id = group[8:].strip()
                         if possible_id:
                             project_context = possible_id
-                            # Spec doesn't say what to do if multiple exist, assuming first match is sufficient
                             break
 
             # 4. Resolve Permissions
-            # Priority: explicit 'permissions' claim -> group mapping
-            raw_permissions = claims.get("permissions")
-            permissions: List[str] = self._ensure_list(raw_permissions) if raw_permissions else []
-
+            # Priority: explicit 'permissions' claim (already parsed) -> group mapping
             if not permissions:
                 # Fallback: Map groups to permissions
                 # Rule: if group is "admin" (case-insensitive), assign ["*"]
@@ -90,7 +122,6 @@ class IdentityMapper:
                     permissions = ["*"]
 
             # 5. Construct UserContext
-            # Pydantic will handle further validation (e.g. email format)
             user_context = UserContext(
                 sub=sub,
                 email=email,
@@ -101,10 +132,8 @@ class IdentityMapper:
             logger.debug(f"Mapped identity for user {sub} to project {project_context}")
             return user_context
 
-        except ValidationError as e:
-            logger.error(f"Identity mapping failed due to validation error: {e}")
-            raise CoreasonIdentityError(f"UserContext validation failed: {e}") from e
         except Exception as e:
+            # Catch unexpected exceptions (InvalidTokenError raised above bypasses this)
             if isinstance(e, CoreasonIdentityError):
                 raise
             logger.exception("Unexpected error during identity mapping")

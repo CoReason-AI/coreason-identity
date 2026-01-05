@@ -29,6 +29,7 @@ from opentelemetry.trace import Status, StatusCode
 from coreason_identity.exceptions import (
     CoreasonIdentityError,
     InvalidAudienceError,
+    InvalidTokenError,
     SignatureVerificationError,
     TokenExpiredError,
 )
@@ -72,7 +73,8 @@ class TokenValidator:
             TokenExpiredError: If the token has expired.
             InvalidAudienceError: If the audience is invalid.
             SignatureVerificationError: If the signature is invalid.
-            CoreasonIdentityError: For other validation errors.
+            InvalidTokenError: If claims are missing or invalid.
+            CoreasonIdentityError: For unexpected errors.
         """
         with tracer.start_as_current_span("validate_token") as span:
             # Sanitize input
@@ -129,12 +131,14 @@ class TokenValidator:
                 span.set_status(Status(StatusCode.ERROR, str(e)))
                 if "aud" in str(e):
                     raise InvalidAudienceError(f"Invalid audience: {e}") from e
-                raise CoreasonIdentityError(f"Invalid claim: {e}") from e
+                # Wrap generic invalid claims as InvalidTokenError, not base error
+                raise InvalidTokenError(f"Invalid claim: {e}") from e
             except MissingClaimError as e:
                 logger.warning(f"Validation failed: Missing claim - {e}")
                 span.record_exception(e)
                 span.set_status(Status(StatusCode.ERROR, str(e)))
-                raise CoreasonIdentityError(f"Missing claim: {e}") from e
+                # Wrap missing claims as InvalidTokenError
+                raise InvalidTokenError(f"Missing claim: {e}") from e
             except BadSignatureError as e:
                 logger.error(f"Validation failed: Bad signature - {e}")
                 span.record_exception(e)
@@ -144,7 +148,8 @@ class TokenValidator:
                 logger.error(f"Validation failed: JOSE error - {e}")
                 span.record_exception(e)
                 span.set_status(Status(StatusCode.ERROR, str(e)))
-                raise CoreasonIdentityError(f"Token validation failed: {e}") from e
+                # Generic JOSE error implies invalid token
+                raise InvalidTokenError(f"Token validation failed: {e}") from e
             except ValueError as e:
                 # Authlib raises ValueError for "Invalid JSON Web Key Set" or "kid" not found sometimes
                 logger.error(f"Validation failed: Value error (likely key missing) - {e}")
