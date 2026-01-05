@@ -24,12 +24,12 @@ from coreason_identity.exceptions import CoreasonIdentityError
 from coreason_identity.manager import IdentityManager
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def key_pair() -> Any:
     return JsonWebKey.generate_key("RSA", 2048, is_private=True)
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def jwks(key_pair: Any) -> Dict[str, Any]:
     return {"keys": [key_pair.as_dict(private=False)]}
 

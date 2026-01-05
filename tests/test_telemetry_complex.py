@@ -28,17 +28,17 @@ class MockClaims(dict[str, Any]):
         pass
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def telemetry_setup() -> Tuple[InMemorySpanExporter, Tracer]:
     exporter = InMemorySpanExporter()
     provider = TracerProvider()
     processor = SimpleSpanProcessor(exporter)
     provider.add_span_processor(processor)
     tracer = provider.get_tracer("test_tracer_complex")
-    return exporter, tracer
+    return exporter, tracer  # type: ignore[return-value]
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def mock_oidc_provider() -> MagicMock:
     provider = MagicMock(spec=OIDCProvider)
     jwks = {"keys": [{"kty": "RSA", "kid": "123", "n": "abc", "e": "AQAB"}]}

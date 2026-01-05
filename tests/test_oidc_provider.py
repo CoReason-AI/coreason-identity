@@ -18,7 +18,7 @@ from coreason_identity.exceptions import CoreasonIdentityError
 from coreason_identity.oidc_provider import OIDCProvider
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def oidc_provider() -> OIDCProvider:
     return OIDCProvider(discovery_url="https://test.auth0.com/.well-known/openid-configuration")
 
@@ -123,10 +123,11 @@ def test_get_jwks_cache_expiration(mock_get: Mock, oidc_provider: OIDCProvider) 
     oidc_provider.get_jwks()
     assert mock_get.call_count == 2
 
-    # Wait for expiration
+    # Manually expire the cache
     import time
 
-    time.sleep(0.2)
+    oidc_provider._last_update = float(time.time() - 4000)
+    oidc_provider.cache_ttl = 3600
 
     # Second call - should refetch
     oidc_provider.get_jwks()

@@ -26,12 +26,12 @@ MOCK_TOKEN = "valid.token.string"
 MOCK_AUTH_HEADER = f"Bearer {MOCK_TOKEN}"
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def config() -> CoreasonIdentityConfig:
     return CoreasonIdentityConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id=MOCK_CLIENT_ID)
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def manager(config: CoreasonIdentityConfig) -> Generator[IdentityManager, Any, None]:
     # Mock internal components during initialization
     with (

@@ -25,28 +25,28 @@ from coreason_identity.validator import TokenValidator
 
 
 class TestTokenValidatorComplex:
-    @pytest.fixture  # type: ignore[misc]
+    @pytest.fixture
     def mock_oidc_provider(self) -> Mock:
         return Mock(spec=OIDCProvider)
 
-    @pytest.fixture  # type: ignore[misc]
+    @pytest.fixture
     def key_pair(self) -> Any:
         # Generate a key pair for testing
         key = JsonWebKey.generate_key("RSA", 2048, is_private=True)
         return key
 
-    @pytest.fixture  # type: ignore[misc]
+    @pytest.fixture
     def second_key_pair(self) -> Any:
         # Generate a second key pair for key rotation testing
         key = JsonWebKey.generate_key("RSA", 2048, is_private=True)
         return key
 
-    @pytest.fixture  # type: ignore[misc]
+    @pytest.fixture
     def jwks(self, key_pair: Any) -> Dict[str, Any]:
         # Return public key in JWKS format
         return {"keys": [key_pair.as_dict(private=False)]}
 
-    @pytest.fixture  # type: ignore[misc]
+    @pytest.fixture
     def validator(self, mock_oidc_provider: Mock) -> TokenValidator:
         return TokenValidator(oidc_provider=mock_oidc_provider, audience="my-audience")
 

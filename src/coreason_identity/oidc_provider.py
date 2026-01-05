@@ -12,6 +12,7 @@
 OIDC Provider component for fetching and caching JWKS.
 """
 
+import threading
 import time
 from typing import Any, Dict, Optional
 
@@ -37,6 +38,7 @@ class OIDCProvider:
         self.cache_ttl = cache_ttl
         self._jwks_cache: Optional[Dict[str, Any]] = None
         self._last_update: float = 0.0
+        self._lock = threading.Lock()
 
     def _fetch_oidc_config(self) -> Dict[str, Any]:
         """
@@ -90,20 +92,32 @@ class OIDCProvider:
         Raises:
             CoreasonIdentityError: If fetching fails.
         """
-        current_time = time.time()
-        if not force_refresh and self._jwks_cache is not None and (current_time - self._last_update) < self.cache_ttl:
-            return self._jwks_cache
+        # Double-checked locking pattern optimization
+        if not force_refresh:
+            current_time = time.time()
+            if self._jwks_cache is not None and (current_time - self._last_update) < self.cache_ttl:
+                return self._jwks_cache
 
-        # Fetch fresh keys
-        oidc_config = self._fetch_oidc_config()
-        jwks_uri = oidc_config.get("jwks_uri")
-        if not jwks_uri:
-            raise CoreasonIdentityError("OIDC configuration does not contain 'jwks_uri'")
+        with self._lock:
+            # Check again inside lock
+            current_time = time.time()
+            if (
+                not force_refresh
+                and self._jwks_cache is not None
+                and (current_time - self._last_update) < self.cache_ttl
+            ):
+                return self._jwks_cache  # pragma: no cover
 
-        jwks = self._fetch_jwks(jwks_uri)
+            # Fetch fresh keys
+            oidc_config = self._fetch_oidc_config()
+            jwks_uri = oidc_config.get("jwks_uri")
+            if not jwks_uri:
+                raise CoreasonIdentityError("OIDC configuration does not contain 'jwks_uri'")
 
-        # Update cache
-        self._jwks_cache = jwks
-        self._last_update = current_time
+            jwks = self._fetch_jwks(jwks_uri)
 
-        return jwks
+            # Update cache
+            self._jwks_cache = jwks
+            self._last_update = current_time
+
+            return jwks

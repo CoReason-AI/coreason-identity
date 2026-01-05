@@ -13,7 +13,9 @@ Configuration for the coreason-identity package.
 """
 
 from typing import Optional
+from urllib.parse import urlparse
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -30,3 +32,17 @@ class CoreasonIdentityConfig(BaseSettings):
     domain: str
     audience: str
     client_id: Optional[str] = None
+
+    @field_validator("domain")
+    @classmethod
+    def normalize_domain(cls, v: str) -> str:
+        """
+        Ensures domain is just the hostname (e.g. auth.coreason.com).
+        Strips scheme and path if present.
+        """
+        v = v.strip().lower()
+        if "://" not in v:
+            v = f"https://{v}"
+
+        parsed = urlparse(v)
+        return parsed.netloc or v
