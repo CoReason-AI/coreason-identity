@@ -14,7 +14,7 @@ from unittest.mock import patch
 import pytest
 
 from coreason_identity.exceptions import CoreasonIdentityError
-from coreason_identity.identity_mapper import IdentityMapper
+from coreason_identity.identity_mapper import IdentityMapper, RawIdPClaims
 from coreason_identity.models import UserContext
 
 
@@ -128,3 +128,169 @@ def test_map_claims_generic_exception(mapper: IdentityMapper) -> None:
 
         with pytest.raises(CoreasonIdentityError, match="Identity mapping error: Unexpected failure"):
             mapper.map_claims(claims)
+
+
+# --- Complex / Edge Case Tests ---
+
+
+def test_complex_groups_empty_vs_valid(mapper: IdentityMapper) -> None:
+    """Test priority when one source is empty list and another is valid."""
+    # 'groups' is empty list, 'roles' has data. Should check roles.
+    claims: Dict[str, Any] = {
+        "sub": "u1",
+        "email": "u@e.com",
+        "groups": [],
+        "roles": ["project:XYZ"],
+    }
+    context = mapper.map_claims(claims)
+    assert context.project_context == "XYZ"
+
+
+def test_complex_malformed_project_group(mapper: IdentityMapper) -> None:
+    """Test groups that look like 'project:' but have empty ID."""
+    claims: Dict[str, Any] = {
+        "sub": "u1",
+        "email": "u@e.com",
+        "groups": ["project:", "project:  ", "project:VALID"],
+    }
+    context = mapper.map_claims(claims)
+    # Should skip the first two and pick VALID
+    assert context.project_context == "VALID"
+
+
+def test_complex_groups_as_string(mapper: IdentityMapper) -> None:
+    """Test if 'groups' is provided as a single string instead of list."""
+    claims: Dict[str, Any] = {
+        "sub": "u1",
+        "email": "u@e.com",
+        "groups": "project:SINGLE",
+    }
+    context = mapper.map_claims(claims)
+    assert context.project_context == "SINGLE"
+
+
+def test_complex_permissions_as_string(mapper: IdentityMapper) -> None:
+    """Test if 'permissions' is provided as a single string."""
+    claims: Dict[str, Any] = {
+        "sub": "u1",
+        "email": "u@e.com",
+        "permissions": "read:all",
+    }
+    context = mapper.map_claims(claims)
+    assert context.permissions == ["read:all"]
+
+
+def test_complex_case_sensitivity(mapper: IdentityMapper) -> None:
+    """Test case insensitivity for 'admin' and 'project:' prefix."""
+    claims: Dict[str, Any] = {
+        "sub": "u1",
+        "email": "u@e.com",
+        "groups": ["ADMIN", "PROJECT:MixedCase"],
+    }
+    context = mapper.map_claims(claims)
+    assert context.permissions == ["*"]
+    assert context.project_context == "MixedCase"
+
+
+def test_complex_whitespace_trimming(mapper: IdentityMapper) -> None:
+    """Test that project ID is trimmed of whitespace."""
+    claims: Dict[str, Any] = {
+        "sub": "u1",
+        "email": "u@e.com",
+        "groups": ["project:  spaced_out  "],
+    }
+    context = mapper.map_claims(claims)
+    assert context.project_context == "spaced_out"
+
+
+def test_complex_mixed_types_in_list(mapper: IdentityMapper) -> None:
+    """Test if list contains non-strings (e.g. integers)."""
+    claims: Dict[str, Any] = {
+        "sub": "u1",
+        "email": "u@e.com",
+        "groups": [123, "project:456"],
+    }
+    # 123 should be converted to "123", not match "project:"
+    # "project:456" should match
+    context = mapper.map_claims(claims)
+    assert context.project_context == "456"
+
+
+def test_complex_invalid_type_input(mapper: IdentityMapper) -> None:
+    """Test _ensure_list logic via Pydantic validator with unsupported type."""
+    # Direct int input for groups -> Validator handles it (fallback to [])?
+    # Actually, verify our ensure_list_of_strings behavior:
+    # if isinstance(v, (list, tuple)) -> str conversion.
+    # if str -> [v].
+    # else -> [].
+
+    claims1: Dict[str, Any] = {"sub": "u1", "email": "u@e.com", "groups": 123}
+    context1 = mapper.map_claims(claims1)
+    # 123 is not list, tuple, or str -> []
+    assert context1.permissions == []
+    assert context1.project_context is None
+
+    # Dict input for permissions (not list or str)
+    claims2: Dict[str, Any] = {"sub": "u1", "email": "u@e.com", "permissions": {"read": True}}
+    context2 = mapper.map_claims(claims2)
+    # _ensure_list({...}) -> fallback to []
+    assert context2.permissions == []
+
+
+def test_ensure_list_of_strings_direct() -> None:
+    """Directly test RawIdPClaims.ensure_list_of_strings to guarantee coverage."""
+    # Test None
+    assert RawIdPClaims.ensure_list_of_strings(None) == []
+    # Test str
+    assert RawIdPClaims.ensure_list_of_strings("valid_string") == ["valid_string"]
+    # Test list
+    assert RawIdPClaims.ensure_list_of_strings(["a", "b"]) == ["a", "b"]
+    # Test mixed list
+    assert RawIdPClaims.ensure_list_of_strings(["a", 1]) == ["a", "1"]
+    # Test tuple
+    assert RawIdPClaims.ensure_list_of_strings(("a", "b")) == ["a", "b"]
+    # Test other type (e.g. int)
+    assert RawIdPClaims.ensure_list_of_strings(123) == []
+
+
+def test_mapper_multiple_project_groups_precedence(mapper: IdentityMapper) -> None:
+    """
+    Test precedence when multiple groups match the 'project:' pattern.
+    The current implementation breaks after the first match.
+    """
+    claims: Dict[str, Any] = {
+        "sub": "u1",
+        "email": "u@e.com",
+        "groups": ["project:PRIMARY", "project:SECONDARY"],
+    }
+    context = mapper.map_claims(claims)
+    # Should pick the first one encountered in the list
+    assert context.project_context == "PRIMARY"
+
+
+def test_mapper_list_with_none(mapper: IdentityMapper) -> None:
+    """
+    Test behavior when 'groups' list contains None.
+    The validator converts [str(item) for item in v], so None becomes "None".
+    """
+    claims: Dict[str, Any] = {
+        "sub": "u1",
+        "email": "u@e.com",
+        "groups": [None, "admin"],
+    }
+    context = mapper.map_claims(claims)
+    # "None" is just a string, likely won't match "project:", but shouldn't crash.
+    # "admin" should map to permissions ["*"]
+    assert context.permissions == ["*"]
+
+
+def test_mapper_empty_project_string(mapper: IdentityMapper) -> None:
+    """Test 'project:' with empty ID string."""
+    claims: Dict[str, Any] = {
+        "sub": "u1",
+        "email": "u@e.com",
+        "groups": ["project:", "project:VALID"],
+    }
+    context = mapper.map_claims(claims)
+    # The logic checks `if possible_id:`, so empty string is skipped.
+    assert context.project_context == "VALID"
