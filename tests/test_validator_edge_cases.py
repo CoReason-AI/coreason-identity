@@ -20,19 +20,19 @@ from coreason_identity.validator import TokenValidator
 
 
 class TestTokenValidatorEdgeCases:
-    @pytest.fixture  # type: ignore[misc]
+    @pytest.fixture
     def mock_oidc_provider(self) -> Mock:
         return Mock(spec=OIDCProvider)
 
-    @pytest.fixture  # type: ignore[misc]
+    @pytest.fixture
     def key_pair(self) -> Any:
         return JsonWebKey.generate_key("RSA", 2048, is_private=True)
 
-    @pytest.fixture  # type: ignore[misc]
+    @pytest.fixture
     def jwks(self, key_pair: Any) -> Dict[str, Any]:
         return {"keys": [key_pair.as_dict(private=False)]}
 
-    @pytest.fixture  # type: ignore[misc]
+    @pytest.fixture
     def validator(self, mock_oidc_provider: Mock) -> TokenValidator:
         # Strict issuer validation
         return TokenValidator(

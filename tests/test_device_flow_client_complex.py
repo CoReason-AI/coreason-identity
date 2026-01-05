@@ -19,12 +19,12 @@ from coreason_identity.exceptions import CoreasonIdentityError
 from coreason_identity.models import DeviceFlowResponse
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def client() -> DeviceFlowClient:
     return DeviceFlowClient(client_id="test-client", idp_url="https://test.auth0.com")
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def mock_httpx() -> Generator[Mock, None, None]:
     with patch("httpx.Client") as mock:
         yield mock

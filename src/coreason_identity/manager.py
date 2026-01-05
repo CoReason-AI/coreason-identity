@@ -13,7 +13,7 @@ IdentityManager component for orchestrating authentication and authorization.
 """
 
 from typing import Optional
-from urllib.parse import urlparse
+from urllib.parse import urljoin
 
 from coreason_identity.config import CoreasonIdentityConfig
 from coreason_identity.device_flow_client import DeviceFlowClient
@@ -39,28 +39,16 @@ class IdentityManager:
         """
         self.config = config
 
-        # Normalize domain to ensure it is just the hostname (and port if any)
-        # We handle "https://domain.com", "http://domain.com", "domain.com", "domain.com/"
-        raw_domain = self.config.domain.lower().strip()
+        # Domain is already normalized by Config validator to be just the hostname (e.g. auth.coreason.com)
+        self.domain = self.config.domain
 
-        # Ensure it has a scheme for urlparse to work correctly if it's missing
-        if "://" not in raw_domain:
-            raw_domain = f"https://{raw_domain}"
+        # Construct base URL (must start with https:// for OIDC)
+        base_url = f"https://{self.domain}"
 
-        parsed = urlparse(raw_domain)
-        # We want just the netloc (e.g. "auth.coreason.com")
-        # If the user provided "https://auth.coreason.com/tenant", we might just want "auth.coreason.com"
-        # The spec says: normalizes configuration domain... to ensure issuer URL is strictly constructed as https://{domain}/
-        # This implies 'domain' is a hostname.
-
-        self.domain = parsed.netloc
-        if not self.domain:
-            # Fallback if parsing failed (e.g. empty string)
-            self.domain = raw_domain
-
-        # Construct URLs
-        discovery_url = f"https://{self.domain}/.well-known/openid-configuration"
-        issuer_url = f"https://{self.domain}/"
+        # Use urljoin for robust path construction
+        # Note: urljoin("https://host", "/path") -> "https://host/path"
+        discovery_url = urljoin(base_url, "/.well-known/openid-configuration")
+        issuer_url = urljoin(base_url, "/")
 
         self.oidc_provider = OIDCProvider(discovery_url)
         self.validator = TokenValidator(

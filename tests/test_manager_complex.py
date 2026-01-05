@@ -9,7 +9,7 @@
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
 from typing import Any, Generator
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -29,12 +29,12 @@ MOCK_AUDIENCE = "test-audience"
 MOCK_CLIENT_ID = "test-client-id"
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def config() -> CoreasonIdentityConfig:
     return CoreasonIdentityConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id=MOCK_CLIENT_ID)
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def manager(config: CoreasonIdentityConfig) -> Generator[IdentityManager, Any, None]:
     with (
         patch("coreason_identity.manager.OIDCProvider"),
@@ -131,3 +131,28 @@ def test_await_device_token_stateless_failure(manager: IdentityManager) -> None:
 
         with pytest.raises(CoreasonIdentityError, match="Access denied"):
             manager.await_device_token(mock_flow)
+
+
+def test_manager_malformed_bearer_headers(manager: IdentityManager) -> None:
+    """Test IdentityManager rejection of malformed Bearer headers."""
+    # We can reuse the 'manager' fixture which is already typed and imported.
+
+    # Mock the validator to avoid actual validation calls if header check passes (it shouldn't)
+    manager.validator = Mock()
+
+    # Case 1: No space
+    with pytest.raises(InvalidTokenError, match="Missing or invalid Authorization header"):
+        manager.validate_token("BearerToken")
+
+    # Case 2: Lowercase bearer (strict check says 'Bearer ')
+    # The code uses `startswith("Bearer ")`.
+    with pytest.raises(InvalidTokenError, match="Missing or invalid Authorization header"):
+        manager.validate_token("bearer token")
+
+    # Case 3: Just "Bearer"
+    with pytest.raises(InvalidTokenError, match="Missing or invalid Authorization header"):
+        manager.validate_token("Bearer")
+
+    # Case 4: None/Empty (handled by type signature usually, but runtime check exists)
+    with pytest.raises(InvalidTokenError, match="Missing or invalid Authorization header"):
+        manager.validate_token("")

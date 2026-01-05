@@ -12,6 +12,7 @@
 IdentityMapper component for mapping IdP claims to internal UserContext.
 """
 
+import re
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, EmailStr, Field, ValidationError, field_validator
@@ -41,13 +42,13 @@ class RawIdPClaims(BaseModel):
     @field_validator("groups", "permissions", mode="before")
     @classmethod
     def ensure_list_of_strings(cls, v: Any) -> List[str]:
-        """Ensures the value is a list of strings."""
+        """Ensures the value is a list of strings, filtering out None values."""
         if v is None:
             return []
         if isinstance(v, str):
             return [v]
         if isinstance(v, (list, tuple)):
-            return [str(item) for item in v]
+            return [str(item) for item in v if item is not None]
         return []
 
     def __init__(self, **data: Any) -> None:
@@ -106,9 +107,10 @@ class IdentityMapper:
 
             if not project_context:
                 for group in groups:
-                    if group.lower().startswith("project:"):
-                        # Extract everything after "project:"
-                        possible_id = group[8:].strip()
+                    # Use regex for robust case-insensitive matching and extraction
+                    match = re.match(r"^project:\s*(.*)", group, re.IGNORECASE)
+                    if match:
+                        possible_id = match.group(1).strip()
                         if possible_id:
                             project_context = possible_id
                             break

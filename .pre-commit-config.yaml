@@ -17,7 +17,15 @@ repos:
     rev: v1.18.2
     hooks:
       - id: mypy
-        additional_dependencies: [pydantic, pydantic-settings]
+        additional_dependencies:
+          - pydantic
+          - pydantic-settings
+          - pytest
+          - authlib
+          - httpx
+          - email-validator
+          - opentelemetry-api
+          - opentelemetry-sdk
   - repo: https://github.com/AleksaC/hadolint-py
     rev: v2.14.0
     hooks:
