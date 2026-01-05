@@ -13,6 +13,7 @@ IdentityManager component for orchestrating authentication and authorization.
 """
 
 from typing import Optional
+from urllib.parse import urlparse
 
 from coreason_identity.config import CoreasonIdentityConfig
 from coreason_identity.device_flow_client import DeviceFlowClient
@@ -38,23 +39,34 @@ class IdentityManager:
         """
         self.config = config
 
-        # Normalize domain: strip protocol and trailing slashes
-        domain = self.config.domain.lower().strip()
-        if domain.startswith("https://"):
-            domain = domain[8:]
-        elif domain.startswith("http://"):
-            domain = domain[7:]
-        domain = domain.rstrip("/")
+        # Normalize domain to ensure it is just the hostname (and port if any)
+        # We handle "https://domain.com", "http://domain.com", "domain.com", "domain.com/"
+        raw_domain = self.config.domain.lower().strip()
 
-        # Construct OIDC Discovery URL
-        # Assumption: Standard .well-known path
-        discovery_url = f"https://{domain}/.well-known/openid-configuration"
+        # Ensure it has a scheme for urlparse to work correctly if it's missing
+        if "://" not in raw_domain:
+            raw_domain = f"https://{raw_domain}"
+
+        parsed = urlparse(raw_domain)
+        # We want just the netloc (e.g. "auth.coreason.com")
+        # If the user provided "https://auth.coreason.com/tenant", we might just want "auth.coreason.com"
+        # The spec says: normalizes configuration domain... to ensure issuer URL is strictly constructed as https://{domain}/
+        # This implies 'domain' is a hostname.
+
+        self.domain = parsed.netloc
+        if not self.domain:
+            # Fallback if parsing failed (e.g. empty string)
+            self.domain = raw_domain
+
+        # Construct URLs
+        discovery_url = f"https://{self.domain}/.well-known/openid-configuration"
+        issuer_url = f"https://{self.domain}/"
 
         self.oidc_provider = OIDCProvider(discovery_url)
         self.validator = TokenValidator(
             oidc_provider=self.oidc_provider,
             audience=self.config.audience,
-            issuer=f"https://{domain}/",
+            issuer=issuer_url,
         )
         self.identity_mapper = IdentityMapper()
         self.device_client: Optional[DeviceFlowClient] = None
@@ -100,26 +112,17 @@ class IdentityManager:
         if not self.config.client_id:
             raise CoreasonIdentityError("client_id is required for device login but not configured.")
 
-        # Initialize DeviceFlowClient on demand or reuse?
-        # Recreating is cheap and stateless except for discovery cache, but DeviceFlowClient
-        # implementation caches endpoints instance-locally.
-        # Let's create a new one or cache it if we want to reuse endpoint discovery.
-        # For now, let's create it on demand but we might want to store it to reuse discovery.
+        # Initialize DeviceFlowClient on demand
         if not self.device_client:
             self.device_client = DeviceFlowClient(
                 client_id=self.config.client_id,
-                idp_url=f"https://{self.config.domain}",
+                idp_url=f"https://{self.domain}",
                 scope=scope or "openid profile email",
             )
         else:
-            # If reusing, ensure scope matches?
-            # Simpler to just create a new one for now to respect the 'scope' arg if it changes.
-            # But to support discovery caching, we might want to improve DeviceFlowClient.
-            # Given the current DeviceFlowClient implementation, it fetches endpoints lazily.
-            # So creating a new one does not immediately hit the network.
             self.device_client = DeviceFlowClient(
                 client_id=self.config.client_id,
-                idp_url=f"https://{self.config.domain}",
+                idp_url=f"https://{self.domain}",
                 scope=scope or "openid profile email",
             )
 
@@ -141,15 +144,10 @@ class IdentityManager:
         if not self.config.client_id:
             raise CoreasonIdentityError("client_id is required for device login but not configured.")
 
-        # We need a DeviceFlowClient instance. If we called start_device_login, we have one.
-        # If this is called statelessly (e.g. CLI restarted), we need to recreate it.
-        # However, we don't know the scope used originally without the user passing it.
-        # But polling only needs client_id and device_code (and token endpoint).
-        # Scope is not sent in the polling request.
         if not self.device_client:
             self.device_client = DeviceFlowClient(
                 client_id=self.config.client_id,
-                idp_url=f"https://{self.config.domain}",
+                idp_url=f"https://{self.domain}",
             )
 
         return self.device_client.poll_token(flow)

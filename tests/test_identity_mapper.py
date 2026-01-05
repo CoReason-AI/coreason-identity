@@ -83,12 +83,12 @@ def test_map_claims_group_sources(mapper: IdentityMapper) -> None:
 
 def test_map_claims_missing_required_fields(mapper: IdentityMapper) -> None:
     """Test that missing sub or email raises CoreasonIdentityError."""
-    # Missing sub
-    with pytest.raises(CoreasonIdentityError, match="Missing required claim: 'sub'"):
+    # Missing sub (Pydantic validation error)
+    with pytest.raises(CoreasonIdentityError, match="UserContext validation failed"):
         mapper.map_claims({"email": "valid@email.com"})
 
-    # Missing email
-    with pytest.raises(CoreasonIdentityError, match="Missing required claim: 'email'"):
+    # Missing email (Pydantic validation error)
+    with pytest.raises(CoreasonIdentityError, match="UserContext validation failed"):
         mapper.map_claims({"sub": "123"})
 
 
@@ -120,7 +120,9 @@ def test_map_claims_generic_exception(mapper: IdentityMapper) -> None:
         "email": "user@example.com",
     }
 
-    # Mock UserContext to raise a generic exception
+    # Mock RawIdPClaims or UserContext logic if strict isolation needed,
+    # but checking standard Exception wrapping here.
+    # We patch UserContext constructor because that's called last.
     with patch("coreason_identity.identity_mapper.UserContext") as mock_user_context:
         mock_user_context.side_effect = Exception("Unexpected failure")
 
