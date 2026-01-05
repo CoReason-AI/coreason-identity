@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, EmailStr, Field, ValidationError, field_validator
 
-from coreason_identity.exceptions import CoreasonIdentityError
+from coreason_identity.exceptions import CoreasonIdentityError, InvalidTokenError
 from coreason_identity.models import UserContext
 from coreason_identity.utils.logger import logger
 
@@ -82,15 +82,17 @@ class IdentityMapper:
             A populated UserContext object.
 
         Raises:
-            CoreasonIdentityError: If required claims are missing or validation fails.
+            InvalidTokenError: If required claims are missing or validation fails.
+            CoreasonIdentityError: For unexpected errors.
         """
         try:
             # 1. Parse and Normalize Inputs using Pydantic
             try:
                 raw_claims = RawIdPClaims(**claims)
             except ValidationError as e:
-                # Map missing required fields (sub, email) to CoreasonIdentityError
-                raise CoreasonIdentityError(f"UserContext validation failed: {e}") from e
+                # Map missing required fields (sub, email) to InvalidTokenError
+                # because it means the token payload is insufficient for the app.
+                raise InvalidTokenError(f"UserContext validation failed: {e}") from e
 
             # 2. Extract Basic Identity
             sub = raw_claims.sub
@@ -131,7 +133,7 @@ class IdentityMapper:
             return user_context
 
         except Exception as e:
-            # Catch unexpected exceptions (CoreasonIdentityError already raised above bypasses this)
+            # Catch unexpected exceptions (InvalidTokenError raised above bypasses this)
             if isinstance(e, CoreasonIdentityError):
                 raise
             logger.exception("Unexpected error during identity mapping")
