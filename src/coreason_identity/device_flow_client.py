@@ -54,7 +54,10 @@ class DeviceFlowClient:
             with httpx.Client() as client:
                 response = client.get(discovery_url)
                 response.raise_for_status()
-                config = response.json()
+                try:
+                    config = response.json()
+                except ValueError as e:
+                    raise CoreasonIdentityError(f"Invalid JSON response from OIDC discovery: {e}") from e
 
                 # Fallback to standard Auth0 paths if not in config (though they should be)
                 device_endpoint = config.get("device_authorization_endpoint", f"{self.idp_url}/oauth/device/code")
@@ -92,7 +95,10 @@ class DeviceFlowClient:
             with httpx.Client() as client:
                 response = client.post(url, data=data)
                 response.raise_for_status()
-                resp_data = response.json()
+                try:
+                    resp_data = response.json()
+                except ValueError as e:
+                    raise CoreasonIdentityError(f"Invalid JSON response from initiate flow: {e}") from e
                 return DeviceFlowResponse(**resp_data)
         except httpx.HTTPError as e:
             logger.error(f"Device flow initiation failed: {e}")
