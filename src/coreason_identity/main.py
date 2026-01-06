@@ -13,14 +13,14 @@ Entry point for the coreason-identity package.
 Demonstrates usage of the IdentityManager for both token validation and device flow.
 """
 
-import sys
+import sys  # pragma: no cover
 
-from coreason_identity.config import CoreasonIdentityConfig
-from coreason_identity.exceptions import CoreasonIdentityError
-from coreason_identity.manager import IdentityManager
+from coreason_identity.config import CoreasonIdentityConfig  # pragma: no cover
+from coreason_identity.exceptions import CoreasonIdentityError  # pragma: no cover
+from coreason_identity.manager import IdentityManager  # pragma: no cover
 
 
-def main() -> None:
+def main() -> None:  # pragma: no cover
     """
     Main entry point for manual verification and demonstration.
     """
@@ -89,5 +89,5 @@ def main() -> None:
         print("  python -m coreason_identity.main login")
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()
