@@ -12,18 +12,14 @@
 Complex and edge case tests for coreason-identity.
 """
 
-import time
 from typing import Any, Dict
 from unittest.mock import Mock, patch
 
 import pytest
 from authlib.jose import JsonWebKey, jwt
-
 from coreason_identity.device_flow_client import DeviceFlowClient
 from coreason_identity.exceptions import (
     CoreasonIdentityError,
-    InvalidTokenError,
-    SignatureVerificationError,
 )
 from coreason_identity.identity_mapper import IdentityMapper
 from coreason_identity.models import DeviceFlowResponse, TokenResponse
