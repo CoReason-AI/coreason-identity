@@ -8,19 +8,18 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
-import os
 import shutil
 import subprocess
 import tarfile
 import zipfile
+from collections.abc import Generator
 from pathlib import Path
-from typing import List
 
 import pytest
 
 
 @pytest.fixture(scope="module")
-def build_artifacts() -> Path:
+def build_artifacts() -> Generator[Path, None, None]:
     """
     Builds the project artifacts (sdist and wheel) and returns the path to the dist directory.
     Cleans up before and after.
@@ -72,7 +71,9 @@ def test_sdist_contents(build_artifacts: Path) -> None:
     # Note: explicit checks for files that should NOT be there
 
     # AGENTS.md should be excluded
-    assert not has_file("/AGENTS.md") and not any(f.endswith("AGENTS.md") for f in filenames), "AGENTS.md should be excluded from sdist"
+    assert not has_file("/AGENTS.md") and not any(f.endswith("AGENTS.md") for f in filenames), (
+        "AGENTS.md should be excluded from sdist"
+    )
 
     # Tests should be excluded
     # Note: filenames usually look like 'pkg-ver/tests/...' if included
