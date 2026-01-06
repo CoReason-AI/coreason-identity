@@ -53,34 +53,35 @@ def test_sdist_contents(build_artifacts: Path) -> None:
     with tarfile.open(sdist_path, "r:gz") as tar:
         filenames = tar.getnames()
 
-    # Normalize filenames (remove the top-level directory which is usually name-version/)
-    # We just check if expected files exist inside that structure.
-    # Example: coreason_identity-0.1.0/src/coreason_identity/__init__.py
-
     # Helper to check if a relative path exists in the tarball
     def has_file(pattern: str) -> bool:
         return any(pattern in f for f in filenames)
 
     # Mandatory inclusions
     assert has_file("src/coreason_identity/__init__.py"), "Source code missing from sdist"
+    assert has_file("src/coreason_identity/utils/logger.py"), "Nested source code missing from sdist"
     assert has_file("pyproject.toml"), "pyproject.toml missing from sdist"
     assert has_file("README.md"), "README.md missing from sdist"
     assert has_file("LICENSE"), "LICENSE missing from sdist"
+    assert has_file("NOTICE"), "NOTICE file missing from sdist"
 
     # Mandatory exclusions
-    # Note: explicit checks for files that should NOT be there
+    # Dev/Infra files
+    excluded_patterns = [
+        "/AGENTS.md",
+        "/Dockerfile",
+        "/mkdocs.yml",
+        "/codecov.yml",
+        "/.pre-commit-config.yaml",
+        "/.github",
+        "/tests/",
+        "/docs/",
+    ]
 
-    # AGENTS.md should be excluded
-    assert not has_file("/AGENTS.md") and not any(f.endswith("AGENTS.md") for f in filenames), (
-        "AGENTS.md should be excluded from sdist"
-    )
-
-    # Tests should be excluded
-    # Note: filenames usually look like 'pkg-ver/tests/...' if included
-    assert not any("/tests/" in f for f in filenames), "tests/ directory should be excluded from sdist"
-
-    # Github workflows
-    assert not any(".github" in f for f in filenames), ".github directory should be excluded from sdist"
+    for pattern in excluded_patterns:
+        assert not has_file(pattern) and not any(f.endswith(pattern.lstrip("/")) for f in filenames), (
+            f"{pattern} should be excluded from sdist"
+        )
 
 
 def test_wheel_contents(build_artifacts: Path) -> None:
@@ -94,13 +95,35 @@ def test_wheel_contents(build_artifacts: Path) -> None:
     with zipfile.ZipFile(wheel_path, "r") as z:
         filenames = z.namelist()
 
-    # Wheel layout is different: it puts src content at root (if configured right) or under package name.
-    # With poetry src layout, it should be:
-    # coreason_identity/__init__.py
-    # coreason_identity-0.1.0.dist-info/...
+        # Check Metadata
+        dist_info = [f for f in filenames if f.endswith(".dist-info/METADATA")]
+        assert len(dist_info) == 1, "Could not find METADATA file in wheel"
+        metadata = z.read(dist_info[0]).decode("utf-8")
 
+        # Poetry/Packaging might use underscore or hyphen. Match the pyproject.toml name.
+        assert "Name: coreason_identity" in metadata, "Incorrect Name in METADATA"
+        assert "Version: 0.1.0" in metadata, "Incorrect Version in METADATA"
+
+    # Mandatory inclusions
     assert "coreason_identity/__init__.py" in filenames, "Package root missing in wheel"
+    assert "coreason_identity/utils/logger.py" in filenames, "Nested source missing in wheel"
+
+    # Check that NOTICE is in the dist-info directory (standard for wheels)
+    # or at the root? Usually standard licenses go to dist-info.
+    # Poetry puts them in dist-info.
+    assert any(f.endswith(".dist-info/NOTICE") for f in filenames) or "NOTICE" in filenames, "NOTICE missing from wheel"
 
     # Exclusions
-    assert "AGENTS.md" not in filenames, "AGENTS.md should be excluded from wheel"
+    excluded_files = [
+        "AGENTS.md",
+        "Dockerfile",
+        "mkdocs.yml",
+        "codecov.yml",
+        ".pre-commit-config.yaml",
+    ]
+
+    for f in excluded_files:
+        assert f not in filenames, f"{f} should be excluded from wheel"
+
     assert not any(f.startswith("tests/") for f in filenames), "tests/ should be excluded from wheel"
+    assert not any(f.startswith("docs/") for f in filenames), "docs/ should be excluded from wheel"
