@@ -15,11 +15,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from authlib.jose.errors import BadSignatureError
-from coreason_identity.oidc_provider import OIDCProvider
-from coreason_identity.validator import TokenValidator
 from opentelemetry.sdk.trace import Tracer, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+
+from coreason_identity.oidc_provider import OIDCProvider
+from coreason_identity.validator import TokenValidator
 
 
 class MockClaims(dict[str, Any]):
