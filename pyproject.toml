@@ -30,6 +30,7 @@ Documentation = "https://github.com/CoReason-AI/coreason_identity"
 
 [tool.poetry]
 packages = [{include = "coreason_identity", from = "src"}]
+include = [{ path = "NOTICE", format = ["sdist", "wheel"] }]
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2.2"
