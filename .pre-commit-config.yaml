@@ -26,7 +26,7 @@ repos:
           - email-validator
           - opentelemetry-api
           - opentelemetry-sdk
-  - repo: https://github.com/AleksaC/hadolint-py
-    rev: v2.14.0
+  - repo: https://github.com/coatl-dev/hadolint-coatl
+    rev: 2.14.0
     hooks:
       - id: hadolint
