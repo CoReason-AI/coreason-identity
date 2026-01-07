@@ -15,7 +15,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 from authlib.jose.errors import InvalidClaimError
 from coreason_identity.config import CoreasonIdentityConfig
-from coreason_identity.exceptions import InvalidAudienceError
+from coreason_identity.exceptions import (
+    CoreasonIdentityError,
+    InvalidAudienceError,
+    InvalidTokenError,
+)
 from coreason_identity.manager import IdentityManager
 from coreason_identity.utils.logger import logger
 
@@ -157,3 +161,82 @@ def test_pii_redaction_in_logs(identity_manager: IdentityManager, log_capture: L
 
         # 4. Specific message format check (fuzzy match)
         assert f"Token validated for user {expected_hash}" in full_log_text
+
+
+class TestSecurityEdgeCases:
+    """
+    Additional complex and edge case tests for security resilience.
+    """
+
+    def test_malformed_token_formats(self, identity_manager: IdentityManager) -> None:
+        """
+        AuthN Edge Case: Verify rejection of invalid Authorization header formats.
+        """
+        # 1. Missing header (empty string passed to manager)
+        with pytest.raises(InvalidTokenError, match="Missing or invalid Authorization header"):
+            identity_manager.validate_token("")
+
+        # 2. "Bearer" only (no token)
+        with pytest.raises(InvalidTokenError):
+            identity_manager.validate_token("Bearer")
+
+        # 3. "Bearer " only (empty token) -> Validator should fail or Manager should strip
+        # Manager strips "Bearer " -> results in empty string. Validator might fail on empty.
+        # Let's check IdentityManager.validate_token implementation:
+        # token = auth_header[7:] -> ""
+        # Mock validator behaviour for empty string:
+        mock_validator = cast(MagicMock, identity_manager.validator)
+        mock_validator.validate_token.side_effect = InvalidTokenError("Empty token")
+
+        with pytest.raises(InvalidTokenError):
+            identity_manager.validate_token("Bearer ")
+
+        # 4. Wrong scheme "Basic"
+        with pytest.raises(InvalidTokenError, match="Must start with 'Bearer '"):
+            identity_manager.validate_token("Basic dXNlcjpwYXNz")
+
+        # 5. Wrong scheme "Token"
+        with pytest.raises(InvalidTokenError, match="Must start with 'Bearer '"):
+            identity_manager.validate_token("Token 123")
+
+    def test_jwks_fetch_failure(self, identity_manager: IdentityManager) -> None:
+        """
+        Resilience Edge Case: Verify behavior when JWKS cannot be fetched (e.g., IdP down).
+        """
+        mock_validator = cast(MagicMock, identity_manager.validator)
+        mock_validator.validate_token.side_effect = CoreasonIdentityError("Failed to fetch JWKS")
+
+        with pytest.raises(CoreasonIdentityError, match="Failed to fetch JWKS"):
+            identity_manager.validate_token("Bearer token")
+
+    def test_unicode_pii_logging(self, log_capture: List[str]) -> None:
+        """
+        Logging Edge Case: Verify that Unicode characters in PII are handled and hashed correctly.
+        """
+        unicode_user_id = "user_🚀_ñ_123"
+        expected_hash = hashlib.sha256(unicode_user_id.encode("utf-8")).hexdigest()
+        token_string = "unicode.jwt.token"
+
+        from coreason_identity.oidc_provider import OIDCProvider
+        from coreason_identity.validator import TokenValidator
+
+        mock_oidc = MagicMock(spec=OIDCProvider)
+        mock_oidc.get_jwks.return_value = {"keys": []}
+
+        validator = TokenValidator(mock_oidc, audience="aud")
+
+        with patch.object(validator.jwt, "decode") as mock_decode:
+            mock_claims_dict = {"sub": unicode_user_id, "aud": "aud", "exp": 1234567890}
+
+            class MockClaims(dict[str, Any]):
+                def validate(self) -> None:
+                    pass
+
+            mock_decode.return_value = MockClaims(mock_claims_dict)
+
+            validator.validate_token(token_string)
+
+            full_log_text = "\n".join(log_capture)
+
+            assert unicode_user_id not in full_log_text
+            assert expected_hash in full_log_text
