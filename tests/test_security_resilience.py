@@ -9,12 +9,11 @@
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
 import hashlib
-from typing import List, Generator
+from typing import Any, Generator, List, cast
 from unittest.mock import MagicMock, patch
 
 import pytest
 from authlib.jose.errors import InvalidClaimError
-
 from coreason_identity.config import CoreasonIdentityConfig
 from coreason_identity.exceptions import InvalidAudienceError
 from coreason_identity.manager import IdentityManager
@@ -40,7 +39,7 @@ def identity_manager(mock_config: CoreasonIdentityConfig) -> IdentityManager:
     ):
         manager = IdentityManager(mock_config)
         # We need to re-attach the mock validator instance to be accessible in tests
-        manager.validator = MockValidator.return_value  # type: ignore
+        manager.validator = MockValidator.return_value
         return manager
 
 
@@ -63,7 +62,8 @@ def test_audience_mismatch_rejection(identity_manager: IdentityManager) -> None:
     token = "some.jwt.token"
 
     # Configure the mock validator to raise InvalidAudienceError
-    identity_manager.validator.validate_token.side_effect = InvalidAudienceError("Invalid audience")
+    mock_validator = cast(MagicMock, identity_manager.validator)
+    mock_validator.validate_token.side_effect = InvalidAudienceError("Invalid audience")
 
     with pytest.raises(InvalidAudienceError) as exc_info:
         identity_manager.validate_token(f"Bearer {token}")
@@ -114,8 +114,8 @@ def test_pii_redaction_in_logs(identity_manager: IdentityManager, log_capture: L
     # Mock validation success on the identity manager itself won't trigger the logging code
     # inside Validator. We need to construct a real Validator or use the one we construct below.
 
-    from coreason_identity.validator import TokenValidator
     from coreason_identity.oidc_provider import OIDCProvider
+    from coreason_identity.validator import TokenValidator
 
     mock_oidc = MagicMock(spec=OIDCProvider)
     mock_oidc.get_jwks.return_value = {"keys": []}
@@ -132,8 +132,8 @@ def test_pii_redaction_in_logs(identity_manager: IdentityManager, log_capture: L
         # 2. It must have .validate()
         # 3. dict(claims) must work
 
-        class MockClaims(dict):
-            def validate(self):
+        class MockClaims(dict[str, Any]):
+            def validate(self) -> None:
                 pass
 
         claims_obj = MockClaims(mock_claims_dict)
