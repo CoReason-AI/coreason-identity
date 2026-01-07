@@ -20,7 +20,7 @@
 ## **1. Project Overview**
 
 * **Type:** Python Application / Library
-* **Language:** Python 3.12, 3.13, 3.14 (Latest 3 versions)
+* **Language:** Python 3.11, 3.12, 3.13, 3.14
 * **Package Manager:** Poetry
 * **License:** Prosperity Public License 3.0 (Proprietary/Dual-licensed)
 * **Project Structure:** src layout (source code resides in src/coreason_identity)
