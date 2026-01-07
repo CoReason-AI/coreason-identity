@@ -12,7 +12,6 @@ from typing import Any, Generator
 from unittest.mock import patch
 
 import pytest
-
 from coreason_identity.config import CoreasonIdentityConfig
 from coreason_identity.exceptions import CoreasonIdentityError, InvalidTokenError
 from coreason_identity.manager import IdentityManager
