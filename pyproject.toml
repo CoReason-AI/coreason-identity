@@ -1,15 +1,37 @@
-[tool.poetry]
+[project]
 name = "coreason_identity"
 version = "0.1.0"
 description = "Decoupled authentication middleware, abstracting OIDC and OAuth2 protocols from the main application."
-authors = ["Gowtham A Rao <gowtham.rao@coreason.ai>"]
-license = "Prosperity-3.0"
 readme = "README.md"
-packages = [{include = "coreason_identity", from = "src"}]
+requires-python = ">=3.11, <3.15"
+authors = [
+    { name = "Gowtham A Rao", email = "gowtham.rao@coreason.ai" },
+]
+license = {text = "Prosperity-3.0"}
+classifiers = [
+    "License :: Other/Proprietary License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "loguru>=0.7.2,<0.8.0",
+    "authlib>=1.6.6,<2.0.0",
+    "pydantic>=2.12.5,<3.0.0",
+    "pydantic-settings>=2.12.0,<3.0.0",
+    "httpx>=0.28.1,<0.29.0",
+    "email-validator>=2.3.0,<3.0.0",
+    "opentelemetry-api>=1.39.1,<2.0.0",
+]
 
-[tool.poetry.dependencies]
-python = ">=3.12, <3.15"
-loguru = "^0.7.2"
+[project.urls]
+Homepage = "https://github.com/CoReason-AI/coreason_identity"
+Repository = "https://github.com/CoReason-AI/coreason_identity"
+Documentation = "https://github.com/CoReason-AI/coreason_identity"
+
+[tool.poetry]
+packages = [{include = "coreason_identity", from = "src"}]
+include = [{ path = "NOTICE", format = ["sdist", "wheel"] }]
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2.2"
@@ -18,44 +40,26 @@ pre-commit = "^3.7.1"
 pytest-cov = "^5.0.0"
 mkdocs = "^1.6.0"
 mkdocs-material = "^9.5.26"
+opentelemetry-sdk = "^1.39.1"
+mypy = "^1.19.1"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
-[project]
-name = "coreason_identity"
-version = "0.1.0"
-description = "Decoupled authentication middleware, abstracting OIDC and OAuth2 protocols from the main application."
-readme = "README.md"
-requires-python = ">=3.11"
-authors = [
-    { name = "Gowtham A Rao", email = "gowtham.rao@coreason.ai" },
-]
-license = { file = "LICENSE" }
-classifiers = [
-    "License :: Other/Proprietary License",
-    "Programming Language :: Python :: 3.12",
-    "Operating System :: OS Independent",
-]
-
-[project.urls]
-Homepage = "https://github.com/CoReason-AI/coreason_identity"
-Repository = "https://github.com/CoReason-AI/coreason_identity"
-Documentation = "https://github.com/CoReason-AI/coreason_identity"
-
 [tool.ruff]
 line-length = 120
-target-version = "py312"
+target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "B", "I"]
 ignore = []
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.11"
 strict = true
 ignore_missing_imports = true
+plugins = ["pydantic.mypy"]
 
 [tool.pytest.ini_options]
 addopts = "--cov=src --cov-report=term-missing --cov-fail-under=100"
