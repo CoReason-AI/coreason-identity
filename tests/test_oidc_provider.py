@@ -8,11 +8,13 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
-from unittest.mock import Mock, patch, AsyncMock
-import pytest
+from unittest.mock import AsyncMock, Mock, patch
+
 import httpx
+import pytest
 from coreason_identity.exceptions import CoreasonIdentityError
 from coreason_identity.oidc_provider import OIDCProvider, OIDCProviderAsync
+
 
 def create_mock_response(json_data=None, status_code=200):
     mock_resp = Mock()
@@ -24,11 +26,14 @@ def create_mock_response(json_data=None, status_code=200):
     )
     return mock_resp
 
+
 # --- Async Tests ---
+
 
 @pytest.fixture
 def oidc_provider_async() -> OIDCProviderAsync:
     return OIDCProviderAsync(discovery_url="https://test.auth0.com/.well-known/openid-configuration")
+
 
 @pytest.mark.asyncio
 async def test_async_initialization() -> None:
@@ -37,12 +42,13 @@ async def test_async_initialization() -> None:
     assert provider.cache_ttl == 1800
     assert provider._jwks_cache is None
 
+
 @pytest.mark.asyncio
 async def test_async_get_jwks_success(oidc_provider_async: OIDCProviderAsync) -> None:
     mock_client = AsyncMock(spec=httpx.AsyncClient)
     mock_client.get.side_effect = [
         create_mock_response({"jwks_uri": "https://test.auth0.com/jwks.json"}),
-        create_mock_response({"keys": [{"kid": "1", "kty": "RSA"}]})
+        create_mock_response({"keys": [{"kid": "1", "kty": "RSA"}]}),
     ]
 
     oidc_provider_async._client = mock_client
@@ -54,12 +60,13 @@ async def test_async_get_jwks_success(oidc_provider_async: OIDCProviderAsync) ->
     assert jwks == {"keys": [{"kid": "1", "kty": "RSA"}]}
     assert mock_client.get.call_count == 2
 
+
 @pytest.mark.asyncio
 async def test_async_get_jwks_caching(oidc_provider_async: OIDCProviderAsync) -> None:
     mock_client = AsyncMock(spec=httpx.AsyncClient)
     mock_client.get.side_effect = [
         create_mock_response({"jwks_uri": "https://test.auth0.com/jwks.json"}),
-        create_mock_response({"keys": [{"kid": "1"}]})
+        create_mock_response({"keys": [{"kid": "1"}]}),
     ]
 
     oidc_provider_async._client = mock_client
@@ -73,6 +80,7 @@ async def test_async_get_jwks_caching(oidc_provider_async: OIDCProviderAsync) ->
     await oidc_provider_async.get_jwks()
     assert mock_client.get.call_count == 2
 
+
 @pytest.mark.asyncio
 async def test_async_fetch_config_fail(oidc_provider_async: OIDCProviderAsync) -> None:
     mock_client = AsyncMock(spec=httpx.AsyncClient)
@@ -84,12 +92,13 @@ async def test_async_fetch_config_fail(oidc_provider_async: OIDCProviderAsync) -
     with pytest.raises(CoreasonIdentityError, match="Failed to fetch OIDC configuration"):
         await oidc_provider_async.get_jwks()
 
+
 @pytest.mark.asyncio
 async def test_async_fetch_jwks_fail(oidc_provider_async: OIDCProviderAsync) -> None:
     mock_client = AsyncMock(spec=httpx.AsyncClient)
     mock_client.get.side_effect = [
         create_mock_response({"jwks_uri": "https://test.auth0.com/jwks.json"}),
-        httpx.HTTPError("Network Error")
+        httpx.HTTPError("Network Error"),
     ]
 
     oidc_provider_async._client = mock_client
@@ -98,10 +107,11 @@ async def test_async_fetch_jwks_fail(oidc_provider_async: OIDCProviderAsync) -> 
     with pytest.raises(CoreasonIdentityError, match="Failed to fetch JWKS"):
         await oidc_provider_async.get_jwks()
 
+
 @pytest.mark.asyncio
 async def test_async_missing_jwks_uri(oidc_provider_async: OIDCProviderAsync) -> None:
     mock_client = AsyncMock(spec=httpx.AsyncClient)
-    mock_client.get.return_value = create_mock_response({"foo": "bar"}) # Missing jwks_uri
+    mock_client.get.return_value = create_mock_response({"foo": "bar"})  # Missing jwks_uri
 
     oidc_provider_async._client = mock_client
     await oidc_provider_async.__aenter__()
@@ -109,11 +119,14 @@ async def test_async_missing_jwks_uri(oidc_provider_async: OIDCProviderAsync) ->
     with pytest.raises(CoreasonIdentityError, match="does not contain 'jwks_uri'"):
         await oidc_provider_async.get_jwks()
 
+
 # --- Sync Facade Tests ---
+
 
 @pytest.fixture
 def oidc_provider_sync() -> OIDCProvider:
     return OIDCProvider(discovery_url="https://test.auth0.com/.well-known/openid-configuration")
+
 
 def test_sync_get_jwks_success(oidc_provider_sync: OIDCProvider) -> None:
     with patch("coreason_identity.oidc_provider.httpx.AsyncClient") as MockClientCls:
@@ -121,13 +134,14 @@ def test_sync_get_jwks_success(oidc_provider_sync: OIDCProvider) -> None:
         MockClientCls.return_value = mock_client
         mock_client.get.side_effect = [
             create_mock_response({"jwks_uri": "https://test.auth0.com/jwks.json"}),
-            create_mock_response({"keys": [{"kid": "1"}]})
+            create_mock_response({"keys": [{"kid": "1"}]}),
         ]
 
         with oidc_provider_sync as provider:
-             jwks = provider.get_jwks()
+            jwks = provider.get_jwks()
 
         assert jwks == {"keys": [{"kid": "1"}]}
+
 
 def test_sync_usage_without_context_manager_fails(oidc_provider_sync: OIDCProvider) -> None:
     with pytest.raises(CoreasonIdentityError, match="Context not started"):

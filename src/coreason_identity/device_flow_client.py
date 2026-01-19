@@ -72,7 +72,7 @@ class DeviceFlowClientAsync:
             return self._endpoints
 
         if not self._client:
-             raise CoreasonIdentityError("Client not initialized. Use 'async with' context manager.")
+            raise CoreasonIdentityError("Client not initialized. Use 'async with' context manager.")
 
         discovery_url = f"{self.idp_url}/.well-known/openid-configuration"
 
@@ -105,7 +105,7 @@ class DeviceFlowClientAsync:
         url = endpoints["device_authorization_endpoint"]
 
         if not self._client:
-             raise CoreasonIdentityError("Client not initialized. Use 'async with' context manager.")
+            raise CoreasonIdentityError("Client not initialized. Use 'async with' context manager.")
 
         data = {
             "client_id": self.client_id,
@@ -137,7 +137,7 @@ class DeviceFlowClientAsync:
         url = endpoints["token_endpoint"]
 
         if not self._client:
-             raise CoreasonIdentityError("Client not initialized. Use 'async with' context manager.")
+            raise CoreasonIdentityError("Client not initialized. Use 'async with' context manager.")
 
         device_code = device_response.device_code
         interval = device_response.interval
@@ -230,10 +230,10 @@ class DeviceFlowClient:
 
     def initiate_flow(self, audience: Optional[str] = None) -> DeviceFlowResponse:
         if not self._portal:
-             raise CoreasonIdentityError("Context not started. Use 'with DeviceFlowClient(...):'.")
+            raise CoreasonIdentityError("Context not started. Use 'with DeviceFlowClient(...):'.")
         return self._portal.call(self._async.initiate_flow, audience)
 
     def poll_token(self, device_response: DeviceFlowResponse) -> TokenResponse:
         if not self._portal:
-             raise CoreasonIdentityError("Context not started. Use 'with DeviceFlowClient(...):'.")
+            raise CoreasonIdentityError("Context not started. Use 'with DeviceFlowClient(...):'.")
         return self._portal.call(self._async.poll_token, device_response)

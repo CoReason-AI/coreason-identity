@@ -8,18 +8,21 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from coreason_identity.config import CoreasonIdentityConfig
-from coreason_identity.manager import IdentityManager
 from coreason_identity.exceptions import CoreasonIdentityError, InvalidTokenError
+from coreason_identity.manager import IdentityManager
 from coreason_identity.models import DeviceFlowResponse, TokenResponse
 
+
 @pytest.fixture
-def config():
+def config() -> CoreasonIdentityConfig:
     return CoreasonIdentityConfig(domain="test.com", audience="aud", client_id="cid")
 
-def test_manager_sync_usage(config):
+
+def test_manager_sync_usage(config: CoreasonIdentityConfig) -> None:
     with patch("coreason_identity.manager.IdentityManagerAsync") as MockAsync:
         mock_instance = MockAsync.return_value
         mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
@@ -36,16 +39,20 @@ def test_manager_sync_usage(config):
         mock_instance.__aexit__.assert_called_once()
         mock_instance.validate_token.assert_awaited_once()
 
-def test_manager_sync_no_context_fail(config):
+
+def test_manager_sync_no_context_fail(config: CoreasonIdentityConfig) -> None:
     mgr = IdentityManager(config)
     with pytest.raises(CoreasonIdentityError, match="Context not started"):
         mgr.validate_token("token")
 
-def test_init_strict_issuer(config):
-    with patch("coreason_identity.manager.OIDCProviderAsync") as MockOIDC, \
-         patch("coreason_identity.manager.TokenValidatorAsync") as MockValidator:
 
+def test_init_strict_issuer(config: CoreasonIdentityConfig) -> None:
+    with (
+        patch("coreason_identity.manager.OIDCProviderAsync") as MockOIDC,
+        patch("coreason_identity.manager.TokenValidatorAsync") as MockValidator,
+    ):
         from coreason_identity.manager import IdentityManagerAsync
+
         IdentityManagerAsync(config)
 
         expected_issuer = "https://test.com/"
@@ -53,14 +60,15 @@ def test_init_strict_issuer(config):
         args, kwargs = MockValidator.call_args
         assert kwargs["issuer"] == expected_issuer
 
-def test_device_flow_methods(config):
+
+def test_device_flow_methods(config: CoreasonIdentityConfig) -> None:
     with patch("coreason_identity.manager.IdentityManagerAsync") as MockAsync:
         mock_instance = MockAsync.return_value
         mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
         mock_instance.__aexit__ = AsyncMock()
 
         flow_resp = DeviceFlowResponse(
-             device_code="dc", user_code="uc", verification_uri="uri", expires_in=300, interval=5
+            device_code="dc", user_code="uc", verification_uri="uri", expires_in=300, interval=5
         )
         token_resp = TokenResponse(access_token="at", token_type="Bearer", expires_in=3600)
 
@@ -78,12 +86,15 @@ def test_device_flow_methods(config):
         mock_instance.start_device_login.assert_awaited_once()
         mock_instance.await_device_token.assert_awaited_once()
 
-def test_validate_token_invalid_header(config):
+
+def test_validate_token_invalid_header(config: CoreasonIdentityConfig) -> None:
     # This logic is in IdentityManagerAsync.validate_token
     # We should test IdentityManagerAsync directly for logic coverage
     from coreason_identity.manager import IdentityManagerAsync
+
     mgr = IdentityManagerAsync(config)
 
     import asyncio
+
     with pytest.raises(InvalidTokenError):
         asyncio.run(mgr.validate_token("Invalid"))

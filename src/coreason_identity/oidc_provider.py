@@ -102,7 +102,7 @@ class OIDCProviderAsync:
                 return self._jwks_cache
 
         if self._lock is None:
-             raise CoreasonIdentityError("Lock not initialized. Use 'async with' context manager.")
+            raise CoreasonIdentityError("Lock not initialized. Use 'async with' context manager.")
 
         async with self._lock:
             # Check again inside lock
@@ -156,5 +156,5 @@ class OIDCProvider:
     def get_jwks(self, force_refresh: bool = False) -> Dict[str, Any]:
         """Returns the JWKS, using the cache if valid."""
         if not self._portal:
-             raise CoreasonIdentityError("Context not started. Use 'with OIDCProvider(...):'.")
+            raise CoreasonIdentityError("Context not started. Use 'with OIDCProvider(...):'.")
         return self._portal.call(self._async.get_jwks, force_refresh)

@@ -8,38 +8,45 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
+import time
+from unittest.mock import AsyncMock
+
 import pytest
-from unittest.mock import Mock, AsyncMock, patch
 from authlib.jose import JsonWebKey, jwt
-from coreason_identity.validator import TokenValidator, TokenValidatorAsync
-from coreason_identity.oidc_provider import OIDCProviderAsync, OIDCProvider
 from coreason_identity.exceptions import (
     CoreasonIdentityError,
     InvalidAudienceError,
+    InvalidTokenError,
     SignatureVerificationError,
     TokenExpiredError,
-    InvalidTokenError
 )
-import time
+from coreason_identity.oidc_provider import OIDCProvider, OIDCProviderAsync
+from coreason_identity.validator import TokenValidator, TokenValidatorAsync
+
 
 @pytest.fixture
 def key_pair():
     return JsonWebKey.generate_key("RSA", 2048, is_private=True)
 
+
 @pytest.fixture
 def jwks(key_pair):
     return {"keys": [key_pair.as_dict(private=False)]}
+
 
 def create_token(key, claims, headers=None):
     if headers is None:
         headers = {"alg": "RS256", "kid": key.as_dict()["kid"]}
     return jwt.encode(headers, claims, key).decode("utf-8")
 
+
 # --- Async Tests ---
+
 
 @pytest.fixture
 def async_provider():
     return AsyncMock(spec=OIDCProviderAsync)
+
 
 @pytest.mark.asyncio
 async def test_async_validate_success(async_provider, key_pair, jwks):
@@ -53,6 +60,7 @@ async def test_async_validate_success(async_provider, key_pair, jwks):
     res = await validator.validate_token(token)
     assert res["sub"] == "user"
 
+
 @pytest.mark.asyncio
 async def test_async_validate_expired(async_provider, key_pair, jwks):
     async_provider.get_jwks.return_value = jwks
@@ -64,6 +72,7 @@ async def test_async_validate_expired(async_provider, key_pair, jwks):
     with pytest.raises(TokenExpiredError):
         await validator.validate_token(token)
 
+
 @pytest.mark.asyncio
 async def test_async_validate_invalid_aud(async_provider, key_pair, jwks):
     async_provider.get_jwks.return_value = jwks
@@ -74,6 +83,7 @@ async def test_async_validate_invalid_aud(async_provider, key_pair, jwks):
 
     with pytest.raises(InvalidAudienceError):
         await validator.validate_token(token)
+
 
 @pytest.mark.asyncio
 async def test_async_validate_bad_sig(async_provider, key_pair, jwks):
@@ -89,6 +99,7 @@ async def test_async_validate_bad_sig(async_provider, key_pair, jwks):
     with pytest.raises(SignatureVerificationError):
         await validator.validate_token(token)
 
+
 @pytest.mark.asyncio
 async def test_async_validate_malformed(async_provider, jwks):
     async_provider.get_jwks.return_value = jwks
@@ -96,6 +107,7 @@ async def test_async_validate_malformed(async_provider, jwks):
 
     with pytest.raises(CoreasonIdentityError):
         await validator.validate_token("not.a.token")
+
 
 @pytest.mark.asyncio
 async def test_async_validate_refresh_keys(async_provider, key_pair, jwks):
@@ -112,6 +124,7 @@ async def test_async_validate_refresh_keys(async_provider, key_pair, jwks):
     assert async_provider.get_jwks.call_count == 2
     # Check force_refresh=True on second call
     assert async_provider.get_jwks.call_args_list[1][1]["force_refresh"] is True
+
 
 @pytest.mark.asyncio
 async def test_async_validate_alg_none(async_provider, jwks):
@@ -140,10 +153,12 @@ async def test_async_validate_alg_none(async_provider, jwks):
 
     # Validator should reject it because we initialized JsonWebToken(["RS256"])
 
-    with pytest.raises(InvalidTokenError): # Or SignatureVerificationError depending on how Authlib handles it
+    with pytest.raises(InvalidTokenError):  # Or SignatureVerificationError depending on how Authlib handles it
         await validator.validate_token(token)
 
+
 # --- Sync Facade Tests ---
+
 
 def test_sync_validate_delegation(key_pair, jwks):
     mock_async_provider = AsyncMock(spec=OIDCProviderAsync)

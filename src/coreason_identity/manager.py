@@ -15,7 +15,6 @@ IdentityManager component for orchestrating authentication and authorization.
 from typing import Any, Optional
 from urllib.parse import urljoin
 
-import anyio
 import httpx
 from anyio.from_thread import start_blocking_portal
 
@@ -133,10 +132,10 @@ class IdentityManagerAsync:
             # Must enter it to bind resources
             await self.device_client.__aenter__()
         else:
-             # If reusing, ensure props are updated if needed, but usually strictly init once.
-             # If scope changes? DeviceFlowClientAsync stores scope.
-             # We recreate if needed? For now assume one client per manager usage.
-             pass
+            # If reusing, ensure props are updated if needed, but usually strictly init once.
+            # If scope changes? DeviceFlowClientAsync stores scope.
+            # We recreate if needed? For now assume one client per manager usage.
+            pass
 
         return await self.device_client.initiate_flow(audience=self.config.audience)
 
@@ -183,15 +182,15 @@ class IdentityManager:
 
     def validate_token(self, auth_header: str) -> UserContext:
         if not self._portal:
-             raise CoreasonIdentityError("Context not started. Use 'with IdentityManager(...):'.")
+            raise CoreasonIdentityError("Context not started. Use 'with IdentityManager(...):'.")
         return self._portal.call(self._async.validate_token, auth_header)
 
     def start_device_login(self, scope: Optional[str] = None) -> DeviceFlowResponse:
         if not self._portal:
-             raise CoreasonIdentityError("Context not started. Use 'with IdentityManager(...):'.")
+            raise CoreasonIdentityError("Context not started. Use 'with IdentityManager(...):'.")
         return self._portal.call(self._async.start_device_login, scope)
 
     def await_device_token(self, flow: DeviceFlowResponse) -> TokenResponse:
         if not self._portal:
-             raise CoreasonIdentityError("Context not started. Use 'with IdentityManager(...):'.")
+            raise CoreasonIdentityError("Context not started. Use 'with IdentityManager(...):'.")
         return self._portal.call(self._async.await_device_token, flow)

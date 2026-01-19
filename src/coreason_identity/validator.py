@@ -184,7 +184,7 @@ class TokenValidator:
         """
         # If wrapped OIDC provider has an active portal, run on that portal
         if self._oidc_provider_sync and getattr(self._oidc_provider_sync, "_portal", None):
-             return self._oidc_provider_sync._portal.call(self._async.validate_token, token)
+            return self._oidc_provider_sync._portal.call(self._async.validate_token, token)
 
         # Fallback: run in a new loop (stateless execution)
         return anyio.run(self._async.validate_token, token)

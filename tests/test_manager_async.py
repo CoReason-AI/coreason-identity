@@ -8,19 +8,22 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
-from unittest.mock import Mock, patch, AsyncMock
-import pytest
+from unittest.mock import AsyncMock, patch
+
 import httpx
-from coreason_identity.manager import IdentityManagerAsync
+import pytest
 from coreason_identity.config import CoreasonIdentityConfig
+from coreason_identity.manager import IdentityManagerAsync
 from coreason_identity.models import DeviceFlowResponse, TokenResponse
 
+
 @pytest.fixture
-def config():
+def config() -> CoreasonIdentityConfig:
     return CoreasonIdentityConfig(domain="test.com", audience="aud", client_id="cid")
 
+
 @pytest.mark.asyncio
-async def test_manager_async_lifecycle(config):
+async def test_manager_async_lifecycle(config: CoreasonIdentityConfig) -> None:
     # Test internal client creation and cleanup
     mgr = IdentityManagerAsync(config)
     assert mgr._internal_client is True
@@ -36,8 +39,9 @@ async def test_manager_async_lifecycle(config):
         await mgr.__aexit__(None, None, None)
         mock_close.assert_awaited_once()
 
+
 @pytest.mark.asyncio
-async def test_manager_async_external_client(config):
+async def test_manager_async_external_client(config: CoreasonIdentityConfig) -> None:
     client = AsyncMock(spec=httpx.AsyncClient)
     client.is_closed = False
     mgr = IdentityManagerAsync(config, client=client)
@@ -50,8 +54,9 @@ async def test_manager_async_external_client(config):
     # Should not close external client
     client.aclose.assert_not_called()
 
+
 @pytest.mark.asyncio
-async def test_manager_async_device_flow(config):
+async def test_manager_async_device_flow(config: CoreasonIdentityConfig) -> None:
     mgr = IdentityManagerAsync(config)
     mock_df_client = AsyncMock()
 
@@ -64,7 +69,7 @@ async def test_manager_async_device_flow(config):
 
         # start_device_login
         mock_df_client.initiate_flow.return_value = DeviceFlowResponse(
-             device_code="dc", user_code="uc", verification_uri="uri", expires_in=300, interval=5
+            device_code="dc", user_code="uc", verification_uri="uri", expires_in=300, interval=5
         )
         resp = await mgr.start_device_login()
         assert resp.device_code == "dc"
@@ -74,7 +79,7 @@ async def test_manager_async_device_flow(config):
 
         # await_device_token
         mock_df_client.poll_token.return_value = TokenResponse(
-             access_token="at", token_type="Bearer", expires_in=3600
+            access_token="at", token_type="Bearer", expires_in=3600
         )
         token = await mgr.await_device_token(resp)
         assert token.access_token == "at"
