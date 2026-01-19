@@ -15,6 +15,7 @@ TokenValidator component for validating JWT signatures and claims.
 import hashlib
 from typing import Any, Dict, Optional
 
+import anyio
 from authlib.jose import JsonWebToken
 from authlib.jose.errors import (
     BadSignatureError,
@@ -33,23 +34,23 @@ from coreason_identity.exceptions import (
     SignatureVerificationError,
     TokenExpiredError,
 )
-from coreason_identity.oidc_provider import OIDCProvider
+from coreason_identity.oidc_provider import OIDCProviderAsync
 from coreason_identity.utils.logger import logger
 
 tracer = trace.get_tracer(__name__)
 
 
-class TokenValidator:
+class TokenValidatorAsync:
     """
-    Validates JWT tokens against the IdP's JWKS and standard claims.
+    Validates JWT tokens against the IdP's JWKS and standard claims (Async).
     """
 
-    def __init__(self, oidc_provider: OIDCProvider, audience: str, issuer: Optional[str] = None) -> None:
+    def __init__(self, oidc_provider: OIDCProviderAsync, audience: str, issuer: Optional[str] = None) -> None:
         """
-        Initialize the TokenValidator.
+        Initialize the TokenValidatorAsync.
 
         Args:
-            oidc_provider: The OIDCProvider instance to fetch JWKS.
+            oidc_provider: The OIDCProviderAsync instance to fetch JWKS.
             audience: The expected audience (aud) claim.
             issuer: The expected issuer (iss) claim.
         """
@@ -59,22 +60,9 @@ class TokenValidator:
         # Use a specific JsonWebToken instance to enforce RS256 and reject 'none'
         self.jwt = JsonWebToken(["RS256"])
 
-    def validate_token(self, token: str) -> Dict[str, Any]:
+    async def validate_token(self, token: str) -> Dict[str, Any]:
         """
         Validates the JWT signature and claims.
-
-        Args:
-            token: The raw Bearer token string.
-
-        Returns:
-            The validated claims dictionary.
-
-        Raises:
-            TokenExpiredError: If the token has expired.
-            InvalidAudienceError: If the audience is invalid.
-            SignatureVerificationError: If the signature is invalid.
-            InvalidTokenError: If claims are missing or invalid.
-            CoreasonIdentityError: For unexpected errors.
         """
         with tracer.start_as_current_span("validate_token") as span:
             # Sanitize input
@@ -89,22 +77,25 @@ class TokenValidator:
                 claims_options["iss"] = {"essential": True, "value": self.issuer}
 
             def _decode(jwks: Dict[str, Any]) -> Any:
+                # This is CPU bound
                 claims = self.jwt.decode(token, jwks, claims_options=claims_options)
                 claims.validate()
                 return claims
 
             try:
                 # Fetch JWKS (cached)
-                jwks = self.oidc_provider.get_jwks()
+                jwks = await self.oidc_provider.get_jwks()
 
                 try:
-                    claims = _decode(jwks)
+                    # Offload crypto to thread
+                    claims = await anyio.to_thread.run_sync(_decode, jwks)
                 except (ValueError, BadSignatureError):
                     # If key is missing or signature is bad (potential key rotation), try refreshing keys
                     logger.info("Validation failed with cached keys, refreshing JWKS and retrying...")
                     span.add_event("refreshing_jwks")
-                    jwks = self.oidc_provider.get_jwks(force_refresh=True)
-                    claims = _decode(jwks)
+                    jwks = await self.oidc_provider.get_jwks(force_refresh=True)
+                    # Offload crypto to thread
+                    claims = await anyio.to_thread.run_sync(_decode, jwks)
 
                 payload = dict(claims)
 
@@ -161,3 +152,39 @@ class TokenValidator:
                 span.record_exception(e)
                 span.set_status(Status(StatusCode.ERROR, str(e)))
                 raise CoreasonIdentityError(f"Unexpected error during token validation: {e}") from e
+
+
+class TokenValidator:
+    """
+    Sync Facade for TokenValidatorAsync.
+    """
+
+    def __init__(self, oidc_provider: Any, audience: str, issuer: Optional[str] = None) -> None:
+        """
+        Initialize the TokenValidator.
+
+        Args:
+            oidc_provider: The OIDCProvider (Sync) or OIDCProviderAsync instance.
+            audience: The expected audience (aud) claim.
+            issuer: The expected issuer (iss) claim.
+        """
+        # Handle Sync Facade vs Async instance
+        if hasattr(oidc_provider, "_async"):
+            oidc_async = oidc_provider._async
+            self._oidc_provider_sync = oidc_provider
+        else:
+            oidc_async = oidc_provider
+            self._oidc_provider_sync = None
+
+        self._async = TokenValidatorAsync(oidc_async, audience, issuer)
+
+    def validate_token(self, token: str) -> Dict[str, Any]:
+        """
+        Validates the JWT signature and claims.
+        """
+        # If wrapped OIDC provider has an active portal, run on that portal
+        if self._oidc_provider_sync and getattr(self._oidc_provider_sync, "_portal", None):
+             return self._oidc_provider_sync._portal.call(self._async.validate_token, token)
+
+        # Fallback: run in a new loop (stateless execution)
+        return anyio.run(self._async.validate_token, token)

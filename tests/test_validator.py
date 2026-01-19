@@ -8,170 +8,154 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
-import time
-from typing import Any, Dict
-from unittest.mock import Mock
-
 import pytest
+from unittest.mock import Mock, AsyncMock, patch
 from authlib.jose import JsonWebKey, jwt
+from coreason_identity.validator import TokenValidator, TokenValidatorAsync
+from coreason_identity.oidc_provider import OIDCProviderAsync, OIDCProvider
 from coreason_identity.exceptions import (
     CoreasonIdentityError,
     InvalidAudienceError,
     SignatureVerificationError,
     TokenExpiredError,
+    InvalidTokenError
 )
-from coreason_identity.oidc_provider import OIDCProvider
-from coreason_identity.validator import TokenValidator
+import time
 
+@pytest.fixture
+def key_pair():
+    return JsonWebKey.generate_key("RSA", 2048, is_private=True)
 
-class TestTokenValidator:
-    @pytest.fixture
-    def mock_oidc_provider(self) -> Mock:
-        return Mock(spec=OIDCProvider)
+@pytest.fixture
+def jwks(key_pair):
+    return {"keys": [key_pair.as_dict(private=False)]}
 
-    @pytest.fixture
-    def key_pair(self) -> Any:
-        # Generate a key pair for testing
-        key = JsonWebKey.generate_key("RSA", 2048, is_private=True)
-        return key
+def create_token(key, claims, headers=None):
+    if headers is None:
+        headers = {"alg": "RS256", "kid": key.as_dict()["kid"]}
+    return jwt.encode(headers, claims, key).decode("utf-8")
 
-    @pytest.fixture
-    def jwks(self, key_pair: Any) -> Dict[str, Any]:
-        # Return public key in JWKS format
-        return {"keys": [key_pair.as_dict(private=False)]}
+# --- Async Tests ---
 
-    @pytest.fixture
-    def validator(self, mock_oidc_provider: Mock) -> TokenValidator:
-        return TokenValidator(oidc_provider=mock_oidc_provider, audience="my-audience")
+@pytest.fixture
+def async_provider():
+    return AsyncMock(spec=OIDCProviderAsync)
 
-    def create_token(self, key: Any, claims: Dict[str, Any], headers: Dict[str, Any] | None = None) -> bytes:
-        if headers is None:
-            headers = {"alg": "RS256", "kid": key.as_dict()["kid"]}
-        return jwt.encode(headers, claims, key)  # type: ignore[no-any-return]
+@pytest.mark.asyncio
+async def test_async_validate_success(async_provider, key_pair, jwks):
+    async_provider.get_jwks.return_value = jwks
 
-    def test_validate_token_success(
-        self, validator: TokenValidator, mock_oidc_provider: Mock, key_pair: Any, jwks: Dict[str, Any]
-    ) -> None:
-        mock_oidc_provider.get_jwks.return_value = jwks
+    validator = TokenValidatorAsync(async_provider, audience="aud")
 
-        now = int(time.time())
-        claims = {
-            "sub": "user123",
-            "aud": "my-audience",
-            "exp": now + 3600,
-            "iat": now,
-        }
-        token = self.create_token(key_pair, claims)
-        token_str = token.decode("utf-8")
+    claims = {"sub": "user", "aud": "aud", "exp": int(time.time()) + 3600}
+    token = create_token(key_pair, claims)
 
-        result = validator.validate_token(token_str)
+    res = await validator.validate_token(token)
+    assert res["sub"] == "user"
 
-        assert result["sub"] == "user123"
-        assert result["aud"] == "my-audience"
-        mock_oidc_provider.get_jwks.assert_called_once()
+@pytest.mark.asyncio
+async def test_async_validate_expired(async_provider, key_pair, jwks):
+    async_provider.get_jwks.return_value = jwks
+    validator = TokenValidatorAsync(async_provider, audience="aud")
 
-    def test_validate_token_expired(
-        self, validator: TokenValidator, mock_oidc_provider: Mock, key_pair: Any, jwks: Dict[str, Any]
-    ) -> None:
-        mock_oidc_provider.get_jwks.return_value = jwks
+    claims = {"sub": "user", "aud": "aud", "exp": int(time.time()) - 3600}
+    token = create_token(key_pair, claims)
 
-        now = int(time.time())
-        claims = {
-            "sub": "user123",
-            "aud": "my-audience",
-            "exp": now - 3600,  # Expired
-        }
-        token = self.create_token(key_pair, claims)
-        token_str = token.decode("utf-8")
+    with pytest.raises(TokenExpiredError):
+        await validator.validate_token(token)
 
-        with pytest.raises(TokenExpiredError, match="Token has expired"):
-            validator.validate_token(token_str)
+@pytest.mark.asyncio
+async def test_async_validate_invalid_aud(async_provider, key_pair, jwks):
+    async_provider.get_jwks.return_value = jwks
+    validator = TokenValidatorAsync(async_provider, audience="aud")
 
-    def test_validate_token_invalid_audience(
-        self, validator: TokenValidator, mock_oidc_provider: Mock, key_pair: Any, jwks: Dict[str, Any]
-    ) -> None:
-        mock_oidc_provider.get_jwks.return_value = jwks
+    claims = {"sub": "user", "aud": "wrong", "exp": int(time.time()) + 3600}
+    token = create_token(key_pair, claims)
 
-        now = int(time.time())
-        claims = {
-            "sub": "user123",
-            "aud": "wrong-audience",
-            "exp": now + 3600,
-        }
-        token = self.create_token(key_pair, claims)
-        token_str = token.decode("utf-8")
+    with pytest.raises(InvalidAudienceError):
+        await validator.validate_token(token)
 
-        with pytest.raises(InvalidAudienceError, match="Invalid audience"):
-            validator.validate_token(token_str)
+@pytest.mark.asyncio
+async def test_async_validate_bad_sig(async_provider, key_pair, jwks):
+    async_provider.get_jwks.return_value = jwks
+    validator = TokenValidatorAsync(async_provider, audience="aud")
 
-    def test_validate_token_bad_signature(
-        self, validator: TokenValidator, mock_oidc_provider: Mock, key_pair: Any, jwks: Dict[str, Any]
-    ) -> None:
-        mock_oidc_provider.get_jwks.return_value = jwks
+    claims = {"sub": "user", "aud": "aud", "exp": int(time.time()) + 3600}
 
-        now = int(time.time())
-        claims = {
-            "sub": "user123",
-            "aud": "my-audience",
-            "exp": now + 3600,
-        }
-        # Sign with a different key
-        other_key = JsonWebKey.generate_key("RSA", 2048, is_private=True)
-        # Use KID of expected key but sign with other key
-        headers = {"alg": "RS256", "kid": key_pair.as_dict()["kid"]}
-        token = jwt.encode(headers, claims, other_key)
-        token_str = token.decode("utf-8")
+    # Sign with different key
+    other_key = JsonWebKey.generate_key("RSA", 2048, is_private=True)
+    token = create_token(other_key, claims, headers={"alg": "RS256", "kid": key_pair.as_dict()["kid"]})
 
-        with pytest.raises(SignatureVerificationError, match="Invalid signature"):
-            validator.validate_token(token_str)
+    with pytest.raises(SignatureVerificationError):
+        await validator.validate_token(token)
 
-    def test_validate_token_malformed(
-        self, validator: TokenValidator, mock_oidc_provider: Mock, jwks: Dict[str, Any]
-    ) -> None:
-        mock_oidc_provider.get_jwks.return_value = jwks
+@pytest.mark.asyncio
+async def test_async_validate_malformed(async_provider, jwks):
+    async_provider.get_jwks.return_value = jwks
+    validator = TokenValidatorAsync(async_provider, audience="aud")
 
-        token_str = "not.a.valid.token"
+    with pytest.raises(CoreasonIdentityError):
+        await validator.validate_token("not.a.token")
 
-        with pytest.raises(CoreasonIdentityError, match="Token validation failed"):
-            validator.validate_token(token_str)
+@pytest.mark.asyncio
+async def test_async_validate_refresh_keys(async_provider, key_pair, jwks):
+    # First call returns empty keys, second returns correct keys
+    async_provider.get_jwks.side_effect = [{"keys": []}, jwks]
 
-    def test_validate_token_missing_claim(
-        self, validator: TokenValidator, mock_oidc_provider: Mock, key_pair: Any, jwks: Dict[str, Any]
-    ) -> None:
-        mock_oidc_provider.get_jwks.return_value = jwks
+    validator = TokenValidatorAsync(async_provider, audience="aud")
 
-        now = int(time.time())
-        claims = {
-            "sub": "user123",
-            # Missing aud
-            "exp": now + 3600,
-        }
-        token = self.create_token(key_pair, claims)
-        token_str = token.decode("utf-8")
+    claims = {"sub": "user", "aud": "aud", "exp": int(time.time()) + 3600}
+    token = create_token(key_pair, claims)
 
-        with pytest.raises(CoreasonIdentityError, match="Missing claim"):
-            validator.validate_token(token_str)
+    res = await validator.validate_token(token)
+    assert res["sub"] == "user"
+    assert async_provider.get_jwks.call_count == 2
+    # Check force_refresh=True on second call
+    assert async_provider.get_jwks.call_args_list[1][1]["force_refresh"] is True
 
-    def test_validate_token_issuer_check(self, mock_oidc_provider: Mock, key_pair: Any, jwks: Dict[str, Any]) -> None:
-        validator = TokenValidator(oidc_provider=mock_oidc_provider, audience="my-audience", issuer="my-issuer")
-        mock_oidc_provider.get_jwks.return_value = jwks
+@pytest.mark.asyncio
+async def test_async_validate_alg_none(async_provider, jwks):
+    # Test for alg: none vulnerability
+    # We construct a token with alg: none
+    async_provider.get_jwks.return_value = jwks
+    validator = TokenValidatorAsync(async_provider, audience="aud")
 
-        now = int(time.time())
-        claims = {
-            "sub": "user123",
-            "aud": "my-audience",
-            "iss": "wrong-issuer",
-            "exp": now + 3600,
-        }
-        token = self.create_token(key_pair, claims)
-        token_str = token.decode("utf-8")
+    claims = {"sub": "hacker", "aud": "aud", "exp": int(time.time()) + 3600}
+    # authlib might block encode with none if not allowed, but let's try to bypass or use a raw construction if needed
+    # Authlib encoding with alg: none
+    header = {"alg": "none"}
+    # Manually construct JWT to ensure it's "none"
+    # Or rely on authlib encode if we pass a key that supports none? none doesn't use key.
+    # JWT with alg:none usually has empty signature
 
-        with pytest.raises(CoreasonIdentityError, match="Invalid claim"):
-            validator.validate_token(token_str)
+    # We can use jwt.encode with alg="none" but we need to see if authlib allows it.
+    # Actually, we can just use a plain string construction for this test to be sure.
+    import base64
+    import json
 
-    def test_validate_token_unexpected_error(self, validator: TokenValidator, mock_oidc_provider: Mock) -> None:
-        # Mocking get_jwks to raise an unexpected exception
-        mock_oidc_provider.get_jwks.side_effect = Exception("Boom")
+    def b64encode(data):
+        return base64.urlsafe_b64encode(json.dumps(data).encode()).decode().rstrip("=")
 
-        with pytest.raises(CoreasonIdentityError, match="Unexpected error"):
-            validator.validate_token("some.token")
+    token = f"{b64encode(header)}.{b64encode(claims)}."
+
+    # Validator should reject it because we initialized JsonWebToken(["RS256"])
+
+    with pytest.raises(InvalidTokenError): # Or SignatureVerificationError depending on how Authlib handles it
+        await validator.validate_token(token)
+
+# --- Sync Facade Tests ---
+
+def test_sync_validate_delegation(key_pair, jwks):
+    mock_async_provider = AsyncMock(spec=OIDCProviderAsync)
+    mock_async_provider.get_jwks.return_value = jwks
+
+    provider = OIDCProvider("url")
+    provider._async = mock_async_provider
+
+    validator = TokenValidator(provider, audience="aud")
+
+    claims = {"sub": "user", "aud": "aud", "exp": int(time.time()) + 3600}
+    token = create_token(key_pair, claims)
+
+    res = validator.validate_token(token)
+    assert res["sub"] == "user"

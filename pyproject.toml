@@ -1,6 +1,6 @@
 [project]
 name = "coreason_identity"
-version = "0.2.0"
+version = "0.3.0"
 description = "Decoupled authentication middleware, abstracting OIDC and OAuth2 protocols from the main application."
 readme = "README.md"
 requires-python = ">=3.11, <3.15"
@@ -22,6 +22,9 @@ dependencies = [
     "httpx>=0.28.1,<0.29.0",
     "email-validator>=2.3.0,<3.0.0",
     "opentelemetry-api>=1.39.1,<2.0.0",
+    "anyio>=4.0.0",
+    "aiofiles>=23.0.0",
+    "types-aiofiles>=23.0.0",
 ]
 
 [project.urls]
@@ -42,6 +45,7 @@ mkdocs = "^1.6.0"
 mkdocs-material = "^9.5.26"
 opentelemetry-sdk = "^1.39.1"
 mypy = "^1.19.1"
+pytest-asyncio = "^0.23.0"
 
 [build-system]
 requires = ["poetry-core"]
@@ -64,6 +68,7 @@ plugins = ["pydantic.mypy"]
 [tool.pytest.ini_options]
 addopts = "--cov=src --cov-report=term-missing --cov-fail-under=100"
 testpaths = ["tests"]
+asyncio_mode = "auto"
 
 [tool.coverage.run]
 omit = ["tests/*"]
