@@ -42,6 +42,11 @@ tracer = trace.get_tracer(__name__)
 class TokenValidator:
     """
     Validates JWT tokens against the IdP's JWKS and standard claims.
+
+    Attributes:
+        oidc_provider (OIDCProvider): The OIDCProvider instance.
+        audience (str): The expected audience claim.
+        issuer (Optional[str]): The expected issuer claim.
     """
 
     def __init__(self, oidc_provider: OIDCProvider, audience: str, issuer: Optional[str] = None) -> None:

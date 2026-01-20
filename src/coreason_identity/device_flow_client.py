@@ -27,6 +27,11 @@ from coreason_identity.utils.logger import logger
 class DeviceFlowClient:
     """
     Handles the OAuth 2.0 Device Authorization Grant flow (RFC 8628).
+
+    Attributes:
+        client_id (str): The OIDC Client ID.
+        idp_url (str): The base URL of the Identity Provider.
+        scope (str): The scopes to request.
     """
 
     def __init__(self, client_id: str, idp_url: str, scope: str = "openid profile email") -> None:
@@ -48,6 +53,12 @@ class DeviceFlowClient:
     def _get_endpoints(self) -> Dict[str, str]:
         """
         Discover OIDC endpoints from the IdP.
+
+        Returns:
+            A dictionary containing the discovered endpoints.
+
+        Raises:
+            CoreasonIdentityError: If OIDC discovery fails.
         """
         if self._endpoints:
             return self._endpoints
@@ -93,6 +104,9 @@ class DeviceFlowClient:
 
         Returns:
             DeviceFlowResponse containing device_code, user_code, verification_uri, etc.
+
+        Raises:
+            CoreasonIdentityError: If the flow initiation fails or the response is invalid.
         """
         endpoints = self._get_endpoints()
         url = endpoints["device_authorization_endpoint"]
@@ -131,7 +145,7 @@ class DeviceFlowClient:
             TokenResponse containing access_token, refresh_token, etc.
 
         Raises:
-            CoreasonIdentityError: If polling fails or times out.
+            CoreasonIdentityError: If polling fails, times out, or the request is denied.
         """
         endpoints = self._get_endpoints()
         url = endpoints["token_endpoint"]

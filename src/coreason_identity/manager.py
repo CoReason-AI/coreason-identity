@@ -28,6 +28,14 @@ class IdentityManager:
     """
     Main entry point for coreason-identity.
     Orchestrates OIDCProvider, TokenValidator, IdentityMapper, and DeviceFlowClient.
+
+    Attributes:
+        config (CoreasonIdentityConfig): The configuration object.
+        domain (str): The normalized domain.
+        oidc_provider (OIDCProvider): The OIDC provider instance.
+        validator (TokenValidator): The token validator instance.
+        identity_mapper (IdentityMapper): The identity mapper instance.
+        device_client (Optional[DeviceFlowClient]): The device flow client instance (lazy-loaded).
     """
 
     def __init__(self, config: CoreasonIdentityConfig) -> None:
