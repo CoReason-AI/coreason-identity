@@ -24,6 +24,10 @@ from coreason_identity.exceptions import CoreasonIdentityError
 class OIDCProvider:
     """
     Fetches and caches the Identity Provider's configuration and JWKS.
+
+    Attributes:
+        discovery_url (str): The OIDC discovery URL.
+        cache_ttl (int): The cache time-to-live in seconds.
     """
 
     def __init__(self, discovery_url: str, cache_ttl: int = 3600) -> None:
@@ -48,7 +52,7 @@ class OIDCProvider:
             The OIDC configuration dictionary.
 
         Raises:
-            CoreasonIdentityError: If the request fails.
+            CoreasonIdentityError: If the request fails or returns invalid data.
         """
         try:
             with httpx.Client() as client:
