@@ -15,7 +15,7 @@ This test ensures that IdentityManager correctly configures TokenValidator to en
 
 import time
 from typing import Any, Dict
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from authlib.jose import JsonWebKey, jwt
@@ -58,7 +58,7 @@ def test_manager_enforces_strict_issuer(key_pair: Any, jwks: Dict[str, Any]) -> 
     # We mock OIDCProvider to return our test keys, but we let TokenValidator run real logic
     with patch("coreason_identity.manager.OIDCProvider") as MockOIDC:
         mock_oidc_instance = MockOIDC.return_value
-        mock_oidc_instance.get_jwks.return_value = jwks
+        mock_oidc_instance.get_jwks = AsyncMock(return_value=jwks)
 
         # We deliberately DO NOT mock TokenValidator or IdentityMapper here to test integration
         # However, IdentityMapper might fail if we don't return expected claims structure.

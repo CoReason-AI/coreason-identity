@@ -14,7 +14,7 @@ Final edge case tests for coreason-identity.
 
 import time
 from typing import Any, Dict
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from authlib.jose import JsonWebKey, jwt
@@ -42,25 +42,31 @@ class TestIdentityManagerEdgeCases:
         """Test validation when header is just 'Bearer ' with no token."""
         with (
             patch("coreason_identity.manager.OIDCProvider"),
-            patch("coreason_identity.manager.TokenValidator") as MockValidator,
+            patch("coreason_identity.manager.TokenValidator"),
             patch("coreason_identity.manager.IdentityMapper"),
         ):
             manager = IdentityManager(config)
 
             # Mock validator to raise error on empty string (simulating underlying lib)
-            MockValidator.return_value.validate_token.side_effect = InvalidTokenError("Empty token")
+            # Access underlying async validator via _async
+            # But facade validate_token calls anyio.run(_async.validate_token)
+
+            # We can mock the validator in _async
+            manager._async.validator.validate_token = AsyncMock(side_effect=InvalidTokenError("Empty token"))  # type: ignore[method-assign]
 
             with pytest.raises(InvalidTokenError):
                 manager.validate_token("Bearer ")
 
             # Ensure validator was called with empty string
-            MockValidator.return_value.validate_token.assert_called_with("")
+            manager._async.validator.validate_token.assert_called_with("")
 
 
 class TestTokenValidatorTimeClaims:
     @pytest.fixture
     def mock_oidc_provider(self) -> Mock:
-        return Mock(spec=OIDCProvider)
+        provider = Mock(spec=OIDCProvider)
+        provider.get_jwks = AsyncMock()
+        return provider
 
     @pytest.fixture
     def key_pair(self) -> Any:
@@ -87,7 +93,8 @@ class TestTokenValidatorTimeClaims:
         headers = {"alg": "RS256", "kid": key.as_dict()["kid"]}
         return jwt.encode(headers, claims, key).decode("utf-8")  # type: ignore[no-any-return]
 
-    def test_iat_in_future(self, validator: TokenValidator, key_pair: Any) -> None:
+    @pytest.mark.asyncio
+    async def test_iat_in_future(self, validator: TokenValidator, key_pair: Any) -> None:
         """
         Test token issued in the future.
         Authlib validates 'iat' by default if present and rejects tokens issued in the future.
@@ -103,9 +110,10 @@ class TestTokenValidatorTimeClaims:
         token = self.create_token(key_pair, claims)
 
         with pytest.raises(InvalidTokenError, match="issued in the future"):
-            validator.validate_token(token)
+            await validator.validate_token(token)
 
-    def test_nbf_in_future(self, validator: TokenValidator, key_pair: Any) -> None:
+    @pytest.mark.asyncio
+    async def test_nbf_in_future(self, validator: TokenValidator, key_pair: Any) -> None:
         """Test token with nbf (Not Before) in the future."""
         now = int(time.time())
         claims = {
@@ -119,9 +127,10 @@ class TestTokenValidatorTimeClaims:
 
         # Authlib validates 'nbf' by default if present.
         with pytest.raises(InvalidTokenError, match="not valid yet"):
-            validator.validate_token(token)
+            await validator.validate_token(token)
 
-    def test_empty_audience_list(self, validator: TokenValidator, key_pair: Any) -> None:
+    @pytest.mark.asyncio
+    async def test_empty_audience_list(self, validator: TokenValidator, key_pair: Any) -> None:
         """Test token with empty audience list."""
         claims = {
             "sub": "user123",
@@ -132,7 +141,7 @@ class TestTokenValidatorTimeClaims:
         token = self.create_token(key_pair, claims)
 
         with pytest.raises(InvalidAudienceError):
-            validator.validate_token(token)
+            await validator.validate_token(token)
 
 
 class TestIdentityMapperUnexpectedTypes:

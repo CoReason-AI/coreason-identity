@@ -10,12 +10,13 @@
 
 import hashlib
 import time
-from typing import Any, Tuple
-from unittest.mock import MagicMock, patch
+from typing import Any, List, Tuple
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from authlib.jose.errors import BadSignatureError
 from coreason_identity.oidc_provider import OIDCProvider
+from coreason_identity.utils.logger import logger
 from coreason_identity.validator import TokenValidator
 from opentelemetry.sdk.trace import Tracer, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
@@ -41,11 +42,12 @@ def telemetry_setup() -> Tuple[InMemorySpanExporter, Tracer]:
 def mock_oidc_provider() -> MagicMock:
     provider = MagicMock(spec=OIDCProvider)
     jwks = {"keys": [{"kty": "RSA", "kid": "123", "n": "abc", "e": "AQAB"}]}
-    provider.get_jwks.return_value = jwks
+    provider.get_jwks = AsyncMock(return_value=jwks)
     return provider
 
 
-def test_telemetry_context_propagation(
+@pytest.mark.asyncio
+async def test_telemetry_context_propagation(
     telemetry_setup: Tuple[InMemorySpanExporter, Tracer],
     mock_oidc_provider: MagicMock,
 ) -> None:
@@ -59,7 +61,7 @@ def test_telemetry_context_propagation(
 
         with patch("authlib.jose.JsonWebToken.decode", return_value=claims):
             with tracer.start_as_current_span("parent_span") as parent_span:
-                validator.validate_token("dummy_token")
+                await validator.validate_token("dummy_token")
                 parent_context = parent_span.get_span_context()
 
     spans = exporter.get_finished_spans()
@@ -71,7 +73,8 @@ def test_telemetry_context_propagation(
     assert child_span.parent.trace_id == parent_context.trace_id
 
 
-def test_telemetry_jwks_refresh_event(
+@pytest.mark.asyncio
+async def test_telemetry_jwks_refresh_event(
     telemetry_setup: Tuple[InMemorySpanExporter, Tracer],
     mock_oidc_provider: MagicMock,
 ) -> None:
@@ -87,7 +90,7 @@ def test_telemetry_jwks_refresh_event(
         with patch("authlib.jose.JsonWebToken.decode") as mock_decode:
             mock_decode.side_effect = [BadSignatureError("bad sig"), claims]
 
-            validator.validate_token("dummy_token")
+            await validator.validate_token("dummy_token")
 
     spans = exporter.get_finished_spans()
     assert len(spans) == 1
@@ -100,12 +103,18 @@ def test_telemetry_jwks_refresh_event(
     mock_oidc_provider.get_jwks.assert_called_with(force_refresh=True)
 
 
-def test_telemetry_unicode_user_id(
+@pytest.mark.asyncio
+async def test_telemetry_unicode_user_id(
     telemetry_setup: Tuple[InMemorySpanExporter, Tracer],
     mock_oidc_provider: MagicMock,
-    caplog: pytest.LogCaptureFixture,
+    # caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Verifies handling of Unicode/Complex user IDs."""
+
+    # Setup custom log capture because loguru
+    logs: List[Any] = []
+    logger.add(logs.append, level="INFO", format="{message}")
+
     exporter, tracer = telemetry_setup
     audience = "test-audience"
     # User ID with emoji and non-ascii
@@ -116,7 +125,7 @@ def test_telemetry_unicode_user_id(
         claims = MockClaims({"sub": user_id, "aud": audience, "exp": time.time() + 3600})
 
         with patch("authlib.jose.JsonWebToken.decode", return_value=claims):
-            validator.validate_token("dummy_token")
+            await validator.validate_token("dummy_token")
 
     spans = exporter.get_finished_spans()
     span = spans[0]
@@ -126,10 +135,11 @@ def test_telemetry_unicode_user_id(
 
     # Check log hash
     expected_hash = hashlib.sha256(user_id.encode("utf-8")).hexdigest()
-    assert any(f"Token validated for user {expected_hash}" in record.message for record in caplog.records)
+    assert any(f"Token validated for user {expected_hash}" in record.record["message"] for record in logs)
 
 
-def test_telemetry_noop_tracer_safety(mock_oidc_provider: MagicMock) -> None:
+@pytest.mark.asyncio
+async def test_telemetry_noop_tracer_safety(mock_oidc_provider: MagicMock) -> None:
     """Verifies that the code runs safely with a ProxyTracer (No-Op)."""
     # Simply use trace.get_tracer without setting a provider, it returns a ProxyTracer/NoOp
     # We need to make sure we are not using the global one set by other tests
@@ -148,4 +158,4 @@ def test_telemetry_noop_tracer_safety(mock_oidc_provider: MagicMock) -> None:
 
         with patch("authlib.jose.JsonWebToken.decode", return_value=claims):
             # Should not raise any exception
-            validator.validate_token("dummy_token")
+            await validator.validate_token("dummy_token")

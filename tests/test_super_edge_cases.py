@@ -14,8 +14,9 @@ Testing missing claims, empty strings, and malformed responses.
 """
 
 from typing import Any, Dict, Optional
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
+import httpx
 import pytest
 from authlib.jose import JsonWebKey
 from coreason_identity.device_flow_client import DeviceFlowClient
@@ -93,31 +94,34 @@ class TestIdentityMapperSuperEdgeCases:
 
 
 class TestDeviceFlowSuperEdgeCases:
-    @patch("coreason_identity.device_flow_client.httpx.Client")
-    def test_poll_token_missing_access_token_field(self, mock_client_cls: Mock) -> None:
+    @pytest.fixture
+    def mock_client(self) -> AsyncMock:
+        return AsyncMock(spec=httpx.AsyncClient)
+
+    @pytest.mark.asyncio
+    async def test_poll_token_missing_access_token_field(self, mock_client: AsyncMock) -> None:
         """
         Verify behavior when IdP returns 200 OK but the JSON is missing 'access_token'.
         This should fail Pydantic validation of TokenResponse.
         """
-        client = DeviceFlowClient("cid", "https://idp.com")
+        client = DeviceFlowClient("cid", "https://idp.com", client=mock_client)
 
-        # Setup mocks
-        mock_instance = mock_client_cls.return_value.__enter__.return_value
         # Discovery
-        mock_instance.get.return_value = create_response(
+        mock_client.get.return_value = create_response(
             200, {"device_authorization_endpoint": "https://idp.com/device", "token_endpoint": "https://idp.com/token"}
         )
 
         # Polling response: 200 OK but missing access_token
         # e.g. {"token_type": "Bearer"}
-        mock_instance.post.return_value = create_response(200, {"token_type": "Bearer", "expires_in": 3600})
+        mock_client.post.return_value = create_response(200, {"token_type": "Bearer", "expires_in": 3600})
 
         flow_resp = DeviceFlowResponse(
             device_code="dc", user_code="uc", verification_uri="uri", expires_in=10, interval=1
         )
 
         with pytest.raises(CoreasonIdentityError, match="Received invalid token response structure"):
-            client.poll_token(flow_resp)
+            with patch("anyio.sleep", new_callable=AsyncMock):
+                await client.poll_token(flow_resp)
 
 
 class TestTokenValidatorSuperEdgeCases:
@@ -135,14 +139,15 @@ class TestTokenValidatorSuperEdgeCases:
 
     @pytest.fixture
     def validator(self, mock_oidc_provider: Mock, jwks: Dict[str, Any]) -> TokenValidator:
-        mock_oidc_provider.get_jwks.return_value = jwks
+        mock_oidc_provider.get_jwks = AsyncMock(return_value=jwks)
         return TokenValidator(
             oidc_provider=mock_oidc_provider,
             audience="my-audience",
             issuer="https://valid-issuer.com/",
         )
 
-    def test_malformed_json_payload_after_signature_check(self, validator: TokenValidator) -> None:
+    @pytest.mark.asyncio
+    async def test_malformed_json_payload_after_signature_check(self, validator: TokenValidator) -> None:
         """
         Simulate a scenario where JWT signature is valid (hypothetically) but payload is not valid JSON.
         In reality, JWT signature covers the payload, so you can't have valid signature on invalid payload
@@ -156,4 +161,4 @@ class TestTokenValidatorSuperEdgeCases:
                 # Wait, validator catches ValueError and raises SignatureVerificationError
                 # with "Invalid signature or key not found: ..."
                 # Let's verify exact mapping.
-                validator.validate_token("some.token.here")
+                await validator.validate_token("some.token.here")

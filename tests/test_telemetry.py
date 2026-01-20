@@ -10,8 +10,8 @@
 
 import hashlib
 import time
-from typing import Any, Tuple
-from unittest.mock import MagicMock, patch
+from typing import Any, List, Tuple
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from authlib.jose.errors import ExpiredTokenError
@@ -48,11 +48,12 @@ def mock_oidc_provider() -> MagicMock:
     provider = MagicMock(spec=OIDCProvider)
     # Mock public key
     jwks = {"keys": [{"kty": "RSA", "kid": "123", "n": "abc", "e": "AQAB"}]}
-    provider.get_jwks.return_value = jwks
+    provider.get_jwks = AsyncMock(return_value=jwks)
     return provider
 
 
-def test_validate_token_success_telemetry(
+@pytest.mark.asyncio
+async def test_validate_token_success_telemetry(
     telemetry_setup: Tuple[InMemorySpanExporter, Tracer],
     mock_oidc_provider: MagicMock,
 ) -> None:
@@ -69,7 +70,7 @@ def test_validate_token_success_telemetry(
 
         with patch("authlib.jose.JsonWebToken.decode") as mock_decode:
             mock_decode.return_value = claims
-            validator.validate_token("dummy_token")
+            await validator.validate_token("dummy_token")
 
     spans = exporter.get_finished_spans()
     assert len(spans) == 1
@@ -81,7 +82,8 @@ def test_validate_token_success_telemetry(
     assert span.attributes["user.id"] == "user123"
 
 
-def test_validate_token_failure_telemetry(
+@pytest.mark.asyncio
+async def test_validate_token_failure_telemetry(
     telemetry_setup: Tuple[InMemorySpanExporter, Tracer],
     mock_oidc_provider: MagicMock,
 ) -> None:
@@ -97,7 +99,7 @@ def test_validate_token_failure_telemetry(
             mock_decode.side_effect = ExpiredTokenError("expired", "exp")
 
             with pytest.raises(TokenExpiredError):
-                validator.validate_token("expired_token")
+                await validator.validate_token("expired_token")
 
     spans = exporter.get_finished_spans()
     assert len(spans) == 1
@@ -109,10 +111,17 @@ def test_validate_token_failure_telemetry(
     assert span.events[0].name == "exception"
 
 
-def test_logging_strictness(mock_oidc_provider: MagicMock, caplog: pytest.LogCaptureFixture) -> None:
+@pytest.mark.asyncio
+async def test_logging_strictness(mock_oidc_provider: MagicMock, caplog: pytest.LogCaptureFixture) -> None:
     """Verifies that the user ID is hashed in the logs."""
     # Ensure we capture logs from our logger
-    logger.add(caplog.handler, level="INFO")
+    # logger.add(caplog.handler, level="INFO")
+    # Note: adding caplog.handler might duplicate if pytest handles it, but loguru needs explicit hook often.
+    # However, standard pytest caplog might not catch loguru unless we sink it.
+
+    # We'll sink to a list to be sure
+    logs: List[Any] = []
+    logger.add(logs.append, level="INFO", format="{message}")
 
     audience = "test-audience"
     validator = TokenValidator(mock_oidc_provider, audience)
@@ -122,13 +131,13 @@ def test_logging_strictness(mock_oidc_provider: MagicMock, caplog: pytest.LogCap
     claims = MockClaims({"sub": user_id, "aud": audience, "exp": time.time() + 3600})
     with patch("authlib.jose.JsonWebToken.decode") as mock_decode:
         mock_decode.return_value = claims
-        validator.validate_token("dummy_token")
+        await validator.validate_token("dummy_token")
 
     # Calculate expected hash
     expected_hash = hashlib.sha256(user_id.encode("utf-8")).hexdigest()
 
     # Check if the message is in the captured logs
-    assert any(f"Token validated for user {expected_hash}" in record.message for record in caplog.records)
+    assert any(f"Token validated for user {expected_hash}" in record.record["message"] for record in logs)
 
     # Ensure raw ID is NOT logged in the message
-    assert not any(user_id in record.message for record in caplog.records)
+    assert not any(user_id in record.record["message"] for record in logs)
