@@ -10,7 +10,7 @@
 
 import time
 from typing import Any, Dict
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from authlib.jose import JsonWebKey, jwt
@@ -27,7 +27,10 @@ from coreason_identity.validator import TokenValidator
 class TestTokenValidator:
     @pytest.fixture
     def mock_oidc_provider(self) -> Mock:
-        return Mock(spec=OIDCProvider)
+        # Mock OIDCProvider with async get_jwks
+        provider = Mock(spec=OIDCProvider)
+        provider.get_jwks = AsyncMock()
+        return provider
 
     @pytest.fixture
     def key_pair(self) -> Any:
@@ -49,7 +52,8 @@ class TestTokenValidator:
             headers = {"alg": "RS256", "kid": key.as_dict()["kid"]}
         return jwt.encode(headers, claims, key)  # type: ignore[no-any-return]
 
-    def test_validate_token_success(
+    @pytest.mark.asyncio
+    async def test_validate_token_success(
         self, validator: TokenValidator, mock_oidc_provider: Mock, key_pair: Any, jwks: Dict[str, Any]
     ) -> None:
         mock_oidc_provider.get_jwks.return_value = jwks
@@ -64,13 +68,14 @@ class TestTokenValidator:
         token = self.create_token(key_pair, claims)
         token_str = token.decode("utf-8")
 
-        result = validator.validate_token(token_str)
+        result = await validator.validate_token(token_str)
 
         assert result["sub"] == "user123"
         assert result["aud"] == "my-audience"
-        mock_oidc_provider.get_jwks.assert_called_once()
+        mock_oidc_provider.get_jwks.assert_awaited_once()
 
-    def test_validate_token_expired(
+    @pytest.mark.asyncio
+    async def test_validate_token_expired(
         self, validator: TokenValidator, mock_oidc_provider: Mock, key_pair: Any, jwks: Dict[str, Any]
     ) -> None:
         mock_oidc_provider.get_jwks.return_value = jwks
@@ -85,9 +90,10 @@ class TestTokenValidator:
         token_str = token.decode("utf-8")
 
         with pytest.raises(TokenExpiredError, match="Token has expired"):
-            validator.validate_token(token_str)
+            await validator.validate_token(token_str)
 
-    def test_validate_token_invalid_audience(
+    @pytest.mark.asyncio
+    async def test_validate_token_invalid_audience(
         self, validator: TokenValidator, mock_oidc_provider: Mock, key_pair: Any, jwks: Dict[str, Any]
     ) -> None:
         mock_oidc_provider.get_jwks.return_value = jwks
@@ -102,9 +108,10 @@ class TestTokenValidator:
         token_str = token.decode("utf-8")
 
         with pytest.raises(InvalidAudienceError, match="Invalid audience"):
-            validator.validate_token(token_str)
+            await validator.validate_token(token_str)
 
-    def test_validate_token_bad_signature(
+    @pytest.mark.asyncio
+    async def test_validate_token_bad_signature(
         self, validator: TokenValidator, mock_oidc_provider: Mock, key_pair: Any, jwks: Dict[str, Any]
     ) -> None:
         mock_oidc_provider.get_jwks.return_value = jwks
@@ -122,10 +129,15 @@ class TestTokenValidator:
         token = jwt.encode(headers, claims, other_key)
         token_str = token.decode("utf-8")
 
-        with pytest.raises(SignatureVerificationError, match="Invalid signature"):
-            validator.validate_token(token_str)
+        # Mocking get_jwks to return valid keys, and forcing retry call if needed
+        # TokenValidator logic: if verify fails, it refreshes keys.
+        # So get_jwks might be called twice.
 
-    def test_validate_token_malformed(
+        with pytest.raises(SignatureVerificationError, match="Invalid signature"):
+            await validator.validate_token(token_str)
+
+    @pytest.mark.asyncio
+    async def test_validate_token_malformed(
         self, validator: TokenValidator, mock_oidc_provider: Mock, jwks: Dict[str, Any]
     ) -> None:
         mock_oidc_provider.get_jwks.return_value = jwks
@@ -133,9 +145,10 @@ class TestTokenValidator:
         token_str = "not.a.valid.token"
 
         with pytest.raises(CoreasonIdentityError, match="Token validation failed"):
-            validator.validate_token(token_str)
+            await validator.validate_token(token_str)
 
-    def test_validate_token_missing_claim(
+    @pytest.mark.asyncio
+    async def test_validate_token_missing_claim(
         self, validator: TokenValidator, mock_oidc_provider: Mock, key_pair: Any, jwks: Dict[str, Any]
     ) -> None:
         mock_oidc_provider.get_jwks.return_value = jwks
@@ -150,9 +163,12 @@ class TestTokenValidator:
         token_str = token.decode("utf-8")
 
         with pytest.raises(CoreasonIdentityError, match="Missing claim"):
-            validator.validate_token(token_str)
+            await validator.validate_token(token_str)
 
-    def test_validate_token_issuer_check(self, mock_oidc_provider: Mock, key_pair: Any, jwks: Dict[str, Any]) -> None:
+    @pytest.mark.asyncio
+    async def test_validate_token_issuer_check(
+        self, mock_oidc_provider: Mock, key_pair: Any, jwks: Dict[str, Any]
+    ) -> None:
         validator = TokenValidator(oidc_provider=mock_oidc_provider, audience="my-audience", issuer="my-issuer")
         mock_oidc_provider.get_jwks.return_value = jwks
 
@@ -167,11 +183,12 @@ class TestTokenValidator:
         token_str = token.decode("utf-8")
 
         with pytest.raises(CoreasonIdentityError, match="Invalid claim"):
-            validator.validate_token(token_str)
+            await validator.validate_token(token_str)
 
-    def test_validate_token_unexpected_error(self, validator: TokenValidator, mock_oidc_provider: Mock) -> None:
+    @pytest.mark.asyncio
+    async def test_validate_token_unexpected_error(self, validator: TokenValidator, mock_oidc_provider: Mock) -> None:
         # Mocking get_jwks to raise an unexpected exception
         mock_oidc_provider.get_jwks.side_effect = Exception("Boom")
 
         with pytest.raises(CoreasonIdentityError, match="Unexpected error"):
-            validator.validate_token("some.token")
+            await validator.validate_token("some.token")

@@ -14,8 +14,9 @@ Final verification tests covering complex scenarios and edge cases identified du
 
 import time
 from typing import Any, Dict
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 from authlib.jose.errors import BadSignatureError, JoseError
 from coreason_identity.device_flow_client import DeviceFlowClient
@@ -39,13 +40,14 @@ def create_response(status_code: int, json_data: Any = None) -> Response:
 # --- 1. TokenValidator Verification ---
 
 
-def test_validator_retry_fails() -> None:
+@pytest.mark.asyncio
+async def test_validator_retry_fails() -> None:
     """
     Verify that if validation fails (BadSignature), and we refresh keys,
     and it STILL fails, we raise SignatureVerificationError (not suppressing it).
     """
     mock_provider = MagicMock(spec=OIDCProvider)
-    mock_provider.get_jwks.return_value = {"keys": []}  # Empty keys
+    mock_provider.get_jwks = AsyncMock(return_value={"keys": []})  # Empty keys
 
     validator = TokenValidator(mock_provider, audience="aud")
 
@@ -56,24 +58,28 @@ def test_validator_retry_fails() -> None:
 
         # The error string from Authlib might contain "bad_signature: " or similar
         with pytest.raises(SignatureVerificationError, match="Invalid signature:.*bad_signature"):
-            validator.validate_token("bad_token")
+            await validator.validate_token("bad_token")
 
     # Ensure refresh was called
     mock_provider.get_jwks.assert_called_with(force_refresh=True)
 
 
-def test_validator_refresh_network_error() -> None:
+@pytest.mark.asyncio
+async def test_validator_refresh_network_error() -> None:
     """
     Verify that if the first validation fails (triggering refresh),
     and the REFRESH itself throws a network error, that error bubbles up
     (possibly wrapped or as CoreasonIdentityError).
     """
     mock_provider = MagicMock(spec=OIDCProvider)
-    # First call succeeds (returns stale keys)
-    mock_provider.get_jwks.side_effect = [
-        {"keys": []},  # First call (cached or initial)
-        CoreasonIdentityError("Network Down"),  # Second call (force_refresh)
-    ]
+    # First call succeeds (returns stale keys), Second call fails
+    # We need to set side_effect on the AsyncMock
+    mock_provider.get_jwks = AsyncMock(
+        side_effect=[
+            {"keys": []},  # First call (cached or initial)
+            CoreasonIdentityError("Network Down"),  # Second call (force_refresh)
+        ]
+    )
 
     validator = TokenValidator(mock_provider, audience="aud")
 
@@ -82,15 +88,16 @@ def test_validator_refresh_network_error() -> None:
         mock_decode.side_effect = BadSignatureError("Bad signature")
 
         with pytest.raises(CoreasonIdentityError, match="Network Down"):
-            validator.validate_token("token_triggering_refresh")
+            await validator.validate_token("token_triggering_refresh")
 
 
-def test_validator_jose_error_generic() -> None:
+@pytest.mark.asyncio
+async def test_validator_jose_error_generic() -> None:
     """
     Verify a generic JoseError (not signature/expired) raises InvalidTokenError.
     """
     mock_provider = MagicMock(spec=OIDCProvider)
-    mock_provider.get_jwks.return_value = {"keys": []}
+    mock_provider.get_jwks = AsyncMock(return_value={"keys": []})
     validator = TokenValidator(mock_provider, audience="aud")
 
     with patch("authlib.jose.JsonWebToken.decode") as mock_decode:
@@ -100,7 +107,7 @@ def test_validator_jose_error_generic() -> None:
         # Note: SignatureVerificationError inherits from InvalidTokenError,
         # but here we expect the generic wrap message "Token validation failed: ..."
         with pytest.raises(CoreasonIdentityError, match="Token validation failed: Some random JOSE error"):
-            validator.validate_token("bad_token")
+            await validator.validate_token("bad_token")
 
 
 # --- 2. IdentityMapper Verification ---
@@ -159,11 +166,14 @@ def test_mapper_huge_input_strings() -> None:
 # --- 3. DeviceFlowClient Verification ---
 
 
-def test_device_flow_mixed_errors() -> None:
+@pytest.mark.asyncio
+async def test_device_flow_mixed_errors() -> None:
     """
     Test a sequence of: slow_down -> authorization_pending -> expired_token.
     """
-    client = DeviceFlowClient("id", "http://idp")
+    # Need mock client for async
+    mock_client = AsyncMock(spec=httpx.AsyncClient)
+    client = DeviceFlowClient("id", "http://idp", client=mock_client)
 
     # Mock endpoints discovery
     with patch.object(client, "_get_endpoints", return_value={"token_endpoint": "url"}):
@@ -171,21 +181,20 @@ def test_device_flow_mixed_errors() -> None:
             device_code="dc", user_code="uc", verification_uri="url", expires_in=10, interval=1
         )
 
-        with patch("httpx.Client") as mock_http:
-            mock_post = mock_http.return_value.__enter__.return_value.post
-            mock_post.side_effect = [
-                create_response(400, {"error": "slow_down"}),  # Should sleep interval+5
-                create_response(400, {"error": "authorization_pending"}),  # Should sleep current interval
-                create_response(400, {"error": "expired_token"}),  # Should raise error
-            ]
+        # Mock responses
+        mock_client.post.side_effect = [
+            create_response(400, {"error": "slow_down"}),  # Should sleep interval+5
+            create_response(400, {"error": "authorization_pending"}),  # Should sleep current interval
+            create_response(400, {"error": "expired_token"}),  # Should raise error
+        ]
 
-            with patch("time.sleep") as mock_sleep:
-                with pytest.raises(CoreasonIdentityError, match="Device code expired"):
-                    client.poll_token(device_resp)
+        with patch("anyio.sleep", new_callable=AsyncMock) as mock_sleep:
+            with pytest.raises(CoreasonIdentityError, match="Device code expired"):
+                await client.poll_token(device_resp)
 
-                # Check sleep calls
-                # 1. slow_down: interval 1 -> 6. Sleep(6)
-                # 2. auth_pending: interval 6. Sleep(6)
-                assert mock_sleep.call_count == 2
-                assert mock_sleep.call_args_list[0] == ((6,),)
-                assert mock_sleep.call_args_list[1] == ((6,),)
+            # Check sleep calls
+            # 1. slow_down: interval 1 -> 6. Sleep(6)
+            # 2. auth_pending: interval 6. Sleep(6)
+            assert mock_sleep.call_count == 2
+            assert mock_sleep.call_args_list[0] == ((6,),)
+            assert mock_sleep.call_args_list[1] == ((6,),)

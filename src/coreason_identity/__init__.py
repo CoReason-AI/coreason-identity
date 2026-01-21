@@ -9,16 +9,36 @@
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
 """
-Decoupled authentication middleware, abstracting OIDC and OAuth2 protocols from the main application.
+Coreason Identity SDK
 """
 
-__version__ = "0.2.0"
+from coreason_identity.config import CoreasonIdentityConfig
+from coreason_identity.exceptions import (
+    CoreasonIdentityError,
+    InsufficientPermissionsError,
+    InvalidAudienceError,
+    InvalidTokenError,
+    SignatureVerificationError,
+    TokenExpiredError,
+)
+from coreason_identity.manager import IdentityManager, IdentityManagerAsync
+from coreason_identity.models import DeviceFlowResponse, TokenResponse, UserContext
+
+__version__ = "0.3.0"
 __author__ = "Gowtham A Rao"
 __email__ = "gowtham.rao@coreason.ai"
 
-from .config import CoreasonIdentityConfig
-from .exceptions import InvalidTokenError
-from .manager import IdentityManager
-from .models import UserContext
-
-__all__ = ["CoreasonIdentityConfig", "IdentityManager", "InvalidTokenError", "UserContext"]
+__all__ = [
+    "CoreasonIdentityConfig",
+    "IdentityManager",
+    "IdentityManagerAsync",
+    "UserContext",
+    "TokenResponse",
+    "DeviceFlowResponse",
+    "CoreasonIdentityError",
+    "InvalidTokenError",
+    "InvalidAudienceError",
+    "SignatureVerificationError",
+    "TokenExpiredError",
+    "InsufficientPermissionsError",
+]

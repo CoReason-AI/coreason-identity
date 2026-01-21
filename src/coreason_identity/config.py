@@ -22,6 +22,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class CoreasonIdentityConfig(BaseSettings):
     """
     Configuration settings for coreason-identity.
+
+    Attributes:
+        domain (str): The domain of the Identity Provider (e.g. auth.coreason.com).
+        audience (str): The expected audience for the token.
+        client_id (Optional[str]): The OIDC Client ID (required for device flow).
     """
 
     model_config = SettingsConfigDict(
@@ -39,6 +44,12 @@ class CoreasonIdentityConfig(BaseSettings):
         """
         Ensures domain is just the hostname (e.g. auth.coreason.com).
         Strips scheme and path if present.
+
+        Args:
+            v: The domain string to normalize.
+
+        Returns:
+            The normalized hostname string.
         """
         v = v.strip().lower()
         if "://" not in v:

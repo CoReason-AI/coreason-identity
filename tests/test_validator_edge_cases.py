@@ -9,7 +9,7 @@
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
 from typing import Any, Dict
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from authlib.jose import JsonWebKey, jwt
@@ -21,7 +21,9 @@ from coreason_identity.validator import TokenValidator
 class TestTokenValidatorEdgeCases:
     @pytest.fixture
     def mock_oidc_provider(self) -> Mock:
-        return Mock(spec=OIDCProvider)
+        provider = Mock(spec=OIDCProvider)
+        provider.get_jwks = AsyncMock()
+        return provider
 
     @pytest.fixture
     def key_pair(self) -> Any:
@@ -50,22 +52,25 @@ class TestTokenValidatorEdgeCases:
             headers = {"alg": "RS256", "kid": key.as_dict()["kid"]}
         return jwt.encode(headers, claims, key).decode("utf-8")  # type: ignore[no-any-return]
 
-    def test_malformed_token_structure(self, validator: TokenValidator) -> None:
+    @pytest.mark.asyncio
+    async def test_malformed_token_structure(self, validator: TokenValidator) -> None:
         """Test that a completely malformed token string raises CoreasonIdentityError."""
         # Not a JWT (no dots)
         with pytest.raises(CoreasonIdentityError, match="Token validation failed"):
-            validator.validate_token("invalid-token-string")
+            await validator.validate_token("invalid-token-string")
 
         # Missing signature part (2 parts only)
         with pytest.raises(CoreasonIdentityError, match="Token validation failed"):
-            validator.validate_token("header.payload")
+            await validator.validate_token("header.payload")
 
-    def test_invalid_base64(self, validator: TokenValidator) -> None:
+    @pytest.mark.asyncio
+    async def test_invalid_base64(self, validator: TokenValidator) -> None:
         """Test token with invalid base64 characters."""
         with pytest.raises(CoreasonIdentityError, match="Token validation failed"):
-            validator.validate_token("header.payload.signature!")
+            await validator.validate_token("header.payload.signature!")
 
-    def test_issuer_mismatch(
+    @pytest.mark.asyncio
+    async def test_issuer_mismatch(
         self,
         validator: TokenValidator,
         mock_oidc_provider: Mock,
@@ -84,9 +89,10 @@ class TestTokenValidatorEdgeCases:
         token = self.create_token(key_pair, claims)
 
         with pytest.raises(CoreasonIdentityError, match="Invalid claim"):
-            validator.validate_token(token)
+            await validator.validate_token(token)
 
-    def test_issuer_missing_in_token(
+    @pytest.mark.asyncio
+    async def test_issuer_missing_in_token(
         self,
         validator: TokenValidator,
         mock_oidc_provider: Mock,
@@ -105,4 +111,4 @@ class TestTokenValidatorEdgeCases:
         token = self.create_token(key_pair, claims)
 
         with pytest.raises(CoreasonIdentityError, match="Missing claim"):
-            validator.validate_token(token)
+            await validator.validate_token(token)

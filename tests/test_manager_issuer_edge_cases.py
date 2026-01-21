@@ -14,7 +14,7 @@ Edge case tests for IdentityManager issuer validation.
 
 import time
 from typing import Any, Dict
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from authlib.jose import JsonWebKey, jwt
@@ -85,9 +85,13 @@ def test_validate_token_missing_iss_claim(key_pair: Any, jwks: Dict[str, Any]) -
     audience = "test-audience"
     config = CoreasonIdentityConfig(domain=domain, audience=audience)
 
+    # We mock OIDCProvider to be injected into IdentityManager
+    # But IdentityManager instantiates it internally.
+    # We patch the class.
     with patch("coreason_identity.manager.OIDCProvider") as MockOIDC:
         mock_oidc_instance = MockOIDC.return_value
-        mock_oidc_instance.get_jwks.return_value = jwks
+        # get_jwks is async
+        mock_oidc_instance.get_jwks = AsyncMock(return_value=jwks)
 
         manager = IdentityManager(config)
 
@@ -119,7 +123,7 @@ def test_validate_token_no_trailing_slash_match(key_pair: Any, jwks: Dict[str, A
 
     with patch("coreason_identity.manager.OIDCProvider") as MockOIDC:
         mock_oidc_instance = MockOIDC.return_value
-        mock_oidc_instance.get_jwks.return_value = jwks
+        mock_oidc_instance.get_jwks = AsyncMock(return_value=jwks)
 
         manager = IdentityManager(config)
 
@@ -145,7 +149,7 @@ def test_validate_token_http_protocol(key_pair: Any, jwks: Dict[str, Any]) -> No
 
     with patch("coreason_identity.manager.OIDCProvider") as MockOIDC:
         mock_oidc_instance = MockOIDC.return_value
-        mock_oidc_instance.get_jwks.return_value = jwks
+        mock_oidc_instance.get_jwks = AsyncMock(return_value=jwks)
 
         manager = IdentityManager(config)
 
