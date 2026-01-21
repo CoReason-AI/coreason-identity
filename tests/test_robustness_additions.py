@@ -13,7 +13,7 @@ Additional robustness tests for complex edge cases not explicitly covered by exi
 """
 
 from typing import Any, Optional
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
@@ -101,44 +101,45 @@ class TestIdentityMapperRobustness:
 
 class TestDeviceFlowClientRobustness:
     @pytest.fixture
-    def client(self) -> DeviceFlowClient:
-        return DeviceFlowClient("client-id", "https://idp.com")
+    def mock_client(self) -> AsyncMock:
+        return AsyncMock(spec=httpx.AsyncClient)
 
-    @patch("coreason_identity.device_flow_client.httpx.Client")
-    def test_initiate_flow_timeout(self, mock_client_cls: Mock, client: DeviceFlowClient) -> None:
+    @pytest.fixture
+    def client(self, mock_client: AsyncMock) -> DeviceFlowClient:
+        return DeviceFlowClient("client-id", "https://idp.com", client=mock_client)
+
+    @pytest.mark.asyncio
+    async def test_initiate_flow_timeout(self, client: DeviceFlowClient, mock_client: AsyncMock) -> None:
         """
         Verify that a network timeout during initiation is caught and raised as CoreasonIdentityError.
         """
-        mock_instance = mock_client_cls.return_value.__enter__.return_value
-
         # Discovery succeeds
-        mock_instance.get.return_value = create_response(
+        mock_client.get.return_value = create_response(
             200, {"device_authorization_endpoint": "https://idp.com/device", "token_endpoint": "https://idp.com/token"}
         )
 
         # Post fails with ReadTimeout (must be httpx error)
-        mock_instance.post.side_effect = httpx.ReadTimeout("Timeout")
+        mock_client.post.side_effect = httpx.ReadTimeout("Timeout")
 
         with pytest.raises(CoreasonIdentityError, match="Failed to initiate device flow"):
-            client.initiate_flow()
+            await client.initiate_flow()
 
-    @patch("coreason_identity.device_flow_client.httpx.Client")
-    @patch("coreason_identity.device_flow_client.time.sleep")
-    def test_poll_token_expired_response_structure(
-        self, mock_sleep: Mock, mock_client_cls: Mock, client: DeviceFlowClient
+    @pytest.mark.asyncio
+    async def test_poll_token_expired_response_structure(
+        self, client: DeviceFlowClient, mock_client: AsyncMock
     ) -> None:
         """
         Verify handling of 'expired_token' error response.
         """
-        mock_instance = mock_client_cls.return_value.__enter__.return_value
-        mock_instance.get.return_value = create_response(200, {"token_endpoint": "url"})
+        mock_client.get.return_value = create_response(200, {"token_endpoint": "url"})
 
         # Return expired_token error
-        mock_instance.post.return_value = create_response(400, {"error": "expired_token"})
+        mock_client.post.return_value = create_response(400, {"error": "expired_token"})
 
         flow_resp = DeviceFlowResponse(
             device_code="dc", user_code="uc", verification_uri="uri", expires_in=10, interval=1
         )
 
         with pytest.raises(CoreasonIdentityError, match="Device code expired"):
-            client.poll_token(flow_resp)
+            with patch("anyio.sleep", new_callable=AsyncMock):
+                await client.poll_token(flow_resp)

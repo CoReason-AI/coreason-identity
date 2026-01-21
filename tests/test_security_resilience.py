@@ -10,7 +10,7 @@
 
 import hashlib
 from typing import Any, Generator, List, cast
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from authlib.jose.errors import InvalidClaimError
@@ -34,17 +34,15 @@ def mock_config() -> CoreasonIdentityConfig:
 
 
 @pytest.fixture
-def identity_manager(mock_config: CoreasonIdentityConfig) -> IdentityManager:
+def identity_manager(mock_config: CoreasonIdentityConfig) -> Generator[IdentityManager, Any, None]:
     # We patch OIDCProvider to avoid network calls during init
     with (
         patch("coreason_identity.manager.OIDCProvider"),
-        patch("coreason_identity.manager.TokenValidator") as MockValidator,
+        patch("coreason_identity.manager.TokenValidator"),
         patch("coreason_identity.manager.IdentityMapper"),
     ):
         manager = IdentityManager(mock_config)
-        # We need to re-attach the mock validator instance to be accessible in tests
-        manager.validator = MockValidator.return_value
-        return manager
+        yield manager
 
 
 @pytest.fixture
@@ -66,8 +64,10 @@ def test_audience_mismatch_rejection(identity_manager: IdentityManager) -> None:
     token = "some.jwt.token"
 
     # Configure the mock validator to raise InvalidAudienceError
-    mock_validator = cast(MagicMock, identity_manager.validator)
-    mock_validator.validate_token.side_effect = InvalidAudienceError("Invalid audience")
+    # Access via _async since IdentityManager is facade
+    mock_validator = cast(MagicMock, identity_manager._async.validator)
+    # validate_token is async
+    mock_validator.validate_token = AsyncMock(side_effect=InvalidAudienceError("Invalid audience"))
 
     with pytest.raises(InvalidAudienceError) as exc_info:
         identity_manager.validate_token(f"Bearer {token}")
@@ -75,7 +75,8 @@ def test_audience_mismatch_rejection(identity_manager: IdentityManager) -> None:
     assert "Invalid audience" in str(exc_info.value)
 
 
-def test_audience_mismatch_real_validator_behavior() -> None:
+@pytest.mark.asyncio
+async def test_audience_mismatch_real_validator_behavior() -> None:
     """
     Security Verification (Deep):
     Test that the TokenValidator logic actually identifies the mismatch
@@ -84,6 +85,7 @@ def test_audience_mismatch_real_validator_behavior() -> None:
     from coreason_identity.validator import TokenValidator
 
     mock_oidc = MagicMock()
+    mock_oidc.get_jwks = AsyncMock(return_value={"keys": []})
     validator = TokenValidator(mock_oidc, audience="expected-audience")
 
     # Mock the internal jwt.decode to raise InvalidClaimError for 'aud'
@@ -92,16 +94,14 @@ def test_audience_mismatch_real_validator_behavior() -> None:
         mock_claims.validate.side_effect = InvalidClaimError("aud")
         mock_decode.return_value = mock_claims
 
-        # We also need to mock get_jwks to return something so it proceeds to decode
-        mock_oidc.get_jwks.return_value = {"keys": []}
-
         with pytest.raises(InvalidAudienceError) as exc_info:
-            validator.validate_token("some.token")
+            await validator.validate_token("some.token")
 
         assert "Invalid audience" in str(exc_info.value)
 
 
-def test_pii_redaction_in_logs(identity_manager: IdentityManager, log_capture: List[str]) -> None:
+@pytest.mark.asyncio
+async def test_pii_redaction_in_logs(log_capture: List[str]) -> None:
     """
     Security Verification:
     Verify that PII (User ID) is never logged in plaintext.
@@ -122,7 +122,7 @@ def test_pii_redaction_in_logs(identity_manager: IdentityManager, log_capture: L
     from coreason_identity.validator import TokenValidator
 
     mock_oidc = MagicMock(spec=OIDCProvider)
-    mock_oidc.get_jwks.return_value = {"keys": []}
+    mock_oidc.get_jwks = AsyncMock(return_value={"keys": []})
 
     validator = TokenValidator(mock_oidc, audience="aud")
 
@@ -143,7 +143,7 @@ def test_pii_redaction_in_logs(identity_manager: IdentityManager, log_capture: L
         claims_obj = MockClaims(mock_claims_dict)
         mock_decode.return_value = claims_obj
 
-        validator.validate_token(token_string)
+        await validator.validate_token(token_string)
 
         # Join logs to search
         full_log_text = "\n".join(log_capture)
@@ -185,8 +185,8 @@ class TestSecurityEdgeCases:
         # Let's check IdentityManager.validate_token implementation:
         # token = auth_header[7:] -> ""
         # Mock validator behaviour for empty string:
-        mock_validator = cast(MagicMock, identity_manager.validator)
-        mock_validator.validate_token.side_effect = InvalidTokenError("Empty token")
+        mock_validator = cast(MagicMock, identity_manager._async.validator)
+        mock_validator.validate_token = AsyncMock(side_effect=InvalidTokenError("Empty token"))
 
         with pytest.raises(InvalidTokenError):
             identity_manager.validate_token("Bearer ")
@@ -203,13 +203,14 @@ class TestSecurityEdgeCases:
         """
         Resilience Edge Case: Verify behavior when JWKS cannot be fetched (e.g., IdP down).
         """
-        mock_validator = cast(MagicMock, identity_manager.validator)
-        mock_validator.validate_token.side_effect = CoreasonIdentityError("Failed to fetch JWKS")
+        mock_validator = cast(MagicMock, identity_manager._async.validator)
+        mock_validator.validate_token = AsyncMock(side_effect=CoreasonIdentityError("Failed to fetch JWKS"))
 
         with pytest.raises(CoreasonIdentityError, match="Failed to fetch JWKS"):
             identity_manager.validate_token("Bearer token")
 
-    def test_unicode_pii_logging(self, log_capture: List[str]) -> None:
+    @pytest.mark.asyncio
+    async def test_unicode_pii_logging(self, log_capture: List[str]) -> None:
         """
         Logging Edge Case: Verify that Unicode characters in PII are handled and hashed correctly.
         """
@@ -221,7 +222,7 @@ class TestSecurityEdgeCases:
         from coreason_identity.validator import TokenValidator
 
         mock_oidc = MagicMock(spec=OIDCProvider)
-        mock_oidc.get_jwks.return_value = {"keys": []}
+        mock_oidc.get_jwks = AsyncMock(return_value={"keys": []})
 
         validator = TokenValidator(mock_oidc, audience="aud")
 
@@ -234,7 +235,7 @@ class TestSecurityEdgeCases:
 
             mock_decode.return_value = MockClaims(mock_claims_dict)
 
-            validator.validate_token(token_string)
+            await validator.validate_token(token_string)
 
             full_log_text = "\n".join(log_capture)
 

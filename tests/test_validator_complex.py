@@ -10,7 +10,7 @@
 
 import time
 from typing import Any, Dict
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from authlib.jose import JsonWebKey, jwt
@@ -26,7 +26,9 @@ from coreason_identity.validator import TokenValidator
 class TestTokenValidatorComplex:
     @pytest.fixture
     def mock_oidc_provider(self) -> Mock:
-        return Mock(spec=OIDCProvider)
+        provider = Mock(spec=OIDCProvider)
+        provider.get_jwks = AsyncMock()
+        return provider
 
     @pytest.fixture
     def key_pair(self) -> Any:
@@ -54,7 +56,8 @@ class TestTokenValidatorComplex:
             headers = {"alg": "RS256", "kid": key.as_dict()["kid"]}
         return jwt.encode(headers, claims, key)  # type: ignore[no-any-return]
 
-    def test_validate_token_aud_list_success(
+    @pytest.mark.asyncio
+    async def test_validate_token_aud_list_success(
         self, validator: TokenValidator, mock_oidc_provider: Mock, key_pair: Any, jwks: Dict[str, Any]
     ) -> None:
         """Test that validation succeeds when aud is a list containing the expected audience."""
@@ -70,10 +73,11 @@ class TestTokenValidatorComplex:
         token = self.create_token(key_pair, claims)
         token_str = token.decode("utf-8")
 
-        result = validator.validate_token(token_str)
+        result = await validator.validate_token(token_str)
         assert result["sub"] == "user123"
 
-    def test_validate_token_aud_list_fail(
+    @pytest.mark.asyncio
+    async def test_validate_token_aud_list_fail(
         self, validator: TokenValidator, mock_oidc_provider: Mock, key_pair: Any, jwks: Dict[str, Any]
     ) -> None:
         """Test that validation fails when aud is a list NOT containing the expected audience."""
@@ -89,9 +93,10 @@ class TestTokenValidatorComplex:
         token_str = token.decode("utf-8")
 
         with pytest.raises(InvalidAudienceError):
-            validator.validate_token(token_str)
+            await validator.validate_token(token_str)
 
-    def test_validate_token_whitespace(
+    @pytest.mark.asyncio
+    async def test_validate_token_whitespace(
         self, validator: TokenValidator, mock_oidc_provider: Mock, key_pair: Any, jwks: Dict[str, Any]
     ) -> None:
         """Test that validation handles whitespace."""
@@ -108,12 +113,13 @@ class TestTokenValidatorComplex:
 
         # Current implementation might fail if it doesn't strip
         try:
-            result = validator.validate_token(token_str)
+            result = await validator.validate_token(token_str)
             assert result["sub"] == "user123"
         except CoreasonIdentityError:
             pytest.fail("Should handle whitespace")
 
-    def test_key_rotation_retry(
+    @pytest.mark.asyncio
+    async def test_key_rotation_retry(
         self, validator: TokenValidator, mock_oidc_provider: Mock, key_pair: Any, second_key_pair: Any
     ) -> None:
         """
@@ -134,7 +140,7 @@ class TestTokenValidatorComplex:
         # The validator calls get_jwks() initially (defaults force_refresh=False)
         # If it fails, it calls get_jwks(force_refresh=True)
 
-        def get_jwks_side_effect(force_refresh: bool = False) -> Dict[str, Any]:
+        async def get_jwks_side_effect(force_refresh: bool = False) -> Dict[str, Any]:
             if force_refresh:
                 return new_jwks
             return old_jwks
@@ -151,7 +157,7 @@ class TestTokenValidatorComplex:
         token = self.create_token(second_key_pair, claims)
         token_str = token.decode("utf-8")
 
-        result = validator.validate_token(token_str)
+        result = await validator.validate_token(token_str)
         assert result["sub"] == "user123"
 
         # Verify call count
@@ -160,7 +166,8 @@ class TestTokenValidatorComplex:
         assert mock_oidc_provider.get_jwks.call_count == 2
         mock_oidc_provider.get_jwks.assert_any_call(force_refresh=True)
 
-    def test_none_algorithm_rejected(
+    @pytest.mark.asyncio
+    async def test_none_algorithm_rejected(
         self, validator: TokenValidator, mock_oidc_provider: Mock, jwks: Dict[str, Any]
     ) -> None:
         """Test that alg: none is rejected."""
@@ -173,12 +180,6 @@ class TestTokenValidatorComplex:
             "exp": now + 3600,
         }
         # Create a token with 'none' alg manually
-        # Authlib's jwt.encode might block 'none' if not configured,
-        # but we can construct the string manually or force it
-        # header: {"alg": "none"} -> eyJhbGciOiJub25lIn0
-        # payload: ...
-        # signature: empty
-
         header_segment = "eyJhbGciOiJub25lIn0"  # {"alg":"none"}
         import base64
         import json
@@ -190,9 +191,10 @@ class TestTokenValidatorComplex:
 
         # This should fail validation
         with pytest.raises(CoreasonIdentityError):
-            validator.validate_token(token_str)
+            await validator.validate_token(token_str)
 
-    def test_key_missing_after_retry(
+    @pytest.mark.asyncio
+    async def test_key_missing_after_retry(
         self, validator: TokenValidator, mock_oidc_provider: Mock, key_pair: Any, jwks: Dict[str, Any]
     ) -> None:
         """
@@ -214,6 +216,6 @@ class TestTokenValidatorComplex:
 
         # It should try once, fail (ValueError), refresh, fail again (ValueError), then propagate
         with pytest.raises(SignatureVerificationError, match="Invalid signature or key not found"):
-            validator.validate_token(token_str)
+            await validator.validate_token(token_str)
 
         assert mock_oidc_provider.get_jwks.call_count == 2
