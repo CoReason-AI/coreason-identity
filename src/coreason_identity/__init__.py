@@ -24,6 +24,10 @@ from coreason_identity.exceptions import (
 from coreason_identity.manager import IdentityManager, IdentityManagerAsync
 from coreason_identity.models import DeviceFlowResponse, TokenResponse, UserContext
 
+__version__ = "0.3.0"
+__author__ = "Gowtham A Rao"
+__email__ = "gowtham.rao@coreason.ai"
+
 __all__ = [
     "CoreasonIdentityConfig",
     "IdentityManager",
