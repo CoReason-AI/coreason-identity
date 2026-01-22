@@ -26,6 +26,13 @@ class RawIdPClaims(BaseModel):
     """
     Internal model to parse and normalize incoming IdP claims.
     Validates structure and normalizes types (e.g., ensuring lists) before business logic.
+
+    Attributes:
+        sub (str): The subject (user ID) from the IdP.
+        email (EmailStr): The user's email address.
+        project_id_claim (Optional[str]): Custom claim for project ID.
+        groups (List[str]): List of groups the user belongs to.
+        permissions (List[str]): List of permissions granted to the user.
     """
 
     sub: str

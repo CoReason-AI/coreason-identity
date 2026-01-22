@@ -13,8 +13,9 @@ Complex and edge case tests for coreason-identity.
 """
 
 from typing import Any, Dict
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
+import httpx
 import pytest
 from authlib.jose import JsonWebKey, jwt
 from coreason_identity.device_flow_client import DeviceFlowClient
@@ -30,7 +31,9 @@ from coreason_identity.validator import TokenValidator
 class TestTokenValidatorComplex:
     @pytest.fixture
     def mock_oidc_provider(self) -> Mock:
-        return Mock(spec=OIDCProvider)
+        provider = Mock(spec=OIDCProvider)
+        provider.get_jwks = AsyncMock()
+        return provider
 
     @pytest.fixture
     def key_pair(self) -> Any:
@@ -60,7 +63,8 @@ class TestTokenValidatorComplex:
             headers = {"alg": alg, "kid": key.as_dict()["kid"] if key else "none"}
         return jwt.encode(headers, claims, key).decode("utf-8")  # type: ignore[no-any-return]
 
-    def test_alg_none_attack(self, validator: TokenValidator) -> None:
+    @pytest.mark.asyncio
+    async def test_alg_none_attack(self, validator: TokenValidator) -> None:
         """
         Security Test: Verify 'alg': 'none' is rejected.
         Even if the signature is empty/valid for none, we enforce RS256.
@@ -76,9 +80,10 @@ class TestTokenValidatorComplex:
         token = jwt.encode({"alg": "none"}, claims, None).decode("utf-8")
 
         with pytest.raises(CoreasonIdentityError, match="Token validation failed"):
-            validator.validate_token(token)
+            await validator.validate_token(token)
 
-    def test_audience_as_list(
+    @pytest.mark.asyncio
+    async def test_audience_as_list(
         self,
         validator: TokenValidator,
         key_pair: Any,
@@ -96,10 +101,11 @@ class TestTokenValidatorComplex:
         token = self.create_token(key_pair, claims)
 
         # Should pass
-        validated = validator.validate_token(token)
+        validated = await validator.validate_token(token)
         assert validated["sub"] == "user123"
 
-    def test_key_rotation_recovery(
+    @pytest.mark.asyncio
+    async def test_key_rotation_recovery(
         self,
         validator: TokenValidator,
         key_pair: Any,
@@ -113,6 +119,7 @@ class TestTokenValidatorComplex:
         new_key = key_pair  # The one signing the token
 
         # Initial cached JWKS has only old_key
+        # We need to simulate side effect for AsyncMock
         mock_oidc_provider.get_jwks.side_effect = [
             {"keys": [old_key.as_dict(private=False)]},  # First call (cache)
             {"keys": [new_key.as_dict(private=False)]},  # Second call (fresh)
@@ -128,7 +135,7 @@ class TestTokenValidatorComplex:
         token = self.create_token(new_key, claims)
 
         # 2. Execute
-        validated = validator.validate_token(token)
+        validated = await validator.validate_token(token)
 
         # 3. Verify
         assert validated["sub"] == "user123"
@@ -183,17 +190,19 @@ class TestIdentityMapperComplex:
 
 
 class TestDeviceFlowClientComplex:
-    @patch("coreason_identity.device_flow_client.httpx.Client")
-    @patch("coreason_identity.device_flow_client.time.sleep")
-    def test_poll_token_slow_down_logic(
+    @pytest.fixture
+    def mock_client(self) -> AsyncMock:
+        return AsyncMock(spec=httpx.AsyncClient)
+
+    @pytest.mark.asyncio
+    async def test_poll_token_slow_down_logic(
         self,
-        mock_sleep: Mock,
-        mock_client_cls: Mock,
+        mock_client: AsyncMock,
     ) -> None:
         """
         Verify that the client increases polling interval when receiving 'slow_down'.
         """
-        client = DeviceFlowClient("client-id", "https://idp.com")
+        client = DeviceFlowClient("client-id", "https://idp.com", client=mock_client)
         # Setup endpoints
         client._endpoints = {
             "device_authorization_endpoint": "https://idp.com/device",
@@ -204,10 +213,7 @@ class TestDeviceFlowClientComplex:
         # 1. slow_down
         # 2. authorization_pending
         # 3. Success
-        mock_post = Mock()
-        mock_client_cls.return_value.__enter__.return_value.post = mock_post
-
-        mock_post.side_effect = [
+        mock_client.post.side_effect = [
             Mock(status_code=400, json=lambda: {"error": "slow_down"}),
             Mock(status_code=400, json=lambda: {"error": "authorization_pending"}),
             Mock(
@@ -229,28 +235,28 @@ class TestDeviceFlowClientComplex:
         )
 
         # Execute
-        token = client.poll_token(flow_response)
+        with patch("anyio.sleep", new_callable=AsyncMock) as mock_sleep:
+            token = await client.poll_token(flow_response)
 
-        # Verify
-        assert isinstance(token, TokenResponse)
-        assert token.access_token == "at"
+            # Verify
+            assert isinstance(token, TokenResponse)
+            assert token.access_token == "at"
 
-        # Check sleep calls
-        # Interval starts at 5.
-        # 1. slow_down -> interval becomes 10. sleep(5) was called? Or wait, logic:
-        #    Error logic runs, interval += 5. Then time.sleep(interval)
-        #    So first sleep should be 10?
-        #    Let's check code:
-        #    elif error == "slow_down": interval += 5
-        #    ... time.sleep(interval)
-        #
-        # 2. authorization_pending -> interval remains 10. time.sleep(10)
-        #
-        # 3. Success -> return.
+            # Check sleep calls
+            # Interval starts at 5.
+            # 1. slow_down -> interval becomes 10. sleep(10) (Wait, code logic: interval += 5, then sleep(interval))
+            #    Wait, in previous sync code:
+            #    error == "slow_down" -> interval += 5
+            #    time.sleep(interval)
+            #    So if interval=5, it becomes 10, then sleeps 10.
 
-        assert mock_sleep.call_count == 2
-        args_list = mock_sleep.call_args_list
-        # First sleep: after slow_down. interval was 5, became 10.
-        assert args_list[0][0][0] == 10
-        # Second sleep: after auth_pending. interval is 10.
-        assert args_list[1][0][0] == 10
+            # 2. authorization_pending -> interval remains 10. time.sleep(10)
+
+            # 3. Success -> return.
+
+            assert mock_sleep.call_count == 2
+            args_list = mock_sleep.call_args_list
+            # First sleep: after slow_down. interval was 5, became 10.
+            assert args_list[0][0][0] == 10
+            # Second sleep: after auth_pending. interval is 10.
+            assert args_list[1][0][0] == 10

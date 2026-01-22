@@ -2,34 +2,65 @@
 
 Decoupled authentication middleware, abstracting OIDC and OAuth2 protocols from the main application.
 
-[![CI](https://github.com/CoReason-AI/coreason_identity/actions/workflows/ci.yml/badge.svg)](https://github.com/CoReason-AI/coreason_identity/actions/workflows/ci.yml)
+[![Organization](https://img.shields.io/badge/org-CoReason--AI-blue)](https://github.com/CoReason-AI)
+[![License](https://img.shields.io/badge/license-Prosperity%203.0-blue)](https://img.shields.io/badge/license-Prosperity%203.0-blue)
+[![Build Status](https://github.com/CoReason-AI/coreason_identity/actions/workflows/build.yml/badge.svg)](https://github.com/CoReason-AI/coreason_identity/actions)
+[![Code Style: Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Documentation](https://img.shields.io/badge/docs-Product%20Requirements-green)](docs/product_requirements.md)
 
-## Getting Started
+## Overview
 
-### Prerequisites
+`coreason-identity` ("The Bouncer") handles all Authentication (AuthN) and Role-Based Access Control (AuthZ) for the CoReason platform. It enforces a strict "Bouncer" philosophy: it checks IDs and checks lists but does not issue IDs.
 
-- Python 3.12+
-- Poetry
+The package standardizes:
+*   **Protocol:** OIDC (OpenID Connect).
+*   **Identity Provider:** Auth0 or Keycloak.
+*   **Library:** Authlib.
 
-### Installation
+## Features
 
-1.  Clone the repository:
-    ```sh
-    git clone https://github.com/example/example.git
-    cd my_python_project
-    ```
-2.  Install dependencies:
-    ```sh
-    poetry install
-    ```
+Based on the [Product Requirements](docs/product_requirements.md):
 
-### Usage
+*   **OIDCProvider:** Fetches and caches JWKS from the OIDC Discovery URL (LRU Cache).
+*   **TokenValidator:** Validates JWT signatures, standard claims (`exp`, `iss`, `aud`), and enforces strict audience checks to prevent "Confused Deputy" attacks.
+*   **IdentityMapper:** Maps IdP claims to a standardized `UserContext` model, handling project context extraction and group-to-permission mapping.
+*   **DeviceFlowClient:** Implements RFC 8628 OAuth 2.0 Device Authorization Grant for headless CLI authentication.
+*   **Observability:** Emits OpenTelemetry spans and secure logs (PII hashed).
 
--   Run the linter:
-    ```sh
-    poetry run pre-commit run --all-files
-    ```
--   Run the tests:
-    ```sh
-    poetry run pytest
-    ```
+## Installation
+
+```bash
+pip install coreason-identity
+```
+
+## Usage
+
+```python
+from coreason_identity import IdentityManager, CoreasonIdentityConfig, InvalidTokenError
+
+# 1. Initialize (The Borrowing)
+config = CoreasonIdentityConfig(domain="auth.coreason.com", audience="api://coreason")
+identity = IdentityManager(config)
+
+# 2. Validate (The Bouncer)
+try:
+    # Validate a raw Bearer token
+    user_context = identity.validate_token(auth_header="Bearer eyJ...")
+    print(f"User {user_context.sub} is authorized for project {user_context.project_context}")
+except InvalidTokenError:
+    # Handle invalid tokens (expired, bad signature, wrong audience, etc.)
+    print("Access denied.")
+
+# 3. CLI Login (The Device Flow)
+# Initiate the flow
+flow = identity.start_device_login()
+print(f"Go to {flow.verification_uri} and enter {flow.user_code}")
+
+# Poll for tokens
+try:
+    tokens = identity.await_device_token(flow)
+    print("Login successful!")
+    print(f"Access Token: {tokens['access_token']}")
+except Exception as e:
+    print(f"Login failed: {e}")
+```

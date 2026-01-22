@@ -42,6 +42,11 @@ tracer = trace.get_tracer(__name__)
 class TokenValidator:
     """
     Validates JWT tokens against the IdP's JWKS and standard claims.
+
+    Attributes:
+        oidc_provider (OIDCProvider): The OIDCProvider instance.
+        audience (str): The expected audience claim.
+        issuer (Optional[str]): The expected issuer claim.
     """
 
     def __init__(self, oidc_provider: OIDCProvider, audience: str, issuer: Optional[str] = None) -> None:
@@ -59,7 +64,7 @@ class TokenValidator:
         # Use a specific JsonWebToken instance to enforce RS256 and reject 'none'
         self.jwt = JsonWebToken(["RS256"])
 
-    def validate_token(self, token: str) -> Dict[str, Any]:
+    async def validate_token(self, token: str) -> Dict[str, Any]:
         """
         Validates the JWT signature and claims.
 
@@ -95,7 +100,8 @@ class TokenValidator:
 
             try:
                 # Fetch JWKS (cached)
-                jwks = self.oidc_provider.get_jwks()
+                # This is now an async call
+                jwks = await self.oidc_provider.get_jwks()
 
                 try:
                     claims = _decode(jwks)
@@ -103,7 +109,7 @@ class TokenValidator:
                     # If key is missing or signature is bad (potential key rotation), try refreshing keys
                     logger.info("Validation failed with cached keys, refreshing JWKS and retrying...")
                     span.add_event("refreshing_jwks")
-                    jwks = self.oidc_provider.get_jwks(force_refresh=True)
+                    jwks = await self.oidc_provider.get_jwks(force_refresh=True)
                     claims = _decode(jwks)
 
                 payload = dict(claims)
