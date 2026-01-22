@@ -15,7 +15,7 @@ allowing the consumer to catch a single exception type.
 """
 
 from typing import Any, Dict
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from authlib.jose import JsonWebKey, jwt
@@ -49,7 +49,8 @@ def test_missing_claim_raises_invalid_token_error(key_pair: Any, jwks: Dict[str,
     # Mock OIDC provider to return keys
     with patch("coreason_identity.manager.OIDCProvider") as MockOIDC:
         mock_oidc_instance = MockOIDC.return_value
-        mock_oidc_instance.get_jwks.return_value = jwks
+        # get_jwks is async in IdentityManagerAsync
+        mock_oidc_instance.get_jwks = AsyncMock(return_value=jwks)
 
         manager = IdentityManager(config)
 
@@ -83,7 +84,7 @@ def test_mapper_validation_raises_invalid_token_error(key_pair: Any, jwks: Dict[
 
     with patch("coreason_identity.manager.OIDCProvider") as MockOIDC:
         mock_oidc_instance = MockOIDC.return_value
-        mock_oidc_instance.get_jwks.return_value = jwks
+        mock_oidc_instance.get_jwks = AsyncMock(return_value=jwks)
 
         manager = IdentityManager(config)
 

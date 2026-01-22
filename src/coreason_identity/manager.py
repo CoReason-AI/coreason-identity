@@ -12,8 +12,11 @@
 IdentityManager component for orchestrating authentication and authorization.
 """
 
-from typing import Optional
+from typing import Any, Optional
 from urllib.parse import urljoin
+
+import anyio
+import httpx
 
 from coreason_identity.config import CoreasonIdentityConfig
 from coreason_identity.device_flow_client import DeviceFlowClient
@@ -24,20 +27,23 @@ from coreason_identity.oidc_provider import OIDCProvider
 from coreason_identity.validator import TokenValidator
 
 
-class IdentityManager:
+class IdentityManagerAsync:
     """
-    Main entry point for coreason-identity.
-    Orchestrates OIDCProvider, TokenValidator, IdentityMapper, and DeviceFlowClient.
+    Async implementation of IdentityManager (The Core).
+    Handles resources via async context manager.
     """
 
-    def __init__(self, config: CoreasonIdentityConfig) -> None:
+    def __init__(self, config: CoreasonIdentityConfig, client: Optional[httpx.AsyncClient] = None) -> None:
         """
-        Initialize the IdentityManager.
+        Initialize the IdentityManagerAsync.
 
         Args:
             config: The configuration object.
+            client: Optional external async client.
         """
         self.config = config
+        self._internal_client = client is None
+        self._client = client or httpx.AsyncClient()
 
         # Domain is already normalized by Config validator to be just the hostname (e.g. auth.coreason.com)
         self.domain = self.config.domain
@@ -46,11 +52,10 @@ class IdentityManager:
         base_url = f"https://{self.domain}"
 
         # Use urljoin for robust path construction
-        # Note: urljoin("https://host", "/path") -> "https://host/path"
         discovery_url = urljoin(base_url, "/.well-known/openid-configuration")
         issuer_url = urljoin(base_url, "/")
 
-        self.oidc_provider = OIDCProvider(discovery_url)
+        self.oidc_provider = OIDCProvider(discovery_url, self._client)
         self.validator = TokenValidator(
             oidc_provider=self.oidc_provider,
             audience=self.config.audience,
@@ -59,18 +64,16 @@ class IdentityManager:
         self.identity_mapper = IdentityMapper()
         self.device_client: Optional[DeviceFlowClient] = None
 
-    def validate_token(self, auth_header: str) -> UserContext:
+    async def __aenter__(self) -> "IdentityManagerAsync":
+        return self
+
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        if self._internal_client:
+            await self._client.aclose()
+
+    async def validate_token(self, auth_header: str) -> UserContext:
         """
         Validates the Bearer token and returns the UserContext.
-
-        Args:
-            auth_header: The Authorization header string (e.g., "Bearer <token>").
-
-        Returns:
-            The UserContext object.
-
-        Raises:
-            InvalidTokenError: If the token is invalid, expired, or malformed.
         """
         if not auth_header or not auth_header.startswith("Bearer "):
             raise InvalidTokenError("Missing or invalid Authorization header format. Must start with 'Bearer '.")
@@ -78,64 +81,96 @@ class IdentityManager:
         token = auth_header[7:]  # Strip "Bearer "
 
         # Delegate to TokenValidator
-        # It raises specific exceptions like TokenExpiredError, which inherit from InvalidTokenError
-        claims = self.validator.validate_token(token)
+        claims = await self.validator.validate_token(token)
 
         # Delegate to IdentityMapper
         return self.identity_mapper.map_claims(claims)
 
-    def start_device_login(self, scope: Optional[str] = None) -> DeviceFlowResponse:
+    async def start_device_login(self, scope: Optional[str] = None) -> DeviceFlowResponse:
         """
         Initiates the Device Authorization Flow.
-
-        Args:
-            scope: Optional scope override.
-
-        Returns:
-            DeviceFlowResponse containing the verification URI and user code.
-
-        Raises:
-            CoreasonIdentityError: If client_id is not configured or flow fails.
         """
         if not self.config.client_id:
             raise CoreasonIdentityError("client_id is required for device login but not configured.")
 
-        # Initialize DeviceFlowClient on demand
         if not self.device_client:
             self.device_client = DeviceFlowClient(
                 client_id=self.config.client_id,
                 idp_url=f"https://{self.domain}",
+                client=self._client,
                 scope=scope or "openid profile email",
             )
         else:
+            # Re-init if needed to ensure correct client is passed if we ever support changing it,
+            # but more importantly to match the synchronous re-init logic if we want to be safe.
+            # However, since we persist self.device_client and it has self._client, it should be fine.
+            # But let's follow the pattern of the sync code which re-created it.
             self.device_client = DeviceFlowClient(
                 client_id=self.config.client_id,
                 idp_url=f"https://{self.domain}",
+                client=self._client,
                 scope=scope or "openid profile email",
             )
 
-        return self.device_client.initiate_flow(audience=self.config.audience)
+        return await self.device_client.initiate_flow(audience=self.config.audience)
+
+    async def await_device_token(self, flow: DeviceFlowResponse) -> TokenResponse:
+        """
+        Polls for the device token.
+        """
+        if not self.config.client_id:
+            raise CoreasonIdentityError("client_id is required for device login but not configured.")
+
+        if not self.device_client:
+            self.device_client = DeviceFlowClient(
+                client_id=self.config.client_id,
+                idp_url=f"https://{self.domain}",
+                client=self._client,
+            )
+
+        return await self.device_client.poll_token(flow)
+
+
+class IdentityManager:
+    """
+    Sync Facade for IdentityManager.
+    Wraps IdentityManagerAsync and bridges Sync -> Async via anyio.run.
+    """
+
+    def __init__(self, config: CoreasonIdentityConfig) -> None:
+        """
+        Initialize the IdentityManager Facade.
+
+        Args:
+            config: The configuration object.
+        """
+        self._async = IdentityManagerAsync(config)
+
+    def __enter__(self) -> "IdentityManager":
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        # anyio.run expects a coroutine function or a coroutine object?
+        # anyio.run(func, *args)
+        # self._async.__aexit__ is a method, so we can pass it and arguments.
+        # But wait, __aexit__ returns a coroutine.
+        # anyio.run(self._async.__aexit__, exc_type, exc_val, exc_tb) is correct.
+        anyio.run(self._async.__aexit__, exc_type, exc_val, exc_tb)
+
+    def validate_token(self, auth_header: str) -> UserContext:
+        """
+        Validates the Bearer token and returns the UserContext.
+        """
+        return anyio.run(self._async.validate_token, auth_header)
+
+    def start_device_login(self, scope: Optional[str] = None) -> DeviceFlowResponse:
+        """
+        Initiates the Device Authorization Flow.
+        """
+        return anyio.run(self._async.start_device_login, scope)
 
     def await_device_token(self, flow: DeviceFlowResponse) -> TokenResponse:
         """
         Polls for the device token.
-
-        Args:
-            flow: The response from start_device_login.
-
-        Returns:
-            The TokenResponse containing the tokens.
-
-        Raises:
-            CoreasonIdentityError: If client_id is not configured or polling fails.
         """
-        if not self.config.client_id:
-            raise CoreasonIdentityError("client_id is required for device login but not configured.")
-
-        if not self.device_client:
-            self.device_client = DeviceFlowClient(
-                client_id=self.config.client_id,
-                idp_url=f"https://{self.domain}",
-            )
-
-        return self.device_client.poll_token(flow)
+        return anyio.run(self._async.await_device_token, flow)

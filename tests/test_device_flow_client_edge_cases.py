@@ -8,9 +8,9 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
-from typing import Generator
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock
 
+import httpx
 import pytest
 from coreason_identity.device_flow_client import DeviceFlowClient
 from coreason_identity.exceptions import CoreasonIdentityError
@@ -18,14 +18,13 @@ from httpx import Request, Response
 
 
 @pytest.fixture
-def client() -> DeviceFlowClient:
-    return DeviceFlowClient(client_id="test-client", idp_url="https://test.auth0.com")
+def mock_client() -> AsyncMock:
+    return AsyncMock(spec=httpx.AsyncClient)
 
 
 @pytest.fixture
-def mock_httpx() -> Generator[Mock, None, None]:
-    with patch("httpx.Client") as mock:
-        yield mock
+def client(mock_client: AsyncMock) -> DeviceFlowClient:
+    return DeviceFlowClient(client_id="test-client", idp_url="https://test.auth0.com", client=mock_client)
 
 
 def create_response(status_code: int, content: bytes) -> Response:
@@ -33,21 +32,21 @@ def create_response(status_code: int, content: bytes) -> Response:
     return Response(status_code, content=content, request=request)
 
 
-def test_discovery_returns_invalid_json(client: DeviceFlowClient, mock_httpx: Mock) -> None:
+@pytest.mark.asyncio
+async def test_discovery_returns_invalid_json(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
     """Test that non-JSON response from OIDC discovery raises CoreasonIdentityError."""
-    mock_instance = mock_httpx.return_value.__enter__.return_value
-    mock_instance.get.return_value = create_response(200, content=b"<html>Error</html>")
+    mock_client.get.return_value = create_response(200, content=b"<html>Error</html>")
 
     with pytest.raises(CoreasonIdentityError, match="Invalid JSON response from OIDC discovery"):
-        client._get_endpoints()
+        await client._get_endpoints()
 
 
-def test_initiate_flow_returns_invalid_json(client: DeviceFlowClient, mock_httpx: Mock) -> None:
+@pytest.mark.asyncio
+async def test_initiate_flow_returns_invalid_json(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
     """Test that non-JSON response from initiate_flow raises CoreasonIdentityError."""
-    mock_instance = mock_httpx.return_value.__enter__.return_value
 
     # Mock discovery success
-    mock_instance.get.return_value = Response(
+    mock_client.get.return_value = Response(
         200,
         json={
             "device_authorization_endpoint": "https://idp/device",
@@ -57,7 +56,7 @@ def test_initiate_flow_returns_invalid_json(client: DeviceFlowClient, mock_httpx
     )
 
     # Mock initiate flow failure (200 OK but HTML)
-    mock_instance.post.return_value = create_response(200, content=b"<html>Error</html>")
+    mock_client.post.return_value = create_response(200, content=b"<html>Error</html>")
 
     with pytest.raises(CoreasonIdentityError, match="Invalid JSON response from initiate flow"):
-        client.initiate_flow()
+        await client.initiate_flow()
