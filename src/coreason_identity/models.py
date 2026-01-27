@@ -12,9 +12,9 @@
 Data models for the coreason-identity package.
 """
 
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, SecretStr
 
 
 class UserContext(BaseModel):
@@ -22,16 +22,20 @@ class UserContext(BaseModel):
     Standardized User Context object to be available throughout the middleware stack.
 
     Attributes:
-        sub (str): Immutable User ID.
-        email (EmailStr): User's email address (PII).
-        project_context (Optional[str]): Project/Tenant ID if available.
-        permissions (List[str]): List of permissions granted to the user.
+        user_id (str): The immutable subject ID (e.g., "sub").
+        email (EmailStr): User's email address (for audit logging).
+        groups (List[str]): Security group IDs for ACL checks in Catalog.
+        scopes (List[str]): OAuth scopes for permission checks.
+        downstream_token (Optional[SecretStr]): The On-Behalf-Of token for Microsoft Graph/Connectors.
+        claims (Dict[str, Any]): Extended attributes.
     """
 
-    sub: str
+    user_id: str
     email: EmailStr
-    project_context: Optional[str] = None
-    permissions: List[str] = Field(default_factory=list)
+    groups: List[str] = Field(default_factory=list)
+    scopes: List[str] = Field(default_factory=list)
+    downstream_token: Optional[SecretStr] = None
+    claims: Dict[str, Any] = Field(default_factory=dict)
 
 
 class DeviceFlowResponse(BaseModel):

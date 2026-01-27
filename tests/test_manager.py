@@ -33,7 +33,6 @@ def config() -> CoreasonIdentityConfig:
 @pytest.fixture
 def manager(config: CoreasonIdentityConfig) -> Generator[IdentityManager, Any, None]:
     # Mock internal components during initialization
-    # We mock IdentityManagerAsync components because IdentityManager instantiates IdentityManagerAsync
     with (
         patch("coreason_identity.manager.OIDCProvider"),
         patch("coreason_identity.manager.TokenValidator"),
@@ -50,11 +49,7 @@ def test_init(config: CoreasonIdentityConfig) -> None:
     ):
         mgr = IdentityManager(config)
 
-        # We need to access the underlying async manager to check components
-        # IdentityManager Facade -> IdentityManagerAsync -> OIDCProvider
-
-        # Verify call args
-        MockOIDC.assert_called_once()  # We can't easily check args without more work due to client passing
+        MockOIDC.assert_called_once()
         assert MockOIDC.call_args[0][0] == f"https://{MOCK_DOMAIN}/.well-known/openid-configuration"
 
         MockValidator.assert_called_once()
@@ -64,21 +59,19 @@ def test_init(config: CoreasonIdentityConfig) -> None:
 def test_validate_token_success(manager: IdentityManager) -> None:
     # Setup mocks
     mock_claims = {"sub": "user123", "email": "test@example.com"}
-    mock_user_context = UserContext(sub="user123", email="test@example.com")
+    mock_user_context = UserContext(user_id="user123", email="test@example.com")
 
     # Manager.validator is in manager._async.validator
-    # It must be an AsyncMock for validate_token
     manager._async.validator.validate_token = AsyncMock(return_value=mock_claims)  # type: ignore[method-assign]
 
     # Cast identity_mapper to Mock for type safety or use ignore
-    # manager._async.identity_mapper is mocked by fixture
     mock_mapper = cast(Mock, manager._async.identity_mapper)
     mock_mapper.map_claims.return_value = mock_user_context
 
     result = manager.validate_token(MOCK_AUTH_HEADER)
 
     manager._async.validator.validate_token.assert_awaited_once_with(MOCK_TOKEN)
-    mock_mapper.map_claims.assert_called_once_with(mock_claims)
+    mock_mapper.map_claims.assert_called_once_with(mock_claims, token=MOCK_TOKEN)
     assert result == mock_user_context
 
 

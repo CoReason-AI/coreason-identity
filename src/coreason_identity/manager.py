@@ -84,7 +84,7 @@ class IdentityManagerAsync:
         claims = await self.validator.validate_token(token)
 
         # Delegate to IdentityMapper
-        return self.identity_mapper.map_claims(claims)
+        return self.identity_mapper.map_claims(claims, token=token)
 
     async def start_device_login(self, scope: Optional[str] = None) -> DeviceFlowResponse:
         """
