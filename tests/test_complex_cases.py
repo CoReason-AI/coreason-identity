@@ -18,7 +18,6 @@ from unittest.mock import AsyncMock, Mock, patch
 import httpx
 import pytest
 from authlib.jose import JsonWebKey, jwt
-
 from coreason_identity.device_flow_client import DeviceFlowClient
 from coreason_identity.exceptions import (
     CoreasonIdentityError,
