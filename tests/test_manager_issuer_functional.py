@@ -103,5 +103,5 @@ def test_manager_enforces_strict_issuer(key_pair: Any, jwks: Dict[str, Any]) -> 
         # The claims have 'sub' and 'email', so it should succeed.
         user_context = manager.validate_token(f"Bearer {token_correct}")
 
-        assert user_context.sub == "user123"
+        assert user_context.user_id == "user123"
         assert user_context.email == "test@example.com"

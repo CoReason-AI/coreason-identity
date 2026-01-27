@@ -157,8 +157,8 @@ class TestIdentityMapperComplex:
             "groups": None,  # Explicit None
         }
         context = mapper.map_claims(claims)
-        assert context.permissions == []
-        assert context.project_context is None
+        assert context.claims["permissions"] == []
+        assert "project_context" not in context.claims
 
     def test_mapper_mixed_source_precedence(self) -> None:
         """
@@ -175,7 +175,7 @@ class TestIdentityMapperComplex:
         }
         context = mapper.map_claims(claims)
         # Explicit claim wins
-        assert context.project_context == "EXPLICIT_ID"
+        assert context.claims["project_context"] == "EXPLICIT_ID"
 
     def test_mapper_admin_group_case_insensitive(self) -> None:
         """Test 'AdMiN' maps to permissions=['*']."""
@@ -186,7 +186,7 @@ class TestIdentityMapperComplex:
             "groups": ["AdMiN"],
         }
         context = mapper.map_claims(claims)
-        assert context.permissions == ["*"]
+        assert context.claims["permissions"] == ["*"]
 
 
 class TestDeviceFlowClientComplex:
