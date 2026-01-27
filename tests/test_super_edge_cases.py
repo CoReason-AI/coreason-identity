@@ -76,7 +76,7 @@ class TestIdentityMapperSuperEdgeCases:
         }
         # If valid, it returns a context with empty sub.
         context = mapper.map_claims(claims)
-        assert context.sub == ""
+        assert context.user_id == ""
 
     def test_project_id_empty_string(self) -> None:
         """
@@ -90,7 +90,7 @@ class TestIdentityMapperSuperEdgeCases:
         }
         context = mapper.map_claims(claims)
         # Empty string should be passed through if it exists
-        assert context.project_context == ""
+        assert context.claims["project_context"] == ""
 
 
 class TestDeviceFlowSuperEdgeCases:

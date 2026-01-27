@@ -162,8 +162,8 @@ class TestIdentityMapperUnexpectedTypes:
         # So it returns [].
 
         context = mapper.map_claims(claims)
-        assert context.permissions == []
-        assert context.project_context is None
+        assert context.claims["permissions"] == []
+        assert "project_context" not in context.claims
 
     def test_permissions_as_integer(self) -> None:
         """Test 'permissions' claim as an integer."""
@@ -174,4 +174,4 @@ class TestIdentityMapperUnexpectedTypes:
             "permissions": 12345,
         }
         context = mapper.map_claims(claims)
-        assert context.permissions == []
+        assert context.claims["permissions"] == []

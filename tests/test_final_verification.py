@@ -134,9 +134,9 @@ def test_mapper_nested_groups_safely_handled() -> None:
 
     # "['nested_group']" does not match regex ^project:
     # "project:valid" matches
-    assert context.project_context == "valid"
+    assert context.claims["project_context"] == "valid"
     # Permissions should be empty (unless groups mapped to permissions, but these don't)
-    assert context.permissions == []
+    assert context.claims["permissions"] == []
 
 
 def test_mapper_huge_input_strings() -> None:
@@ -160,7 +160,7 @@ def test_mapper_huge_input_strings() -> None:
 
     # Since regex is ^project:, it anchors to start.
     # "aaaa...project:HIDDEN" does NOT start with project:
-    assert context.project_context is None
+    assert "project_context" not in context.claims
 
 
 # --- 3. DeviceFlowClient Verification ---

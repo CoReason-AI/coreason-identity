@@ -42,7 +42,8 @@ class TestIdentityMapperRobustness:
             "groups": ["group1", "group2"],
         }
         context = mapper.map_claims(claims)
-        assert "group1" in context.permissions or "*" in context.permissions or not context.permissions
+        permissions = context.claims.get("permissions", [])
+        assert "group1" in permissions or "*" in permissions or not permissions
 
         claims_mixed = {
             "sub": "u1",
@@ -67,8 +68,8 @@ class TestIdentityMapperRobustness:
             "permissions": ["explicit:read"],
         }
         context = mapper.map_claims(claims)
-        assert context.permissions == ["explicit:read"]
-        assert "*" not in context.permissions
+        assert context.claims["permissions"] == ["explicit:read"]
+        assert "*" not in context.claims["permissions"]
 
     def test_project_id_claim_priority(self) -> None:
         """
@@ -82,7 +83,7 @@ class TestIdentityMapperRobustness:
             "groups": ["project:IMPLICIT"],
         }
         context = mapper.map_claims(claims)
-        assert context.project_context == "EXPLICIT"
+        assert context.claims["project_context"] == "EXPLICIT"
 
     def test_malformed_project_id_type(self) -> None:
         """
