@@ -14,28 +14,57 @@ Data models for the coreason-identity package.
 
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, EmailStr, Field, SecretStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr
 
 
 class UserContext(BaseModel):
     """
     Standardized User Context object to be available throughout the middleware stack.
 
-    Attributes:
-        user_id (str): The immutable subject ID (e.g., "sub").
-        email (EmailStr): User's email address (for audit logging).
-        groups (List[str]): Security group IDs for ACL checks in Catalog.
-        scopes (List[str]): OAuth scopes for permission checks.
-        downstream_token (Optional[SecretStr]): The On-Behalf-Of token for Microsoft Graph/Connectors.
-        claims (Dict[str, Any]): Extended attributes.
+    This model is frozen (immutable) to ensure integrity as it passes through the system.
     """
 
-    user_id: str
-    email: EmailStr
-    groups: List[str] = Field(default_factory=list)
-    scopes: List[str] = Field(default_factory=list)
-    downstream_token: Optional[SecretStr] = None
-    claims: Dict[str, Any] = Field(default_factory=dict)
+    model_config = ConfigDict(
+        frozen=True,
+        extra="ignore",
+        json_schema_extra={
+            "example": {
+                "user_id": "auth0|123456",
+                "email": "alice@coreason.ai",
+                "groups": ["admin", "project:apollo"],
+                "scopes": ["openid", "profile", "read:reports"],
+            }
+        }
+    )
+
+    user_id: str = Field(
+        ...,
+        description="The immutable subject ID (e.g., 'sub'). Unique identifier for the user.",
+        examples=["auth0|123456"]
+    )
+    email: EmailStr = Field(
+        ...,
+        description="The user's email address. Verified and strictly typed.",
+        examples=["alice@coreason.ai"]
+    )
+    groups: List[str] = Field(
+        default_factory=list,
+        description="Security group IDs. Used for Row-Level Security (RLS).",
+        examples=[["admin", "project:apollo"]]
+    )
+    scopes: List[str] = Field(
+        default_factory=list,
+        description="OAuth 2.0 scopes for coarse-grained API permission checks.",
+        examples=[["openid", "profile"]]
+    )
+    downstream_token: Optional[SecretStr] = Field(
+        default=None,
+        description="The On-Behalf-Of (OBO) token for downstream API calls. Protected from logging."
+    )
+    claims: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Extended attributes and legacy field mappings."
+    )
 
 
 class DeviceFlowResponse(BaseModel):

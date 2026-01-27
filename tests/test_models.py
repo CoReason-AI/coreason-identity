@@ -68,9 +68,8 @@ def test_user_context_missing_email() -> None:
 
 def test_user_context_immutability() -> None:
     """
-    Test that the model behaves as expected (standard Pydantic models are mutable by default,
-    but we verify basic assignment works).
+    Test that the model is immutable.
     """
     user = UserContext(user_id="user123", email="test@example.com")
-    user.claims = {"new": "claim"}
-    assert user.claims == {"new": "claim"}
+    with pytest.raises(ValidationError):
+        user.claims = {"new": "claim"}  # type: ignore
