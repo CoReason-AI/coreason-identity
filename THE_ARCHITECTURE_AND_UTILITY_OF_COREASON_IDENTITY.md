@@ -41,10 +41,16 @@ try:
     # Turns "Bearer eyJ..." into a strictly typed object
     user = identity.validate_token(auth_header="Bearer <token>")
 
-    print(f"User {user.sub} is acting in project {user.project_context}")
+    print(f"User {user.user_id} is acting in context.")
 
-    if "admin:write" in user.permissions:
+    # Check scopes/permissions
+    if "admin:write" in user.scopes:
         perform_privileged_action()
+
+    # Access legacy project context via claims
+    project = user.claims.get("project_context")
+    if project:
+        print(f"Acting in project {project}")
 
 except InvalidTokenError:
     # Fail closed on any signature or claim error

@@ -46,7 +46,18 @@ identity = IdentityManager(config)
 try:
     # Validate a raw Bearer token
     user_context = identity.validate_token(auth_header="Bearer eyJ...")
-    print(f"User {user_context.sub} is authorized for project {user_context.project_context}")
+
+    # Access canonical Identity Passport fields
+    print(f"User {user_context.user_id} ({user_context.email}) is active.")
+
+    # Check groups for Row-Level Security
+    if "admin" in user_context.groups:
+        print("Admin access granted.")
+
+    # Access extended attributes
+    project = user_context.claims.get("project_context")
+    print(f"Authorized for project: {project}")
+
 except InvalidTokenError:
     # Handle invalid tokens (expired, bad signature, wrong audience, etc.)
     print("Access denied.")
