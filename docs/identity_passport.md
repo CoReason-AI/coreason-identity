@@ -1,74 +1,38 @@
-# The Identity Passport
+# The Identity Passport: Delegated Access & Zero-Copy Security
 
-The "Identity Passport" is the canonical data structure representing an authenticated user's context within the CoReason ecosystem. It is implemented as the `UserContext` class in `coreason_identity`.
+## The Metaphor
 
-## Philosophy
+The `coreason-identity` package acts as the central authority for user identity within the CoReason platform. Think of it as the issuer of a **"Passport"** (represented by the `UserContext` object).
 
-As microservices proliferate, passing raw JWTs or ad-hoc dictionaries leads to inconsistency and security gaps. The Identity Passport serves as a strictly typed, immutable contract that every service can rely on. It "hydrates" the raw identity (IdP claims) into a platform-native format.
+When a request hits the **API Gateway** (`coreason-api`), the system validates the incoming OIDC token and issues this Passport. From that point forward, every service in the ecosystem trusts this Passport. It travels with the request, eliminating the need for redundant validation and ensuring a consistent identity context across all boundaries.
 
-## Schema
+## The Structure
 
-The `UserContext` schema is designed to support:
-1.  **Core Identity:** Who is this? (`user_id`, `email`)
-2.  **Access Control:** What groups/roles do they have? (`groups`, `scopes`)
-3.  **Delegation:** Can they act on behalf of someone else? (`downstream_token`)
-4.  **Extensibility:** Custom attributes. (`claims`)
+The Passport is realized as the `UserContext` Pydantic model. It contains strict fields that define the user's identity and capabilities.
 
-### Fields
+### `UserContext` Fields
 
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `user_id` | `str` | The immutable subject ID (e.g., `sub` from OIDC). Unique identifier for the user. |
-| `email` | `EmailStr` | The user's email address. Verified and strictly typed. Essential for audit logs and notifications. |
-| `groups` | `List[str]` | Security group IDs. Used for **Row-Level Security (RLS)** in services like Catalog or Search. |
-| `scopes` | `List[str]` | OAuth 2.0 scopes (e.g., `openid`, `profile`, `api:read`). Used for coarse-grained API permission checks. |
-| `downstream_token` | `SecretStr` | The raw On-Behalf-Of (OBO) token. This is used when the service needs to call downstream APIs (e.g., Microsoft Graph) as the user. Stored as a `SecretStr` to prevent accidental logging. |
-| `claims` | `Dict[str, Any]` | A dictionary containing any extended attributes or mapped legacy fields (e.g., `project_context`, `permissions`). |
+*   **`user_id`** (`str`):
+    The immutable subject identifier (e.g., `sub` from the OIDC provider). This is the source of truth for *who* the user is.
 
-## Usage Patterns
+*   **`groups`** (`List[str]`):
+    A list of group identifiers the user belongs to. This is primarily used for **Row-Level Security (RLS)** in the Catalog (`coreason-catalog`), ensuring users only see data they are authorized to access.
 
-### 1. Basic Identity Check
-```python
-def get_current_user(token: str = Depends(oauth2_scheme)):
-    user = identity_manager.validate_token(token)
-    logger.info(f"Action by {user.user_id}")
-    return user
-```
+*   **`downstream_token`** (`SecretStr`):
+    The "On-Behalf-Of" (OBO) token. This is a sensitive credential used to access downstream services like Microsoft 365 or SharePoint via `coreason-connect`. It is wrapped in a `SecretStr` to prevent accidental exposure.
 
-### 2. Row-Level Security (RLS)
-Services can pass `user.groups` to database queries to filter results.
+## The Rules
 
-```python
-def search_documents(user: UserContext, query: str):
-    # Only return docs where the user is in the allowed groups
-    return db.search(query, allowed_groups=user.groups)
-```
+To maintain the integrity and security of the "Shared Kernel" architecture, all services must adhere to the following rules:
 
-### 3. Delegated Calls (OBO)
-When calling external APIs, use the `downstream_token`.
+### Rule 1: Zero-Copy Security
+**Never unwrap the `downstream_token` until the last mile.**
+The `downstream_token` is strictly for use by `coreason-connect`. No other service should attempt to peek inside, decrypt, or use this token. It should be passed along blindly as part of the Passport.
 
-```python
-import httpx
+### Rule 2: Strict Logging Hygiene
+**Never log the `UserContext` as a raw string.**
+The `UserContext` contains secrets (the `downstream_token`). Logging the entire object as a string risks leaking credentials into logs. Always use structured logging and specific fields (like `user_id`) when recording audit trails.
 
-async def fetch_outlook_calendar(user: UserContext):
-    if not user.downstream_token:
-        raise Unauthorized("No delegation token available")
-
-    token = user.downstream_token.get_secret_value()
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            "https://graph.microsoft.com/v1.0/me/calendar",
-            headers={"Authorization": f"Bearer {token}"}
-        )
-```
-
-### 4. Legacy Migration
-If you were using `project_context` or `permissions` fields directly, they are now available in `claims`:
-
-```python
-# Old
-# project = user.project_context
-
-# New
-project = user.claims.get("project_context")
-```
+### Rule 3: Explicit Dependency Injection
+**All inter-service communication must pass this object explicitly.**
+Do not rely on global state or thread-local storage. The `UserContext` must be explicitly passed as an argument to functions and services (Dependency Injection). This ensures that every action is clearly attributable to a specific user and that the "On-Behalf-Of" context is preserved.
