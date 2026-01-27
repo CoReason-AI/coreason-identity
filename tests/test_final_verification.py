@@ -19,8 +19,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 from authlib.jose.errors import BadSignatureError, JoseError
-from httpx import Request, Response
-
 from coreason_identity.device_flow_client import DeviceFlowClient
 from coreason_identity.exceptions import (
     CoreasonIdentityError,
@@ -30,6 +28,7 @@ from coreason_identity.identity_mapper import IdentityMapper
 from coreason_identity.models import DeviceFlowResponse
 from coreason_identity.oidc_provider import OIDCProvider
 from coreason_identity.validator import TokenValidator
+from httpx import Request, Response
 
 
 # --- Helper ---

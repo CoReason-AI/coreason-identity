@@ -13,7 +13,6 @@ Edge case tests specifically for the new Identity Mapper logic and UserContext.
 """
 
 import pytest
-
 from coreason_identity.exceptions import InvalidTokenError
 from coreason_identity.identity_mapper import IdentityMapper
 

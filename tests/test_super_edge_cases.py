@@ -19,10 +19,6 @@ from unittest.mock import AsyncMock, Mock, patch
 import httpx
 import pytest
 from authlib.jose import JsonWebKey
-
-# Helper for httpx mocks
-from httpx import Request, Response
-
 from coreason_identity.device_flow_client import DeviceFlowClient
 from coreason_identity.exceptions import (
     CoreasonIdentityError,
@@ -32,6 +28,9 @@ from coreason_identity.identity_mapper import IdentityMapper
 from coreason_identity.models import DeviceFlowResponse
 from coreason_identity.oidc_provider import OIDCProvider
 from coreason_identity.validator import TokenValidator
+
+# Helper for httpx mocks
+from httpx import Request, Response
 
 
 def create_response(status_code: int, json_data: Optional[Any] = None) -> Response:

@@ -17,12 +17,11 @@ from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
-from httpx import Request, Response
-
 from coreason_identity.device_flow_client import DeviceFlowClient
 from coreason_identity.exceptions import CoreasonIdentityError, InvalidTokenError
 from coreason_identity.identity_mapper import IdentityMapper
 from coreason_identity.models import DeviceFlowResponse
+from httpx import Request, Response
 
 
 # Helper for httpx mocks

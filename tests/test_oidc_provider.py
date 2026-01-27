@@ -14,10 +14,9 @@ from unittest.mock import AsyncMock, Mock
 
 import httpx
 import pytest
-from httpx import Response
-
 from coreason_identity.exceptions import CoreasonIdentityError
 from coreason_identity.oidc_provider import OIDCProvider
+from httpx import Response
 
 
 @pytest.fixture
