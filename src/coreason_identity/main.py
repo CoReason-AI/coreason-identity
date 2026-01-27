@@ -58,10 +58,11 @@ def main() -> None:  # pragma: no cover
                 header = token if token.startswith("Bearer ") else f"Bearer {token}"
                 user = identity.validate_token(header)
                 print("\nSUCCESS: Token Validated")
-                print(f"User ID: {user.sub}")
+                print(f"User ID: {user.user_id}")
                 print(f"Email:   {user.email}")
-                print(f"Project: {user.project_context}")
-                print(f"Perms:   {user.permissions}")
+                print(f"Groups:  {user.groups}")
+                print(f"Scopes:  {user.scopes}")
+                print(f"Claims:  {user.claims}")
             except CoreasonIdentityError as e:
                 print(f"\nFAILURE: Validation Failed - {e}")
 

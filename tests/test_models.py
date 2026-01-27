@@ -27,6 +27,7 @@ def test_user_context_valid() -> None:
     assert user.email == "test@example.com"
     assert user.groups == ["admin"]
     assert user.scopes == ["read"]
+    assert user.downstream_token is not None
     assert user.downstream_token.get_secret_value() == "secret"
     assert user.claims == {"custom": "value"}
 
