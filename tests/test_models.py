@@ -9,8 +9,9 @@
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
 import pytest
+from pydantic import SecretStr, ValidationError
+
 from coreason_identity.models import UserContext
-from pydantic import ValidationError, SecretStr
 
 
 def test_user_context_valid() -> None:
@@ -21,7 +22,7 @@ def test_user_context_valid() -> None:
         groups=["admin"],
         scopes=["read"],
         downstream_token=SecretStr("secret"),
-        claims={"custom": "value"}
+        claims={"custom": "value"},
     )
     assert user.user_id == "user123"
     assert user.email == "test@example.com"

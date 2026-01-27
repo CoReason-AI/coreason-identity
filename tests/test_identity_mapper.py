@@ -12,6 +12,7 @@ from typing import Any, Dict
 from unittest.mock import patch
 
 import pytest
+
 from coreason_identity.exceptions import CoreasonIdentityError
 from coreason_identity.identity_mapper import IdentityMapper, RawIdPClaims
 from coreason_identity.models import UserContext
@@ -30,7 +31,7 @@ def test_map_claims_happy_path_explicit(mapper: IdentityMapper) -> None:
         "https://coreason.com/project_id": "proj_123",
         "permissions": ["read", "write"],
         "scope": "read write",
-        "groups": ["group1"]
+        "groups": ["group1"],
     }
     context = mapper.map_claims(claims)
 

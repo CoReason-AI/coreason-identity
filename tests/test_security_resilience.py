@@ -14,6 +14,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from authlib.jose.errors import InvalidClaimError
+
 from coreason_identity.config import CoreasonIdentityConfig
 from coreason_identity.exceptions import (
     CoreasonIdentityError,
