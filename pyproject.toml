@@ -1,6 +1,6 @@
 [project]
 name = "coreason_identity"
-version = "0.4.0"
+version = "0.4.1"
 description = "Decoupled authentication middleware, abstracting OIDC and OAuth2 protocols from the main application."
 readme = "README.md"
 requires-python = ">=3.11, <3.15"

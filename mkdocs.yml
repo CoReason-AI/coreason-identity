@@ -3,3 +3,5 @@ theme:
   name: material
 nav:
   - Home: index.md
+  - Identity Passport: identity_passport.md
+  - Integration Guides: integration_guides.md
