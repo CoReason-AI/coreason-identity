@@ -1,6 +1,6 @@
 [project]
 name = "coreason_identity"
-version = "0.4.1"
+version = "0.4.2"
 description = "Decoupled authentication middleware, abstracting OIDC and OAuth2 protocols from the main application."
 readme = "README.md"
 requires-python = ">=3.11, <3.15"
@@ -23,8 +23,8 @@ dependencies = [
     "email-validator>=2.3.0,<3.0.0",
     "opentelemetry-api>=1.39.1,<2.0.0",
     "anyio>=4.12.1,<5.0.0",
-    "aiofiles>=23.0.0,<24.0.0",
-    "types-aiofiles>=23.0.0,<24.0.0",
+    "aiofiles>=25.1.0,<26.0.0",
+    "types-aiofiles>=25.1.0,<26.0.0",
 ]
 
 [project.urls]
@@ -37,10 +37,10 @@ packages = [{include = "coreason_identity", from = "src"}]
 include = [{ path = "NOTICE", format = ["sdist", "wheel"] }]
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^8.2.2"
+pytest = "^9.0.2"
 ruff = "^0.14.14"
-pre-commit = "^3.7.1"
-pytest-cov = "^5.0.0"
+pre-commit = "^4.5.1"
+pytest-cov = "^7.0.0"
 mkdocs = "^1.6.0"
 mkdocs-material = "^9.5.26"
 opentelemetry-sdk = "^1.39.1"
