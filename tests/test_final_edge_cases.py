@@ -18,6 +18,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from authlib.jose import JsonWebKey, jwt
+
 from coreason_identity.config import CoreasonIdentityConfig
 from coreason_identity.exceptions import (
     InvalidAudienceError,

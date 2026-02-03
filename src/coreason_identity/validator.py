@@ -16,7 +16,6 @@ import hashlib
 from typing import Any, Dict, Optional
 
 from authlib.jose import JsonWebToken
-from authlib.jose.util import extract_header
 from authlib.jose.errors import (
     BadSignatureError,
     ExpiredTokenError,
@@ -24,6 +23,7 @@ from authlib.jose.errors import (
     JoseError,
     MissingClaimError,
 )
+from authlib.jose.util import extract_header
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
 
@@ -91,7 +91,8 @@ class TokenValidator:
                     return True
                 else:
                     logger.warning(
-                        f"Token has known kid '{kid}' but validation failed ({type(exception).__name__}). Not refreshing."
+                        f"Token has known kid '{kid}' but validation failed ({type(exception).__name__}). "
+                        "Not refreshing."
                     )
                     return False
             else:
@@ -154,7 +155,9 @@ class TokenValidator:
                 except (ValueError, BadSignatureError) as e:
                     # DoS Protection / Smart Refresh check
                     if self._should_refresh_jwks(token, jwks, e):
-                        logger.info("Validation failed with cached keys and unknown kid, refreshing JWKS and retrying...")
+                        logger.info(
+                            "Validation failed with cached keys and unknown kid, refreshing JWKS and retrying..."
+                        )
                         span.add_event("refreshing_jwks")
                         # force_refresh=True will now respect the debounce interval in OIDCProvider
                         jwks = await self.oidc_provider.get_jwks(force_refresh=True)
