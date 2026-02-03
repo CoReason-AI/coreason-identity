@@ -93,7 +93,8 @@ async def test_telemetry_jwks_refresh_event(
                 mock_extract.return_value = {"kid": "unknown-key"}
                 mock_decode.side_effect = [BadSignatureError("bad sig"), claims]
 
-                await validator.validate_token("dummy_token")
+                # Use a structurally valid token (3 parts) to pass the malformed check
+                await validator.validate_token("header.payload.signature")
 
     spans = exporter.get_finished_spans()
     assert len(spans) == 1

@@ -119,7 +119,7 @@ async def test_validator_jose_error_generic() -> None:
         # Note: SignatureVerificationError inherits from InvalidTokenError,
         # but here we expect the generic wrap message "Token validation failed: ..."
         with pytest.raises(CoreasonIdentityError, match="Token validation failed: Some random JOSE error"):
-            await validator.validate_token("bad_token")
+            await validator.validate_token("header.payload.signature")
 
 
 # --- 2. IdentityMapper Verification ---
