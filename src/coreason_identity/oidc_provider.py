@@ -27,10 +27,10 @@ class OIDCProvider:
 
     Attributes:
         discovery_url (str): The OIDC discovery URL.
-        cache_ttl (int): The cache time-to-live in seconds.
+        cache_ttl (float): The cache time-to-live in seconds.
     """
 
-    def __init__(self, discovery_url: str, client: httpx.AsyncClient, cache_ttl: int = 3600) -> None:
+    def __init__(self, discovery_url: str, client: httpx.AsyncClient, cache_ttl: float = 3600) -> None:
         """
         Initialize the OIDCProvider.
 

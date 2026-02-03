@@ -23,6 +23,7 @@ from authlib.jose.errors import (
     JoseError,
     MissingClaimError,
 )
+from authlib.jose.util import extract_header
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
 
@@ -113,17 +114,37 @@ class TokenValidator:
                 try:
                     claims = _decode(jwks, claims_options)
                 except (ValueError, BadSignatureError):
-                    # If key is missing or signature is bad (potential key rotation), try refreshing keys
-                    logger.info("Validation failed with cached keys, refreshing JWKS and retrying...")
-                    span.add_event("refreshing_jwks")
-                    jwks = await self.oidc_provider.get_jwks(force_refresh=True)
+                    # Check if key rotation is needed
+                    should_refresh = True
+                    try:
+                        # Extract kid manually to avoid refresh on bad signature with known key
+                        if token.count('.') == 2:
+                            header_segment = token.split('.')[0].encode('ascii')
+                            header = extract_header(header_segment, ValueError)
+                            kid = header.get("kid")
+                            if kid:
+                                # jwks is {'keys': [...]}
+                                known_kids = {k.get("kid") for k in jwks.get("keys", [])}
+                                if kid in known_kids:
+                                    should_refresh = False
+                                    logger.warning(f"Signature verification failed for known key {kid}. Not refreshing JWKS.")
+                    except Exception:
+                        pass  # Fallback to refresh
 
-                    # Update issuer if dynamic, as config might have changed (rare but possible)
-                    if not self.issuer:
-                        expected_issuer = await self.oidc_provider.get_issuer()
-                        claims_options = get_claims_options(expected_issuer)
+                    if should_refresh:
+                        # If key is missing or signature is bad (potential key rotation), try refreshing keys
+                        logger.info("Validation failed with unknown key or missing kid, refreshing JWKS...")
+                        span.add_event("refreshing_jwks")
+                        jwks = await self.oidc_provider.get_jwks(force_refresh=True)
 
-                    claims = _decode(jwks, claims_options)
+                        # Update issuer if dynamic, as config might have changed (rare but possible)
+                        if not self.issuer:
+                            expected_issuer = await self.oidc_provider.get_issuer()
+                            claims_options = get_claims_options(expected_issuer)
+
+                        claims = _decode(jwks, claims_options)
+                    else:
+                        raise
 
                 payload = dict(claims)
 
