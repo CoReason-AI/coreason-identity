@@ -178,7 +178,7 @@ class TestIdentityMapperComplex:
         assert context.claims["project_context"] == "EXPLICIT_ID"
 
     def test_mapper_admin_group_case_insensitive(self) -> None:
-        """Test 'AdMiN' maps to permissions=['*']."""
+        """Test 'AdMiN' does NOT map to permissions=['*'] anymore."""
         mapper = IdentityMapper()
         claims = {
             "sub": "u1",
@@ -186,7 +186,7 @@ class TestIdentityMapperComplex:
             "groups": ["AdMiN"],
         }
         context = mapper.map_claims(claims)
-        assert context.claims["permissions"] == ["*"]
+        assert context.claims["permissions"] == []
 
 
 class TestDeviceFlowClientComplex:

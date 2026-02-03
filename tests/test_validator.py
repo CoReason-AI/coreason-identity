@@ -27,9 +27,10 @@ from coreason_identity.validator import TokenValidator
 class TestTokenValidator:
     @pytest.fixture
     def mock_oidc_provider(self) -> Mock:
-        # Mock OIDCProvider with async get_jwks
+        # Mock OIDCProvider with async get_jwks and get_issuer
         provider = Mock(spec=OIDCProvider)
         provider.get_jwks = AsyncMock()
+        provider.get_issuer = AsyncMock(return_value="https://valid-issuer.com")
         return provider
 
     @pytest.fixture
@@ -62,6 +63,7 @@ class TestTokenValidator:
         claims = {
             "sub": "user123",
             "aud": "my-audience",
+            "iss": "https://valid-issuer.com",
             "exp": now + 3600,
             "iat": now,
         }
@@ -84,6 +86,7 @@ class TestTokenValidator:
         claims = {
             "sub": "user123",
             "aud": "my-audience",
+            "iss": "https://valid-issuer.com",
             "exp": now - 3600,  # Expired
         }
         token = self.create_token(key_pair, claims)
@@ -102,6 +105,7 @@ class TestTokenValidator:
         claims = {
             "sub": "user123",
             "aud": "wrong-audience",
+            "iss": "https://valid-issuer.com",
             "exp": now + 3600,
         }
         token = self.create_token(key_pair, claims)
@@ -120,6 +124,7 @@ class TestTokenValidator:
         claims = {
             "sub": "user123",
             "aud": "my-audience",
+            "iss": "https://valid-issuer.com",
             "exp": now + 3600,
         }
         # Sign with a different key
@@ -157,6 +162,7 @@ class TestTokenValidator:
         claims = {
             "sub": "user123",
             # Missing aud
+            "iss": "https://valid-issuer.com",
             "exp": now + 3600,
         }
         token = self.create_token(key_pair, claims)
