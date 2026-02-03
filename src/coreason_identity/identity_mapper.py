@@ -138,12 +138,8 @@ class IdentityMapper:
                             break
 
             # 4. Resolve Permissions
-            # Priority: explicit 'permissions' claim (already parsed) -> group mapping
-            if not permissions:
-                # Fallback: Map groups to permissions
-                # Rule: if group is "admin" (case-insensitive), assign ["*"]
-                if any(g.lower() == "admin" for g in groups):
-                    permissions = ["*"]
+            # Priority: explicit 'permissions' claim (already parsed)
+            # No fallback logic to "admin" group for security reasons (avoid implicit privilege escalation)
 
             # 5. Construct Extended Claims
             # We preserve all original claims and add derived ones for convenience if not present

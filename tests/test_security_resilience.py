@@ -86,6 +86,7 @@ async def test_audience_mismatch_real_validator_behavior() -> None:
 
     mock_oidc = MagicMock()
     mock_oidc.get_jwks = AsyncMock(return_value={"keys": []})
+    mock_oidc.get_issuer = AsyncMock(return_value="https://issuer.com")
     validator = TokenValidator(mock_oidc, audience="expected-audience")
 
     # Mock the internal jwt.decode to raise InvalidClaimError for 'aud'
@@ -123,6 +124,7 @@ async def test_pii_redaction_in_logs(log_capture: List[str]) -> None:
 
     mock_oidc = MagicMock(spec=OIDCProvider)
     mock_oidc.get_jwks = AsyncMock(return_value={"keys": []})
+    mock_oidc.get_issuer = AsyncMock(return_value="https://issuer.com")
 
     validator = TokenValidator(mock_oidc, audience="aud")
 
@@ -223,6 +225,7 @@ class TestSecurityEdgeCases:
 
         mock_oidc = MagicMock(spec=OIDCProvider)
         mock_oidc.get_jwks = AsyncMock(return_value={"keys": []})
+        mock_oidc.get_issuer = AsyncMock(return_value="https://issuer.com")
 
         validator = TokenValidator(mock_oidc, audience="aud")
 

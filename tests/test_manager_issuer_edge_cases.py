@@ -41,8 +41,8 @@ def create_token(key: Any, claims: Dict[str, Any], headers: Dict[str, Any] | Non
 
 def test_init_with_trailing_slash_in_domain() -> None:
     """
-    Test that if config.domain has a trailing slash, the constructed issuer
-    normalizes it to a single slash.
+    Test that if config.domain has a trailing slash, it is normalized,
+    and TokenValidator is initialized with issuer=None (dynamic).
     """
     domain = "test.auth0.com/"
     config = CoreasonIdentityConfig(domain=domain, audience="aud")
@@ -53,16 +53,15 @@ def test_init_with_trailing_slash_in_domain() -> None:
     ):
         IdentityManager(config)
 
-        expected_issuer = "https://test.auth0.com/"
         MockValidator.assert_called_once()
         args, kwargs = MockValidator.call_args
-        assert kwargs["issuer"] == expected_issuer
+        assert kwargs["issuer"] is None
 
 
 def test_init_with_protocol_in_domain() -> None:
     """
     Test behavior when domain includes protocol.
-    It should be stripped and forced to https.
+    TokenValidator should receive issuer=None.
     """
     domain = "https://test.auth0.com"
     config = CoreasonIdentityConfig(domain=domain, audience="aud")
@@ -73,10 +72,9 @@ def test_init_with_protocol_in_domain() -> None:
     ):
         IdentityManager(config)
 
-        expected_issuer = "https://test.auth0.com/"
         MockValidator.assert_called_once()
         args, kwargs = MockValidator.call_args
-        assert kwargs["issuer"] == expected_issuer
+        assert kwargs["issuer"] is None
 
 
 def test_validate_token_missing_iss_claim(key_pair: Any, jwks: Dict[str, Any]) -> None:
@@ -85,13 +83,11 @@ def test_validate_token_missing_iss_claim(key_pair: Any, jwks: Dict[str, Any]) -
     audience = "test-audience"
     config = CoreasonIdentityConfig(domain=domain, audience=audience)
 
-    # We mock OIDCProvider to be injected into IdentityManager
-    # But IdentityManager instantiates it internally.
-    # We patch the class.
     with patch("coreason_identity.manager.OIDCProvider") as MockOIDC:
         mock_oidc_instance = MockOIDC.return_value
-        # get_jwks is async
         mock_oidc_instance.get_jwks = AsyncMock(return_value=jwks)
+        # Mock get_issuer to return a valid issuer
+        mock_oidc_instance.get_issuer = AsyncMock(return_value=f"https://{domain}/")
 
         manager = IdentityManager(config)
 
@@ -105,7 +101,7 @@ def test_validate_token_missing_iss_claim(key_pair: Any, jwks: Dict[str, Any]) -
         }
         token = create_token(key_pair, claims).decode("utf-8")
 
-        # Should fail because iss is marked essential=True in TokenValidator
+        # Should fail because iss is marked essential=True in TokenValidator (derived from get_issuer)
         with pytest.raises(CoreasonIdentityError, match="Missing claim"):
             manager.validate_token(f"Bearer {token}")
 
@@ -113,17 +109,21 @@ def test_validate_token_missing_iss_claim(key_pair: Any, jwks: Dict[str, Any]) -
 def test_validate_token_no_trailing_slash_match(key_pair: Any, jwks: Dict[str, Any]) -> None:
     """
     Test validation when token issuer is valid domain but missing trailing slash.
-    Config expects: https://domain/
-    Token has: https://domain
-    Should fail due to strict string matching.
+    Config expects: https://domain/ (usually)
+    But now we rely on OIDCProvider.get_issuer().
+    If OIDC Provider returns issuer WITHOUT slash, and token matches, it should PASS.
     """
     domain = "test.auth0.com"
     audience = "test-audience"
     config = CoreasonIdentityConfig(domain=domain, audience=audience)
 
+    # Issuer from OIDC Config (no slash)
+    oidc_issuer = f"https://{domain}"
+
     with patch("coreason_identity.manager.OIDCProvider") as MockOIDC:
         mock_oidc_instance = MockOIDC.return_value
         mock_oidc_instance.get_jwks = AsyncMock(return_value=jwks)
+        mock_oidc_instance.get_issuer = AsyncMock(return_value=oidc_issuer)
 
         manager = IdentityManager(config)
 
@@ -131,14 +131,14 @@ def test_validate_token_no_trailing_slash_match(key_pair: Any, jwks: Dict[str, A
         claims = {
             "sub": "user123",
             "aud": audience,
-            "iss": f"https://{domain}",  # No trailing slash
+            "iss": oidc_issuer,  # Matches OIDC config
             "exp": now + 3600,
             "email": "test@example.com",
         }
         token = create_token(key_pair, claims).decode("utf-8")
 
-        with pytest.raises(CoreasonIdentityError, match="Invalid claim"):
-            manager.validate_token(f"Bearer {token}")
+        # Should PASS now
+        manager.validate_token(f"Bearer {token}")
 
 
 def test_validate_token_http_protocol(key_pair: Any, jwks: Dict[str, Any]) -> None:
@@ -147,9 +147,13 @@ def test_validate_token_http_protocol(key_pair: Any, jwks: Dict[str, Any]) -> No
     audience = "test-audience"
     config = CoreasonIdentityConfig(domain=domain, audience=audience)
 
+    # Issuer from OIDC Config (HTTPS)
+    oidc_issuer = f"https://{domain}/"
+
     with patch("coreason_identity.manager.OIDCProvider") as MockOIDC:
         mock_oidc_instance = MockOIDC.return_value
         mock_oidc_instance.get_jwks = AsyncMock(return_value=jwks)
+        mock_oidc_instance.get_issuer = AsyncMock(return_value=oidc_issuer)
 
         manager = IdentityManager(config)
 
@@ -157,7 +161,7 @@ def test_validate_token_http_protocol(key_pair: Any, jwks: Dict[str, Any]) -> No
         claims = {
             "sub": "user123",
             "aud": audience,
-            "iss": f"http://{domain}/",  # HTTP
+            "iss": f"http://{domain}/",  # HTTP (mismatch)
             "exp": now + 3600,
             "email": "test@example.com",
         }
@@ -170,7 +174,7 @@ def test_validate_token_http_protocol(key_pair: Any, jwks: Dict[str, Any]) -> No
 def test_init_with_http_protocol_in_domain() -> None:
     """
     Test behavior when domain includes http:// protocol.
-    It should be stripped and forced to https.
+    TokenValidator should receive issuer=None.
     """
     domain = "http://test.auth0.com"
     config = CoreasonIdentityConfig(domain=domain, audience="aud")
@@ -181,7 +185,6 @@ def test_init_with_http_protocol_in_domain() -> None:
     ):
         IdentityManager(config)
 
-        expected_issuer = "https://test.auth0.com/"
         MockValidator.assert_called_once()
         args, kwargs = MockValidator.call_args
-        assert kwargs["issuer"] == expected_issuer
+        assert kwargs["issuer"] is None
