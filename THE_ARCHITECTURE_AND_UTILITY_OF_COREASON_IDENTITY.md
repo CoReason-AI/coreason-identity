@@ -18,7 +18,7 @@ The architecture follows a "Borrow Over Build" directive, wrapping industry-stan
 Internally, the `IdentityManager` orchestrates a pipeline:
 1.  **Auto-Discovery:** It fetches the OIDC configuration from the IdP.
 2.  **Validation:** It cryptographically verifies the token signature and strictly checks the `aud` (audience) claim to prevent token misuse.
-3.  **Mapping:** It transforms abstract IdP groups (e.g., "admins") into concrete application permissions and project contexts.
+3.  **Mapping:** It transforms abstract IdP groups into concrete application project contexts, while enforcing strict permission mapping without implicit privilege escalation.
 
 ### 3. In Practice (The How)
 The package exposes a single, high-level entry point: `IdentityManager`.

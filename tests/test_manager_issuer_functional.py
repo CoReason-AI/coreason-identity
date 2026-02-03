@@ -59,6 +59,7 @@ def test_manager_enforces_strict_issuer(key_pair: Any, jwks: Dict[str, Any]) -> 
     with patch("coreason_identity.manager.OIDCProvider") as MockOIDC:
         mock_oidc_instance = MockOIDC.return_value
         mock_oidc_instance.get_jwks = AsyncMock(return_value=jwks)
+        mock_oidc_instance.get_issuer = AsyncMock(return_value=correct_issuer)
 
         # We deliberately DO NOT mock TokenValidator or IdentityMapper here to test integration
         # However, IdentityMapper might fail if we don't return expected claims structure.

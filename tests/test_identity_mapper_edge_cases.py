@@ -73,7 +73,7 @@ def test_mapper_claims_conflicts(mapper: IdentityMapper) -> None:
     ctx2 = mapper.map_claims(c2)
     # Logic: if not permissions (input), map groups.
     # If mapped -> extended_claims["permissions"] = mapped
-    assert ctx2.claims["permissions"] == ["*"]
+    assert ctx2.claims["permissions"] == []
 
     # Case 3: Both exist. Explicit should win (based on code reading).
     # "if not permissions:" check ensures we don't overwrite if permissions exist.

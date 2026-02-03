@@ -56,7 +56,7 @@ class TokenValidator:
         Args:
             oidc_provider: The OIDCProvider instance to fetch JWKS.
             audience: The expected audience (aud) claim.
-            issuer: The expected issuer (iss) claim.
+            issuer: The expected issuer (iss) claim. If None, it will be fetched dynamically from OIDCProvider.
         """
         self.oidc_provider = oidc_provider
         self.audience = audience
@@ -85,32 +85,45 @@ class TokenValidator:
             # Sanitize input
             token = token.strip()
 
-            # Define claim options
-            claims_options = {
-                "exp": {"essential": True},
-                "aud": {"essential": True, "value": self.audience},
-            }
-            if self.issuer:
-                claims_options["iss"] = {"essential": True, "value": self.issuer}
-
-            def _decode(jwks: Dict[str, Any]) -> Any:
-                claims = self.jwt.decode(token, jwks, claims_options=claims_options)
-                claims.validate()
-                return claims
-
             try:
                 # Fetch JWKS (cached)
-                # This is now an async call
+                # This ensures OIDC config is also fetched/cached
                 jwks = await self.oidc_provider.get_jwks()
 
+                # Determine expected issuer
+                expected_issuer = self.issuer
+                if not expected_issuer:
+                    expected_issuer = await self.oidc_provider.get_issuer()
+
+                # Define claim options factory
+                def get_claims_options(iss: str) -> Dict[str, Any]:
+                    return {
+                        "exp": {"essential": True},
+                        "aud": {"essential": True, "value": self.audience},
+                        "iss": {"essential": True, "value": iss},
+                    }
+
+                claims_options = get_claims_options(expected_issuer)
+
+                def _decode(jwks_data: Dict[str, Any], opts: Dict[str, Any]) -> Any:
+                    claims = self.jwt.decode(token, jwks_data, claims_options=opts)
+                    claims.validate()
+                    return claims
+
                 try:
-                    claims = _decode(jwks)
+                    claims = _decode(jwks, claims_options)
                 except (ValueError, BadSignatureError):
                     # If key is missing or signature is bad (potential key rotation), try refreshing keys
                     logger.info("Validation failed with cached keys, refreshing JWKS and retrying...")
                     span.add_event("refreshing_jwks")
                     jwks = await self.oidc_provider.get_jwks(force_refresh=True)
-                    claims = _decode(jwks)
+
+                    # Update issuer if dynamic, as config might have changed (rare but possible)
+                    if not self.issuer:
+                        expected_issuer = await self.oidc_provider.get_issuer()
+                        claims_options = get_claims_options(expected_issuer)
+
+                    claims = _decode(jwks, claims_options)
 
                 payload = dict(claims)
 
