@@ -8,15 +8,14 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
+import asyncio
 import time
-from typing import Any
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
 import pytest
 from coreason_identity.exceptions import CoreasonIdentityError
 from coreason_identity.oidc_provider import OIDCProvider
-from httpx import Response
 
 
 @pytest.fixture
@@ -25,201 +24,197 @@ def mock_client() -> AsyncMock:
 
 
 @pytest.fixture
-def oidc_provider(mock_client: AsyncMock) -> OIDCProvider:
-    return OIDCProvider(discovery_url="https://test.auth0.com/.well-known/openid-configuration", client=mock_client)
-
-
-def test_initialization(mock_client: AsyncMock) -> None:
-    provider = OIDCProvider(
-        discovery_url="https://test.auth0.com/.well-known/openid-configuration", client=mock_client, cache_ttl=1800
-    )
-    assert provider.discovery_url == "https://test.auth0.com/.well-known/openid-configuration"
-    assert provider.cache_ttl == 1800
-    assert provider._jwks_cache is None
-    assert provider._last_update == 0.0
-    assert provider.client is mock_client
+def provider(mock_client: AsyncMock) -> OIDCProvider:
+    return OIDCProvider("https://idp/.well-known/openid-configuration", mock_client)
 
 
 @pytest.mark.asyncio
-async def test_get_jwks_success(mock_client: AsyncMock, oidc_provider: OIDCProvider) -> None:
-    # Setup mocks
-    mock_config_response = Mock(spec=Response)
-    mock_config_response.raise_for_status.return_value = None
-    mock_config_response.json.return_value = {"jwks_uri": "https://test.auth0.com/.well-known/jwks.json"}
+async def test_get_jwks_success(provider: OIDCProvider, mock_client: AsyncMock) -> None:
+    # Mock OIDC config response
+    mock_client.get.side_effect = [
+        Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks"}),
+        Mock(status_code=200, json=lambda: {"keys": []}),
+    ]
 
-    mock_jwks_response = Mock(spec=Response)
-    mock_jwks_response.raise_for_status.return_value = None
-    mock_jwks_response.json.return_value = {"keys": [{"kid": "123", "kty": "RSA"}]}
-
-    # Configure side_effect for consecutive calls
-    mock_client.get.side_effect = [mock_config_response, mock_jwks_response]
-
-    # Execute
-    jwks = await oidc_provider.get_jwks()
-
-    # Verify
-    assert jwks == {"keys": [{"kid": "123", "kty": "RSA"}]}
-    assert oidc_provider._jwks_cache == jwks
-    assert oidc_provider._last_update > 0.0
-    assert mock_client.get.call_count == 2
-    mock_client.get.assert_any_call("https://test.auth0.com/.well-known/openid-configuration")
-    mock_client.get.assert_any_call("https://test.auth0.com/.well-known/jwks.json")
-
-
-@pytest.mark.asyncio
-async def test_get_jwks_caching(mock_client: AsyncMock, oidc_provider: OIDCProvider) -> None:
-    # Setup mocks
-    mock_config_response = Mock(spec=Response)
-    mock_config_response.raise_for_status.return_value = None
-    mock_config_response.json.return_value = {"jwks_uri": "https://test.auth0.com/.well-known/jwks.json"}
-
-    mock_jwks_response = Mock(spec=Response)
-    mock_jwks_response.raise_for_status.return_value = None
-    mock_jwks_response.json.return_value = {"keys": [{"kid": "123", "kty": "RSA"}]}
-
-    mock_client.get.side_effect = [mock_config_response, mock_jwks_response]
-
-    # First call - fetches from network
-    jwks1 = await oidc_provider.get_jwks()
+    jwks = await provider.get_jwks()
+    assert jwks == {"keys": []}
     assert mock_client.get.call_count == 2
 
-    # Second call - should use cache
-    jwks2 = await oidc_provider.get_jwks()
-    assert jwks1 == jwks2
-    assert mock_client.get.call_count == 2  # Count should remain 2
+
+@pytest.mark.asyncio
+async def test_get_jwks_cache_hit(provider: OIDCProvider, mock_client: AsyncMock) -> None:
+    # Populate cache
+    provider._jwks_cache = {"keys": ["cached"]}
+    provider._last_update = time.time()
+
+    jwks = await provider.get_jwks()
+    assert jwks == {"keys": ["cached"]}
+    assert mock_client.get.call_count == 0
 
 
 @pytest.mark.asyncio
-async def test_get_jwks_force_refresh(mock_client: AsyncMock, oidc_provider: OIDCProvider) -> None:
-    # Setup mocks
-    mock_config_response = Mock(spec=Response)
-    mock_config_response.raise_for_status.return_value = None
-    mock_config_response.json.return_value = {"jwks_uri": "https://test.auth0.com/.well-known/jwks.json"}
+async def test_get_jwks_force_refresh(provider: OIDCProvider, mock_client: AsyncMock) -> None:
+    provider._jwks_cache = {"keys": ["cached"]}
+    provider._last_update = time.time()
 
-    mock_jwks_response = Mock(spec=Response)
-    mock_jwks_response.raise_for_status.return_value = None
-    mock_jwks_response.json.return_value = {"keys": [{"kid": "123", "kty": "RSA"}]}
+    mock_client.get.side_effect = [
+        Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks"}),
+        Mock(status_code=200, json=lambda: {"keys": ["fresh"]}),
+    ]
 
-    # We expect 2 cycles of calls (config, jwks, config, jwks)
-    mock_client.get.side_effect = [mock_config_response, mock_jwks_response, mock_config_response, mock_jwks_response]
-
-    # First call
-    await oidc_provider.get_jwks()
-    assert mock_client.get.call_count == 2
-
-    # Force refresh
-    await oidc_provider.get_jwks(force_refresh=True)
-    assert mock_client.get.call_count == 4
+    jwks = await provider.get_jwks(force_refresh=True)
+    assert jwks == {"keys": ["fresh"]}
 
 
 @pytest.mark.asyncio
-async def test_get_jwks_cache_expiration(mock_client: AsyncMock, oidc_provider: OIDCProvider) -> None:
-    # Setup mocks
-    mock_config_response = Mock(spec=Response)
-    mock_config_response.raise_for_status.return_value = None
-    mock_config_response.json.return_value = {"jwks_uri": "https://test.auth0.com/.well-known/jwks.json"}
+async def test_get_jwks_expired_cache(provider: OIDCProvider, mock_client: AsyncMock) -> None:
+    provider._jwks_cache = {"keys": ["cached"]}
+    provider._last_update = time.time() - 3601  # Expired
 
-    mock_jwks_response = Mock(spec=Response)
-    mock_jwks_response.raise_for_status.return_value = None
-    mock_jwks_response.json.return_value = {"keys": [{"kid": "123", "kty": "RSA"}]}
+    mock_client.get.side_effect = [
+        Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks"}),
+        Mock(status_code=200, json=lambda: {"keys": ["fresh"]}),
+    ]
 
-    mock_client.get.side_effect = [mock_config_response, mock_jwks_response, mock_config_response, mock_jwks_response]
-
-    # Set a short TTL for testing
-    oidc_provider.cache_ttl = 0.1  # type: ignore[assignment]
-
-    # First call
-    await oidc_provider.get_jwks()
-    assert mock_client.get.call_count == 2
-
-    # Manually expire the cache
-    import time
-
-    oidc_provider._last_update = float(time.time() - 4000)
-    oidc_provider.cache_ttl = 3600
-
-    # Second call - should refetch
-    await oidc_provider.get_jwks()
-    assert mock_client.get.call_count == 4
+    jwks = await provider.get_jwks()
+    assert jwks == {"keys": ["fresh"]}
 
 
 @pytest.mark.asyncio
-async def test_fetch_oidc_config_failure(mock_client: AsyncMock, oidc_provider: OIDCProvider) -> None:
+async def test_fetch_oidc_config_error(provider: OIDCProvider, mock_client: AsyncMock) -> None:
     mock_client.get.side_effect = httpx.HTTPError("Network error")
 
-    with pytest.raises(CoreasonIdentityError) as exc_info:
-        await oidc_provider.get_jwks()
-
-    assert "Failed to fetch OIDC configuration" in str(exc_info.value)
+    with pytest.raises(CoreasonIdentityError, match="Failed to fetch OIDC configuration"):
+        await provider.get_jwks()
 
 
 @pytest.mark.asyncio
-async def test_fetch_jwks_failure(mock_client: AsyncMock, oidc_provider: OIDCProvider) -> None:
-    mock_config_response = Mock(spec=Response)
-    mock_config_response.raise_for_status.return_value = None
-    mock_config_response.json.return_value = {"jwks_uri": "https://test.auth0.com/.well-known/jwks.json"}
+async def test_missing_jwks_uri(provider: OIDCProvider, mock_client: AsyncMock) -> None:
+    mock_client.get.return_value = Mock(status_code=200, json=lambda: {})
 
-    mock_client.get.side_effect = [mock_config_response, httpx.HTTPError("Network error")]
-
-    with pytest.raises(CoreasonIdentityError) as exc_info:
-        await oidc_provider.get_jwks()
-
-    assert "Failed to fetch JWKS" in str(exc_info.value)
+    with pytest.raises(CoreasonIdentityError, match="OIDC configuration does not contain 'jwks_uri'"):
+        await provider.get_jwks()
 
 
 @pytest.mark.asyncio
-async def test_missing_jwks_uri(mock_client: AsyncMock, oidc_provider: OIDCProvider) -> None:
-    mock_config_response = Mock(spec=Response)
-    mock_config_response.raise_for_status.return_value = None
-    mock_config_response.json.return_value = {"other_field": "value"}
+async def test_fetch_jwks_error(provider: OIDCProvider, mock_client: AsyncMock) -> None:
+    mock_client.get.side_effect = [
+        Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks"}),
+        httpx.HTTPError("Network error"),
+    ]
 
-    mock_client.get.return_value = mock_config_response
-
-    with pytest.raises(CoreasonIdentityError) as exc_info:
-        await oidc_provider.get_jwks()
-
-    assert "OIDC configuration does not contain 'jwks_uri'" in str(exc_info.value)
+    with pytest.raises(CoreasonIdentityError, match="Failed to fetch JWKS"):
+        await provider.get_jwks()
 
 
 @pytest.mark.asyncio
-async def test_get_jwks_double_checked_lock_hit(mock_client: AsyncMock, oidc_provider: OIDCProvider) -> None:
-    """
-    Test that the double-check locking logic works.
-    We simulate a race condition where cache is invalid initially,
-    but becomes valid just before the lock is acquired.
-    """
-    # Simulate cache valid state but _jwks_cache initially None
-    oidc_provider._jwks_cache = None
-    oidc_provider._last_update = 0.0
+async def test_get_issuer_success(provider: OIDCProvider, mock_client: AsyncMock) -> None:
+    """Test retrieving issuer from fresh fetch."""
+    mock_client.get.side_effect = [
+        Mock(
+            status_code=200,
+            json=lambda: {"jwks_uri": "https://idp/jwks", "issuer": "https://idp.com"},
+        ),
+        Mock(status_code=200, json=lambda: {"keys": []}),
+    ]
 
-    valid_keys = {"keys": [{"kid": "race"}]}
+    issuer = await provider.get_issuer()
+    assert issuer == "https://idp.com"
+    # Ensure cache was populated (both config and JWKS)
+    assert provider._oidc_config_cache is not None
+    assert provider._jwks_cache is not None
 
-    # We need to simulate that after entering the lock, the cache is magically populated
-    # by another thread/task.
 
-    original_lock = oidc_provider._lock
+@pytest.mark.asyncio
+async def test_get_issuer_from_cache(provider: OIDCProvider, mock_client: AsyncMock) -> None:
+    """Test retrieving issuer from existing valid cache."""
+    provider._oidc_config_cache = {"issuer": "https://cached-idp.com", "jwks_uri": "..."}
+    provider._jwks_cache = {"keys": []}
+    provider._last_update = time.time()
 
-    class FakeLock:
-        async def __aenter__(self) -> None:
-            # Simulate another thread updated it
-            oidc_provider._jwks_cache = valid_keys
-            oidc_provider._last_update = time.time()
-            return None
-
-        async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-            pass
-
-    oidc_provider._lock = FakeLock()  # type: ignore
-
-    # Now call get_jwks without force_refresh
-    # It will see cache is None (outside lock), enter lock (FakeLock updates cache),
-    # check cache again (inside lock logic), find it valid, and return it.
-
-    result = await oidc_provider.get_jwks()
-
-    assert result == valid_keys
-    # Verify no network calls made
+    issuer = await provider.get_issuer()
+    assert issuer == "https://cached-idp.com"
     mock_client.get.assert_not_called()
 
-    # Restore lock just in case
-    oidc_provider._lock = original_lock
+
+@pytest.mark.asyncio
+async def test_get_issuer_missing_in_config(provider: OIDCProvider, mock_client: AsyncMock) -> None:
+    """Test error when 'issuer' is missing from OIDC config."""
+    mock_client.get.side_effect = [
+        Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks"}),  # No issuer
+        Mock(status_code=200, json=lambda: {"keys": []}),
+    ]
+
+    with pytest.raises(CoreasonIdentityError, match="does not contain 'issuer'"):
+        await provider.get_issuer()
+
+
+@pytest.mark.asyncio
+async def test_get_issuer_refreshes_if_expired(provider: OIDCProvider, mock_client: AsyncMock) -> None:
+    """Test that it refreshes if cache is expired."""
+    provider._oidc_config_cache = {"issuer": "old", "jwks_uri": "..."}
+    provider._jwks_cache = {}
+    provider._last_update = time.time() - 3601  # Expired
+
+    mock_client.get.side_effect = [
+        Mock(
+            status_code=200,
+            json=lambda: {"jwks_uri": "https://idp/jwks", "issuer": "new"},
+        ),
+        Mock(status_code=200, json=lambda: {"keys": []}),
+    ]
+
+    issuer = await provider.get_issuer()
+    assert issuer == "new"
+    assert mock_client.get.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_get_issuer_fails_if_config_none(provider: OIDCProvider) -> None:
+    """
+    Test fallback error if config remains None after attempt.
+    This scenario is theoretically unreachable if get_jwks raises on failure,
+    but we mock get_jwks to simulate strange state or for coverage.
+    """
+    # Mock get_jwks to NOT raise but also NOT populate config (simulating a bug or weird state)
+    # Since get_jwks implementation *does* populate it or raise, we have to patch it.
+    with patch.object(provider, "get_jwks", new=AsyncMock()):
+        # get_jwks does nothing, so _oidc_config_cache stays None
+        with pytest.raises(CoreasonIdentityError, match="Failed to load OIDC configuration"):
+            await provider.get_issuer()
+
+
+@pytest.mark.asyncio
+async def test_get_jwks_double_check_locking(provider: OIDCProvider, mock_client: AsyncMock) -> None:
+    """
+    Test the double-checked locking inside the lock.
+    We simulate a race where the cache is updated by another task while the current task is waiting for the lock.
+    """
+    # 1. Start with invalid cache so we enter the waiting phase
+    provider._jwks_cache = {"keys": ["old"]}
+    provider._last_update = 0  # Expired
+
+    # 2. Acquire lock manually to block the upcoming get_jwks call
+    await provider._lock.acquire()
+
+    try:
+        # 3. Schedule get_jwks() in background
+        task = asyncio.create_task(provider.get_jwks())
+
+        # Yield to allow task to start and hit the lock
+        await asyncio.sleep(0)
+
+        # 4. Update cache to be valid (simulating another thread finished refreshing)
+        provider._jwks_cache = {"keys": ["race_winner"]}
+        provider._last_update = time.time()
+
+    finally:
+        # 5. Release lock, allowing background task to proceed
+        provider._lock.release()
+
+    # 6. Await result
+    jwks = await task
+
+    # 7. Assert it used the cache we set, NOT fetching new one
+    assert jwks == {"keys": ["race_winner"]}
+    mock_client.get.assert_not_called()

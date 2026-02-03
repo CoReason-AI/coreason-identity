@@ -43,6 +43,7 @@ class OIDCProvider:
         self.client = client
         self.cache_ttl = cache_ttl
         self._jwks_cache: Optional[Dict[str, Any]] = None
+        self._oidc_config_cache: Optional[Dict[str, Any]] = None
         self._last_update: float = 0.0
         self._lock = anyio.Lock()
 
@@ -122,6 +123,32 @@ class OIDCProvider:
 
             # Update cache
             self._jwks_cache = jwks
+            self._oidc_config_cache = oidc_config
             self._last_update = current_time
 
             return jwks
+
+    async def get_issuer(self) -> str:
+        """
+        Returns the issuer from the OIDC configuration.
+        Refreshes configuration if not cached or expired (via get_jwks).
+
+        Returns:
+            The issuer string.
+
+        Raises:
+            CoreasonIdentityError: If configuration is invalid or fetching fails.
+        """
+        # Ensure cache is populated
+        if self._oidc_config_cache is None or (time.time() - self._last_update) >= self.cache_ttl:
+            await self.get_jwks()
+
+        if self._oidc_config_cache is None:
+            # Should be unreachable if get_jwks succeeds
+            raise CoreasonIdentityError("Failed to load OIDC configuration")
+
+        issuer = self._oidc_config_cache.get("issuer")
+        if not issuer:
+            raise CoreasonIdentityError("OIDC configuration does not contain 'issuer'")
+
+        return str(issuer)

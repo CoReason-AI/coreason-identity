@@ -69,7 +69,7 @@ def test_full_auth_flow_simulation(identity_manager: IdentityManager) -> None:
         groups=["admin", "project:apollo"],
         scopes=["read", "write"],
         downstream_token="raw_jwt_token_string",
-        claims={"project_context": "apollo", "permissions": ["*"]},  # Admin -> *
+        claims={"project_context": "apollo", "permissions": []},
     )
 
     # Cast to Any to satisfy typing for the mocked method
@@ -131,7 +131,7 @@ def test_integration_legacy_access(integration_manager: IdentityManager) -> None
     mock_claims = {
         "sub": "u2",
         "email": "bob@example.com",
-        "groups": ["project:gemini", "admin"],  # Admin -> * permissions
+        "groups": ["project:gemini", "admin"],
     }
 
     integration_manager._async.validator.validate_token = AsyncMock(return_value=mock_claims)  # type: ignore[method-assign]
@@ -140,7 +140,7 @@ def test_integration_legacy_access(integration_manager: IdentityManager) -> None
 
     # Verify Legacy Access
     assert user.claims.get("project_context") == "gemini"
-    assert user.claims.get("permissions") == ["*"]
+    assert user.claims.get("permissions") == []
 
     # Verify New Access
     assert user.groups == ["project:gemini", "admin"]

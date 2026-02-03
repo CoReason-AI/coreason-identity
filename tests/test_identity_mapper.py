@@ -66,8 +66,8 @@ def test_map_claims_project_fallback_to_groups(mapper: IdentityMapper) -> None:
     assert context.claims["project_context"] == "proj_ABC"
 
 
-def test_map_claims_permissions_fallback_admin(mapper: IdentityMapper) -> None:
-    """Test extracting permissions from 'admin' group."""
+def test_map_claims_permissions_fallback_admin_removed(mapper: IdentityMapper) -> None:
+    """Test that implicit admin -> * permissions mapping is removed."""
     claims: Dict[str, Any] = {
         "sub": "admin|789",
         "email": "admin@coreason.com",
@@ -75,7 +75,8 @@ def test_map_claims_permissions_fallback_admin(mapper: IdentityMapper) -> None:
     }
     context = mapper.map_claims(claims)
 
-    assert context.claims["permissions"] == ["*"]
+    # Should be empty or None depending on implementation, here empty list default
+    assert context.claims["permissions"] == []
     assert "project_context" not in context.claims
 
 

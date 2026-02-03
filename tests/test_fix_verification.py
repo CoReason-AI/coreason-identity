@@ -51,6 +51,7 @@ def test_missing_claim_raises_invalid_token_error(key_pair: Any, jwks: Dict[str,
         mock_oidc_instance = MockOIDC.return_value
         # get_jwks is async in IdentityManagerAsync
         mock_oidc_instance.get_jwks = AsyncMock(return_value=jwks)
+        mock_oidc_instance.get_issuer = AsyncMock(return_value=f"https://{domain}/")
 
         manager = IdentityManager(config)
 
@@ -85,6 +86,7 @@ def test_mapper_validation_raises_invalid_token_error(key_pair: Any, jwks: Dict[
     with patch("coreason_identity.manager.OIDCProvider") as MockOIDC:
         mock_oidc_instance = MockOIDC.return_value
         mock_oidc_instance.get_jwks = AsyncMock(return_value=jwks)
+        mock_oidc_instance.get_issuer = AsyncMock(return_value=f"https://{domain}/")
 
         manager = IdentityManager(config)
 

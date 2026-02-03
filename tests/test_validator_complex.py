@@ -28,6 +28,7 @@ class TestTokenValidatorComplex:
     def mock_oidc_provider(self) -> Mock:
         provider = Mock(spec=OIDCProvider)
         provider.get_jwks = AsyncMock()
+        provider.get_issuer = AsyncMock(return_value="https://valid-issuer.com")
         return provider
 
     @pytest.fixture
@@ -67,6 +68,7 @@ class TestTokenValidatorComplex:
         claims = {
             "sub": "user123",
             "aud": ["other-audience", "my-audience"],  # List with valid aud
+            "iss": "https://valid-issuer.com",
             "exp": now + 3600,
             "iat": now,
         }
@@ -87,6 +89,7 @@ class TestTokenValidatorComplex:
         claims = {
             "sub": "user123",
             "aud": ["other-audience", "another-one"],  # List without valid aud
+            "iss": "https://valid-issuer.com",
             "exp": now + 3600,
         }
         token = self.create_token(key_pair, claims)
@@ -106,6 +109,7 @@ class TestTokenValidatorComplex:
         claims = {
             "sub": "user123",
             "aud": "my-audience",
+            "iss": "https://valid-issuer.com",
             "exp": now + 3600,
         }
         token = self.create_token(key_pair, claims)
@@ -151,6 +155,7 @@ class TestTokenValidatorComplex:
         claims = {
             "sub": "user123",
             "aud": "my-audience",
+            "iss": "https://valid-issuer.com",
             "exp": now + 3600,
         }
         # Sign with second key (which is missing in old_jwks)
@@ -177,6 +182,7 @@ class TestTokenValidatorComplex:
         claims = {
             "sub": "user123",
             "aud": "my-audience",
+            "iss": "https://valid-issuer.com",
             "exp": now + 3600,
         }
         # Create a token with 'none' alg manually
@@ -209,6 +215,7 @@ class TestTokenValidatorComplex:
         claims = {
             "sub": "user123",
             "aud": "my-audience",
+            "iss": "https://valid-issuer.com",
             "exp": now + 3600,
         }
         token = self.create_token(unknown_key, claims)
