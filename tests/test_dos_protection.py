@@ -1,3 +1,4 @@
+
 import time
 from typing import Any, Dict
 from unittest.mock import AsyncMock, Mock
@@ -106,6 +107,7 @@ class TestDoS:
     ) -> None:
         """
         Verify that a MALFORMED token (garbage) does NOT trigger a JWKS refresh.
+        Case 1: 3 parts but invalid base64 (extract_header fails).
         """
         mock_oidc_provider.get_jwks.return_value = jwks
 
@@ -122,3 +124,23 @@ class TestDoS:
         assert not any(
             call.kwargs.get("force_refresh") is True for call in calls
         ), "get_jwks called with force_refresh=True for malformed token!"
+
+    @pytest.mark.asyncio
+    async def test_dos_really_malformed_token_no_refresh(
+        self, validator: TokenValidator, mock_oidc_provider: Mock, jwks: Dict[str, Any]
+    ) -> None:
+        """
+        Verify that a REALLY MALFORMED token (0 or 1 part) does NOT trigger a JWKS refresh.
+        Case 2: Not enough parts (covers 'else' block).
+        """
+        mock_oidc_provider.get_jwks.return_value = jwks
+
+        token_str = "garbage_without_dots"
+
+        with pytest.raises(CoreasonIdentityError):
+            await validator.validate_token(token_str)
+
+        calls = mock_oidc_provider.get_jwks.await_args_list
+        assert not any(
+            call.kwargs.get("force_refresh") is True for call in calls
+        ), "get_jwks called with force_refresh=True for really malformed token!"

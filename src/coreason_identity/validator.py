@@ -113,7 +113,7 @@ class TokenValidator:
 
                 try:
                     claims = _decode(jwks, claims_options)
-                except (ValueError, BadSignatureError):
+                except (ValueError, BadSignatureError, JoseError):
                     # Check if key rotation is needed
                     # Default to False: only refresh if we are SURE it's a new key
                     should_refresh = False
