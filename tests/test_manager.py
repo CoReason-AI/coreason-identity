@@ -222,10 +222,9 @@ def test_await_device_token_missing_client_id() -> None:
             mgr.await_device_token(mock_flow)
 
 
-def test_init_strict_issuer() -> None:
-    """Test that IdentityManager initializes TokenValidator with strict issuer check."""
+def test_init_dynamic_issuer() -> None:
+    """Test that IdentityManager initializes TokenValidator with dynamic issuer resolution (issuer=None)."""
     config = CoreasonIdentityConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id=MOCK_CLIENT_ID)
-    expected_issuer = f"https://{MOCK_DOMAIN}/"
 
     with (
         patch("coreason_identity.manager.OIDCProvider") as MockOIDC,
@@ -237,5 +236,5 @@ def test_init_strict_issuer() -> None:
         MockValidator.assert_called_once_with(
             oidc_provider=MockOIDC.return_value,
             audience=MOCK_AUDIENCE,
-            issuer=expected_issuer,
+            issuer=None,
         )

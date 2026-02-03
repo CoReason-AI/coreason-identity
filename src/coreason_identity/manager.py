@@ -53,13 +53,14 @@ class IdentityManagerAsync:
 
         # Use urljoin for robust path construction
         discovery_url = urljoin(base_url, "/.well-known/openid-configuration")
-        issuer_url = urljoin(base_url, "/")
 
         self.oidc_provider = OIDCProvider(discovery_url, self._client)
+        # Initialize TokenValidator with dynamic issuer resolution (issuer=None)
+        # This allows the validator to fetch the correct issuer from the OIDC config
         self.validator = TokenValidator(
             oidc_provider=self.oidc_provider,
             audience=self.config.audience,
-            issuer=issuer_url,
+            issuer=None,
         )
         self.identity_mapper = IdentityMapper()
         self.device_client: Optional[DeviceFlowClient] = None
