@@ -51,14 +51,22 @@ async def test_validator_retry_fails() -> None:
 
     validator = TokenValidator(mock_provider, audience="aud")
 
-    # Mock internal JWT decode
-    with patch("authlib.jose.JsonWebToken.decode") as mock_decode:
-        # First call fails, Second call (after refresh) also fails
-        mock_decode.side_effect = BadSignatureError("bad_signature")
+    # To trigger refresh with new logic, token must simulate an UNKNOWN kid.
+    # Cached JWKS is empty, so any kid is "unknown".
+    # Token must have 3 parts to be valid structure.
+    # We mock extract_header to return a kid.
 
-        # The error string from Authlib might contain "bad_signature: " or similar
-        with pytest.raises(SignatureVerificationError, match="Invalid signature:.*bad_signature"):
-            await validator.validate_token("bad_token")
+    with patch("authlib.jose.JsonWebToken.decode") as mock_decode:
+        with patch("coreason_identity.validator.extract_header") as mock_extract:
+            # Setup: token has 'kid': 'new-key'
+            mock_extract.return_value = {"kid": "new-key"}
+
+            # First call fails, Second call (after refresh) also fails
+            mock_decode.side_effect = BadSignatureError("bad_signature")
+
+            # The error string from Authlib might contain "bad_signature: " or similar
+            with pytest.raises(SignatureVerificationError, match="Invalid signature:.*bad_signature"):
+                await validator.validate_token("header.payload.signature")
 
     # Ensure refresh was called
     mock_provider.get_jwks.assert_called_with(force_refresh=True)
@@ -84,11 +92,15 @@ async def test_validator_refresh_network_error() -> None:
     validator = TokenValidator(mock_provider, audience="aud")
 
     with patch("authlib.jose.JsonWebToken.decode") as mock_decode:
-        # First decode fails (triggering refresh)
-        mock_decode.side_effect = BadSignatureError("Bad signature")
+        with patch("coreason_identity.validator.extract_header") as mock_extract:
+            # Force refresh logic: mock header with kid NOT in empty keys
+            mock_extract.return_value = {"kid": "unknown-key"}
 
-        with pytest.raises(CoreasonIdentityError, match="Network Down"):
-            await validator.validate_token("token_triggering_refresh")
+            # First decode fails (triggering refresh)
+            mock_decode.side_effect = BadSignatureError("Bad signature")
+
+            with pytest.raises(CoreasonIdentityError, match="Network Down"):
+                await validator.validate_token("header.payload.signature")
 
 
 @pytest.mark.asyncio

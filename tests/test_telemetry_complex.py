@@ -88,9 +88,12 @@ async def test_telemetry_jwks_refresh_event(
 
         # Simulate first decode failing with BadSignatureError, then second succeeding
         with patch("authlib.jose.JsonWebToken.decode") as mock_decode:
-            mock_decode.side_effect = [BadSignatureError("bad sig"), claims]
+            with patch("coreason_identity.validator.extract_header") as mock_extract:
+                # Mock unknown kid to force refresh
+                mock_extract.return_value = {"kid": "unknown-key"}
+                mock_decode.side_effect = [BadSignatureError("bad sig"), claims]
 
-            await validator.validate_token("dummy_token")
+                await validator.validate_token("dummy_token")
 
     spans = exporter.get_finished_spans()
     assert len(spans) == 1
