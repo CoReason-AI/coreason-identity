@@ -1,4 +1,3 @@
-
 import asyncio
 import time
 from unittest.mock import AsyncMock, MagicMock
@@ -22,18 +21,14 @@ async def test_dos_jwks_refresh_debounce() -> None:
     # We delay the first response slightly to simulate network latency, exposing race conditions if lock missing.
     async def side_effect(url: str) -> MagicMock:
         if "openid-configuration" in url:
-            return MagicMock(
-                status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks", "issuer": "https://idp"}
-            )
+            return MagicMock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks", "issuer": "https://idp"})
         await asyncio.sleep(0.1)  # Simulate latency
         return MagicMock(status_code=200, json=lambda: {"keys": [{"kid": "old-key", "kty": "RSA"}]})
 
     mock_client.get.side_effect = side_effect
 
     # Set a large debounce interval
-    provider = OIDCProvider(
-        "https://idp/.well-known/openid-configuration", mock_client, min_refresh_interval=100.0
-    )
+    provider = OIDCProvider("https://idp/.well-known/openid-configuration", mock_client, min_refresh_interval=100.0)
 
     validator = TokenValidator(provider, audience="aud")
 
@@ -78,9 +73,7 @@ async def test_refresh_allowed_after_interval() -> None:
 
     def side_effect(url: str) -> MagicMock:
         if "openid-configuration" in url:
-            return MagicMock(
-                status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks", "issuer": "https://idp"}
-            )
+            return MagicMock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks", "issuer": "https://idp"})
         return MagicMock(status_code=200, json=lambda: {"keys": [{"kid": "old-key", "kty": "RSA"}]})
 
     mock_client.get.side_effect = side_effect
@@ -128,17 +121,13 @@ async def test_smart_refresh_known_kid() -> None:
 
     def side_effect(url: str) -> MagicMock:
         if "openid-configuration" in url:
-            return MagicMock(
-                status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks", "issuer": "https://idp"}
-            )
+            return MagicMock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks", "issuer": "https://idp"})
         return MagicMock(status_code=200, json=lambda: {"keys": keys})
 
     mock_client.get.side_effect = side_effect
 
     # Disable debounce (interval=0) to ensure logic relies on validator check, not debounce
-    provider = OIDCProvider(
-        "https://idp/.well-known/openid-configuration", mock_client, min_refresh_interval=0.0
-    )
+    provider = OIDCProvider("https://idp/.well-known/openid-configuration", mock_client, min_refresh_interval=0.0)
 
     validator = TokenValidator(provider, audience="aud")
 
@@ -172,9 +161,7 @@ async def test_smart_refresh_missing_kid() -> None:
 
     def side_effect(url: str) -> MagicMock:
         if "openid-configuration" in url:
-            return MagicMock(
-                status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks", "issuer": "https://idp"}
-            )
+            return MagicMock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks", "issuer": "https://idp"})
         return MagicMock(status_code=200, json=lambda: {"keys": [{"kid": "old-key", "kty": "RSA"}]})
 
     mock_client.get.side_effect = side_effect
