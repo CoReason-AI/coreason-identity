@@ -8,8 +8,8 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
-import time
 import asyncio
+import time
 from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
@@ -178,10 +178,11 @@ async def test_get_issuer_fails_if_config_none(provider: OIDCProvider) -> None:
     """
     # Mock get_jwks to NOT raise but also NOT populate config (simulating a bug or weird state)
     # Since get_jwks implementation *does* populate it or raise, we have to patch it.
-    with patch.object(provider, "get_jwks", new=AsyncMock()) as mock_get_jwks:
+    with patch.object(provider, "get_jwks", new=AsyncMock()):
         # get_jwks does nothing, so _oidc_config_cache stays None
         with pytest.raises(CoreasonIdentityError, match="Failed to load OIDC configuration"):
             await provider.get_issuer()
+
 
 @pytest.mark.asyncio
 async def test_get_jwks_double_check_locking(provider: OIDCProvider, mock_client: AsyncMock) -> None:
@@ -191,7 +192,7 @@ async def test_get_jwks_double_check_locking(provider: OIDCProvider, mock_client
     """
     # 1. Start with invalid cache so we enter the waiting phase
     provider._jwks_cache = {"keys": ["old"]}
-    provider._last_update = 0 # Expired
+    provider._last_update = 0  # Expired
 
     # 2. Acquire lock manually to block the upcoming get_jwks call
     await provider._lock.acquire()
