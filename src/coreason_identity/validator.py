@@ -118,8 +118,8 @@ class TokenValidator:
                     should_refresh = True
                     try:
                         # Extract kid manually to avoid refresh on bad signature with known key
-                        if token.count('.') == 2:
-                            header_segment = token.split('.')[0].encode('ascii')
+                        if token.count(".") == 2:
+                            header_segment = token.split(".")[0].encode("ascii")
                             header = extract_header(header_segment, ValueError)
                             kid = header.get("kid")
                             if kid:
@@ -127,7 +127,9 @@ class TokenValidator:
                                 known_kids = {k.get("kid") for k in jwks.get("keys", [])}
                                 if kid in known_kids:
                                     should_refresh = False
-                                    logger.warning(f"Signature verification failed for known key {kid}. Not refreshing JWKS.")
+                                    logger.warning(
+                                        f"Signature verification failed for known key {kid}. Not refreshing JWKS."
+                                    )
                     except Exception:
                         pass  # Fallback to refresh
 

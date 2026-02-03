@@ -1,4 +1,3 @@
-
 import time
 from typing import Any, Dict
 from unittest.mock import AsyncMock, Mock
@@ -8,6 +7,7 @@ from authlib.jose import JsonWebKey, jwt
 from coreason_identity.exceptions import SignatureVerificationError
 from coreason_identity.oidc_provider import OIDCProvider
 from coreason_identity.validator import TokenValidator
+
 
 class TestDoS:
     @pytest.fixture
@@ -62,8 +62,9 @@ class TestDoS:
         calls = mock_oidc_provider.get_jwks.await_args_list
 
         # Check that NO call has force_refresh=True
-        assert not any(call.kwargs.get("force_refresh") is True for call in calls), \
-            "get_jwks called with force_refresh=True, allowing DoS!"
+        assert not any(
+            call.kwargs.get("force_refresh") is True for call in calls
+        ), "get_jwks called with force_refresh=True, allowing DoS!"
 
     @pytest.mark.asyncio
     async def test_key_rotation_refresh(
@@ -95,5 +96,6 @@ class TestDoS:
 
         # But get_jwks MUST be called with force_refresh=True because kid was unknown
         calls = mock_oidc_provider.get_jwks.await_args_list
-        assert any(call.kwargs.get("force_refresh") is True for call in calls), \
-            "get_jwks SHOULD be called with force_refresh=True for unknown key!"
+        assert any(
+            call.kwargs.get("force_refresh") is True for call in calls
+        ), "get_jwks SHOULD be called with force_refresh=True for unknown key!"
