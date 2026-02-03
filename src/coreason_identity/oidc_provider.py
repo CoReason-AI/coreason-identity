@@ -19,6 +19,7 @@ import anyio
 import httpx
 
 from coreason_identity.exceptions import CoreasonIdentityError
+from coreason_identity.utils.logger import logger
 
 
 class OIDCProvider:
@@ -30,18 +31,26 @@ class OIDCProvider:
         cache_ttl (int): The cache time-to-live in seconds.
     """
 
-    def __init__(self, discovery_url: str, client: httpx.AsyncClient, cache_ttl: int = 3600) -> None:
+    def __init__(
+        self,
+        discovery_url: str,
+        client: httpx.AsyncClient,
+        cache_ttl: int = 3600,
+        min_refresh_interval: float = 60.0,
+    ) -> None:
         """
         Initialize the OIDCProvider.
 
         Args:
-            discovery_url: The OIDC discovery URL (e.g., https://my-tenant.auth0.com/.well-known/openid-configuration).
-            client: The async HTTP client to use for requests.
-            cache_ttl: Time-to-live for the JWKS cache in seconds. Defaults to 3600 (1 hour).
+            discovery_url: The OIDC discovery URL.
+            client: The async HTTP client.
+            cache_ttl: Cache TTL in seconds.
+            min_refresh_interval: Minimum seconds between forced refreshes to prevent DoS.
         """
         self.discovery_url = discovery_url
         self.client = client
         self.cache_ttl = cache_ttl
+        self.min_refresh_interval = min_refresh_interval
         self._jwks_cache: Optional[Dict[str, Any]] = None
         self._oidc_config_cache: Optional[Dict[str, Any]] = None
         self._last_update: float = 0.0
@@ -112,6 +121,12 @@ class OIDCProvider:
                 and (current_time - self._last_update) < self.cache_ttl
             ):
                 return self._jwks_cache
+
+            # DoS Protection: Debounce forced refreshes
+            if force_refresh and self._jwks_cache is not None:
+                if (current_time - self._last_update) < self.min_refresh_interval:
+                    logger.warning("JWKS refresh debounced to prevent DoS.")
+                    return self._jwks_cache
 
             # Fetch fresh keys
             oidc_config = await self._fetch_oidc_config()

@@ -73,3 +73,18 @@ try:
 except Exception as e:
     print(f"Login failed: {e}")
 ```
+
+### 4. Security Resilience (The Stamina)
+Beyond basic validation, `coreason-identity` implements advanced protection mechanisms to ensure the system remains available and secure under attack or failure conditions.
+
+#### DoS Protection via Debouncing
+To prevent Denial of Service (DoS) attacks where malicious actors flood the system with invalid tokens to trigger expensive JWKS refreshes (Key Exhaustion), the `OIDCProvider` implements a strict **Debounce Mechanism**.
+*   **Logic:** If a token signature fails, the validator requests a key refresh. However, the provider will reject this request if a refresh occurred recently (default: 60 seconds).
+*   **Benefit:** This rate-limits outgoing requests to the Identity Provider, protecting both the application and the IdP from exhaustion.
+
+#### Smart Refresh Strategy
+The `TokenValidator` employs a **Smart Refresh** strategy to distinguish between genuine key rotation and malicious tampering.
+*   **Logic:** Before requesting a JWKS refresh, the validator inspects the token's `kid` (Key ID) header.
+    *   **Unknown `kid`:** This implies legitimate key rotation by the IdP. A refresh is triggered (subject to debounce).
+    *   **Known `kid`:** If the `kid` is already in the cache but the signature is invalid, this implies token tampering or a bad token. **No refresh is triggered.**
+*   **Benefit:** This drastic reduction in unnecessary network calls ensures that attackers cannot weaponize malformed tokens with known Key IDs to degrade system performance.

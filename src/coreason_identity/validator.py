@@ -16,6 +16,7 @@ import hashlib
 from typing import Any, Dict, Optional
 
 from authlib.jose import JsonWebToken
+from authlib.jose.util import extract_header
 from authlib.jose.errors import (
     BadSignatureError,
     ExpiredTokenError,
@@ -63,6 +64,44 @@ class TokenValidator:
         self.issuer = issuer
         # Use a specific JsonWebToken instance to enforce RS256 and reject 'none'
         self.jwt = JsonWebToken(["RS256"])
+
+    def _should_refresh_jwks(self, token: str, jwks: Dict[str, Any], exception: Exception) -> bool:
+        """
+        Determines whether to trigger a JWKS refresh based on the token header and error.
+        Implements Smart Refresh / DoS Protection.
+        """
+        # Only consider refresh for signature/value errors (potential key rotation)
+        if not isinstance(exception, (ValueError, BadSignatureError)):
+            return False
+
+        try:
+            # Extract the header segment (first part before the dot)
+            parts = token.split(".")
+            # str.split always returns at least one element.
+            header_segment = parts[0].encode("utf-8")
+            header = extract_header(header_segment, None)
+            kid = header.get("kid")
+
+            # If no kid, we can't do smart check, but RS256 usually requires kid.
+            # If kid is present, check if we have it.
+            if kid:
+                known_keys = [k.get("kid") for k in jwks.get("keys", [])]
+                if kid not in known_keys:
+                    logger.info(f"Token has unknown kid '{kid}'. Triggering refresh.")
+                    return True
+                else:
+                    logger.warning(
+                        f"Token has known kid '{kid}' but validation failed ({type(exception).__name__}). Not refreshing."
+                    )
+                    return False
+            else:
+                # No kid in header, assume we might need refresh if rotation happened without kid (unlikely for OIDC)
+                return True
+
+        except Exception:
+            # If we can't parse header, token is garbage. Don't refresh.
+            logger.warning("Failed to parse token header. Not refreshing.")
+            return False
 
     async def validate_token(self, token: str) -> Dict[str, Any]:
         """
@@ -112,18 +151,22 @@ class TokenValidator:
 
                 try:
                     claims = _decode(jwks, claims_options)
-                except (ValueError, BadSignatureError):
-                    # If key is missing or signature is bad (potential key rotation), try refreshing keys
-                    logger.info("Validation failed with cached keys, refreshing JWKS and retrying...")
-                    span.add_event("refreshing_jwks")
-                    jwks = await self.oidc_provider.get_jwks(force_refresh=True)
+                except (ValueError, BadSignatureError) as e:
+                    # DoS Protection / Smart Refresh check
+                    if self._should_refresh_jwks(token, jwks, e):
+                        logger.info("Validation failed with cached keys and unknown kid, refreshing JWKS and retrying...")
+                        span.add_event("refreshing_jwks")
+                        # force_refresh=True will now respect the debounce interval in OIDCProvider
+                        jwks = await self.oidc_provider.get_jwks(force_refresh=True)
 
-                    # Update issuer if dynamic, as config might have changed (rare but possible)
-                    if not self.issuer:
-                        expected_issuer = await self.oidc_provider.get_issuer()
-                        claims_options = get_claims_options(expected_issuer)
+                        # Update issuer if dynamic
+                        if not self.issuer:
+                            expected_issuer = await self.oidc_provider.get_issuer()
+                            claims_options = get_claims_options(expected_issuer)
 
-                    claims = _decode(jwks, claims_options)
+                        claims = _decode(jwks, claims_options)
+                    else:
+                        raise
 
                 payload = dict(claims)
 

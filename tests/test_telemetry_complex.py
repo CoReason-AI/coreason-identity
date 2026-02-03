@@ -61,7 +61,9 @@ async def test_telemetry_context_propagation(
 
         with patch("authlib.jose.JsonWebToken.decode", return_value=claims):
             with tracer.start_as_current_span("parent_span") as parent_span:
-                await validator.validate_token("dummy_token")
+                # Use a token that looks valid enough to extract header, even if mocked decode succeeds
+                # Header: {"kid": "123"} -> eyJraWQiOiAiMTIzIn0
+                await validator.validate_token("eyJraWQiOiAiMTIzIn0.payload.sig")
                 parent_context = parent_span.get_span_context()
 
     spans = exporter.get_finished_spans()
@@ -90,7 +92,13 @@ async def test_telemetry_jwks_refresh_event(
         with patch("authlib.jose.JsonWebToken.decode") as mock_decode:
             mock_decode.side_effect = [BadSignatureError("bad sig"), claims]
 
-            await validator.validate_token("dummy_token")
+            # To trigger refresh, we need a token with an UNKNOWN kid.
+            # Mock provider has key with kid "123".
+            # We use a token with kid "unknown".
+            # Header: {"kid": "unknown"} -> eyJraWQiOiJ1bmtub3duIn0
+            token_with_unknown_kid = "eyJraWQiOiJ1bmtub3duIn0.payload.sig"
+
+            await validator.validate_token(token_with_unknown_kid)
 
     spans = exporter.get_finished_spans()
     assert len(spans) == 1
@@ -125,7 +133,7 @@ async def test_telemetry_unicode_user_id(
         claims = MockClaims({"sub": user_id, "aud": audience, "exp": time.time() + 3600})
 
         with patch("authlib.jose.JsonWebToken.decode", return_value=claims):
-            await validator.validate_token("dummy_token")
+            await validator.validate_token("eyJraWQiOiAiMTIzIn0.payload.sig")
 
     spans = exporter.get_finished_spans()
     span = spans[0]
@@ -158,4 +166,4 @@ async def test_telemetry_noop_tracer_safety(mock_oidc_provider: MagicMock) -> No
 
         with patch("authlib.jose.JsonWebToken.decode", return_value=claims):
             # Should not raise any exception
-            await validator.validate_token("dummy_token")
+            await validator.validate_token("eyJraWQiOiAiMTIzIn0.payload.sig")

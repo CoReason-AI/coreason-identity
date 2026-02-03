@@ -55,7 +55,8 @@ async def test_get_jwks_cache_hit(provider: OIDCProvider, mock_client: AsyncMock
 @pytest.mark.asyncio
 async def test_get_jwks_force_refresh(provider: OIDCProvider, mock_client: AsyncMock) -> None:
     provider._jwks_cache = {"keys": ["cached"]}
-    provider._last_update = time.time()
+    # Ensure update is old enough to bypass debounce logic
+    provider._last_update = time.time() - 3600
 
     mock_client.get.side_effect = [
         Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks"}),

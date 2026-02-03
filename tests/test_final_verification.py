@@ -56,9 +56,13 @@ async def test_validator_retry_fails() -> None:
         # First call fails, Second call (after refresh) also fails
         mock_decode.side_effect = BadSignatureError("bad_signature")
 
+        # Must use a token with UNKNOWN kid to trigger refresh logic
+        # Header: {"kid": "unknown"} -> eyJraWQiOiJ1bmtub3duIn0
+        token_trigger = "eyJraWQiOiJ1bmtub3duIn0.payload.sig"
+
         # The error string from Authlib might contain "bad_signature: " or similar
         with pytest.raises(SignatureVerificationError, match="Invalid signature:.*bad_signature"):
-            await validator.validate_token("bad_token")
+            await validator.validate_token(token_trigger)
 
     # Ensure refresh was called
     mock_provider.get_jwks.assert_called_with(force_refresh=True)
@@ -87,8 +91,12 @@ async def test_validator_refresh_network_error() -> None:
         # First decode fails (triggering refresh)
         mock_decode.side_effect = BadSignatureError("Bad signature")
 
+        # Must use a token with UNKNOWN kid to trigger refresh logic
+        # Header: {"kid": "unknown"} -> eyJraWQiOiJ1bmtub3duIn0
+        token_trigger = "eyJraWQiOiJ1bmtub3duIn0.payload.sig"
+
         with pytest.raises(CoreasonIdentityError, match="Network Down"):
-            await validator.validate_token("token_triggering_refresh")
+            await validator.validate_token(token_trigger)
 
 
 @pytest.mark.asyncio
