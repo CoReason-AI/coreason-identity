@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 from authlib.jose import JsonWebKey, jwt
-from coreason_identity.exceptions import SignatureVerificationError
+from coreason_identity.exceptions import CoreasonIdentityError, SignatureVerificationError
 from coreason_identity.oidc_provider import OIDCProvider
 from coreason_identity.validator import TokenValidator
 
@@ -99,3 +99,26 @@ class TestDoS:
         assert any(
             call.kwargs.get("force_refresh") is True for call in calls
         ), "get_jwks SHOULD be called with force_refresh=True for unknown key!"
+
+    @pytest.mark.asyncio
+    async def test_dos_malformed_token_no_refresh(
+        self, validator: TokenValidator, mock_oidc_provider: Mock, jwks: Dict[str, Any]
+    ) -> None:
+        """
+        Verify that a MALFORMED token (garbage) does NOT trigger a JWKS refresh.
+        """
+        mock_oidc_provider.get_jwks.return_value = jwks
+
+        token_str = "this.is.garbage"
+
+        # This should raise CoreasonIdentityError or InvalidTokenError
+        with pytest.raises(CoreasonIdentityError):
+            await validator.validate_token(token_str)
+
+        # Verify calls to get_jwks
+        calls = mock_oidc_provider.get_jwks.await_args_list
+
+        # Check that NO call has force_refresh=True
+        assert not any(
+            call.kwargs.get("force_refresh") is True for call in calls
+        ), "get_jwks called with force_refresh=True for malformed token!"

@@ -18,6 +18,7 @@ The architecture follows a "Borrow Over Build" directive, wrapping industry-stan
 Internally, the `IdentityManager` orchestrates a pipeline:
 1.  **Auto-Discovery:** It fetches the OIDC configuration from the IdP.
 2.  **Validation:** It cryptographically verifies the token signature and strictly checks the `aud` (audience) claim to prevent token misuse.
+    *   **DoS Resilience:** The validator is hardened against Denial of Service attacks. If a signature check fails, it intelligently inspects the token header. If the Key ID (`kid`) is already known (cached), it skips the expensive network refresh of the JWKS, preventing attackers from exhausting system resources with invalid tokens.
 3.  **Mapping:** It transforms abstract IdP groups into concrete application project contexts, while enforcing strict permission mapping without implicit privilege escalation.
 
 ### 3. In Practice (The How)

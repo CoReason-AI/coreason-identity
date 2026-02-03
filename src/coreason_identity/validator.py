@@ -115,27 +115,39 @@ class TokenValidator:
                     claims = _decode(jwks, claims_options)
                 except (ValueError, BadSignatureError):
                     # Check if key rotation is needed
-                    should_refresh = True
+                    # Default to False: only refresh if we are SURE it's a new key
+                    should_refresh = False
                     try:
-                        # Extract kid manually to avoid refresh on bad signature with known key
+                        # Only valid JWT structures should be considered for refresh
                         if token.count(".") == 2:
                             header_segment = token.split(".")[0].encode("ascii")
                             header = extract_header(header_segment, ValueError)
                             kid = header.get("kid")
-                            if kid:
-                                # jwks is {'keys': [...]}
-                                known_kids = {k.get("kid") for k in jwks.get("keys", [])}
-                                if kid in known_kids:
-                                    should_refresh = False
-                                    logger.warning(
-                                        f"Signature verification failed for known key {kid}. Not refreshing JWKS."
-                                    )
+
+                            # jwks is {'keys': [...]}
+                            known_kids = {k.get("kid") for k in jwks.get("keys", [])}
+
+                            if not kid:
+                                # If kid is missing, we might want to refresh to be safe (unlikely but possible)
+                                # or just fail. Let's refresh to be compliant with weird IdPs.
+                                should_refresh = True
+                                logger.info("Token missing kid header, triggering JWKS refresh.")
+                            elif kid not in known_kids:
+                                # Unknown key -> legitimate rotation scenario
+                                should_refresh = True
+                                logger.info(f"Unknown key {kid} detected, triggering JWKS refresh.")
+                            else:
+                                # Known key -> Signature error -> Attack or Bug -> Do NOT refresh
+                                logger.warning(
+                                    f"Signature verification failed for known key {kid}. Not refreshing JWKS."
+                                )
+                        else:
+                            logger.warning("Malformed token structure (not 3 parts). Not refreshing JWKS.")
                     except Exception:
-                        pass  # Fallback to refresh
+                        # If header extraction fails, it's likely garbage -> Do NOT refresh
+                        pass
 
                     if should_refresh:
-                        # If key is missing or signature is bad (potential key rotation), try refreshing keys
-                        logger.info("Validation failed with unknown key or missing kid, refreshing JWKS...")
                         span.add_event("refreshing_jwks")
                         jwks = await self.oidc_provider.get_jwks(force_refresh=True)
 
