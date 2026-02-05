@@ -8,11 +8,12 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 from authlib.jose import JsonWebKey, jwt
+
 from coreason_identity.exceptions import CoreasonIdentityError
 from coreason_identity.oidc_provider import OIDCProvider
 from coreason_identity.validator import TokenValidator
@@ -30,7 +31,7 @@ class TestTokenValidatorEdgeCases:
         return JsonWebKey.generate_key("RSA", 2048, is_private=True)
 
     @pytest.fixture
-    def jwks(self, key_pair: Any) -> Dict[str, Any]:
+    def jwks(self, key_pair: Any) -> dict[str, Any]:
         return {"keys": [key_pair.as_dict(private=False)]}
 
     @pytest.fixture
@@ -45,12 +46,12 @@ class TestTokenValidatorEdgeCases:
     def create_token(
         self,
         key: Any,
-        claims: Dict[str, Any],
-        headers: Dict[str, Any] | None = None,
+        claims: dict[str, Any],
+        headers: dict[str, Any] | None = None,
     ) -> str:
         if headers is None:
             headers = {"alg": "RS256", "kid": key.as_dict()["kid"]}
-        return jwt.encode(headers, claims, key).decode("utf-8")  # type: ignore[no-any-return]
+        return jwt.encode(headers, claims, key).decode("utf-8")
 
     @pytest.mark.asyncio
     async def test_malformed_token_structure(self, validator: TokenValidator) -> None:
@@ -75,7 +76,7 @@ class TestTokenValidatorEdgeCases:
         validator: TokenValidator,
         mock_oidc_provider: Mock,
         key_pair: Any,
-        jwks: Dict[str, Any],
+        jwks: dict[str, Any],
     ) -> None:
         """Test that token from wrong issuer is rejected."""
         mock_oidc_provider.get_jwks.return_value = jwks
@@ -97,7 +98,7 @@ class TestTokenValidatorEdgeCases:
         validator: TokenValidator,
         mock_oidc_provider: Mock,
         key_pair: Any,
-        jwks: Dict[str, Any],
+        jwks: dict[str, Any],
     ) -> None:
         """Test that token missing 'iss' claim is rejected if issuer check is enabled."""
         mock_oidc_provider.get_jwks.return_value = jwks

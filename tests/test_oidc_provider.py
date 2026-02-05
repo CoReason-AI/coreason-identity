@@ -14,6 +14,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
 import pytest
+
 from coreason_identity.exceptions import CoreasonIdentityError
 from coreason_identity.oidc_provider import OIDCProvider
 
@@ -90,7 +91,7 @@ async def test_fetch_oidc_config_error(provider: OIDCProvider, mock_client: Asyn
 
 @pytest.mark.asyncio
 async def test_missing_jwks_uri(provider: OIDCProvider, mock_client: AsyncMock) -> None:
-    mock_client.get.return_value = Mock(status_code=200, json=lambda: {})
+    mock_client.get.return_value = Mock(status_code=200, json=dict)
 
     with pytest.raises(CoreasonIdentityError, match="OIDC configuration does not contain 'jwks_uri'"):
         await provider.get_jwks()
@@ -178,10 +179,11 @@ async def test_get_issuer_fails_if_config_none(provider: OIDCProvider) -> None:
     """
     # Mock get_jwks to NOT raise but also NOT populate config (simulating a bug or weird state)
     # Since get_jwks implementation *does* populate it or raise, we have to patch it.
-    with patch.object(provider, "get_jwks", new=AsyncMock()):
-        # get_jwks does nothing, so _oidc_config_cache stays None
-        with pytest.raises(CoreasonIdentityError, match="Failed to load OIDC configuration"):
-            await provider.get_issuer()
+    with (
+        patch.object(provider, "get_jwks", new=AsyncMock()),
+        pytest.raises(CoreasonIdentityError, match="Failed to load OIDC configuration"),
+    ):
+        await provider.get_issuer()
 
 
 @pytest.mark.asyncio

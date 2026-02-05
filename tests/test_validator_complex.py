@@ -9,11 +9,12 @@
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
 import time
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 from authlib.jose import JsonWebKey, jwt
+
 from coreason_identity.exceptions import (
     CoreasonIdentityError,
     InvalidAudienceError,
@@ -34,17 +35,15 @@ class TestTokenValidatorComplex:
     @pytest.fixture
     def key_pair(self) -> Any:
         # Generate a key pair for testing
-        key = JsonWebKey.generate_key("RSA", 2048, is_private=True)
-        return key
+        return JsonWebKey.generate_key("RSA", 2048, is_private=True)
 
     @pytest.fixture
     def second_key_pair(self) -> Any:
         # Generate a second key pair for key rotation testing
-        key = JsonWebKey.generate_key("RSA", 2048, is_private=True)
-        return key
+        return JsonWebKey.generate_key("RSA", 2048, is_private=True)
 
     @pytest.fixture
-    def jwks(self, key_pair: Any) -> Dict[str, Any]:
+    def jwks(self, key_pair: Any) -> dict[str, Any]:
         # Return public key in JWKS format
         return {"keys": [key_pair.as_dict(private=False)]}
 
@@ -52,14 +51,14 @@ class TestTokenValidatorComplex:
     def validator(self, mock_oidc_provider: Mock) -> TokenValidator:
         return TokenValidator(oidc_provider=mock_oidc_provider, audience="my-audience")
 
-    def create_token(self, key: Any, claims: Dict[str, Any], headers: Dict[str, Any] | None = None) -> bytes:
+    def create_token(self, key: Any, claims: dict[str, Any], headers: dict[str, Any] | None = None) -> bytes:
         if headers is None:
             headers = {"alg": "RS256", "kid": key.as_dict()["kid"]}
-        return jwt.encode(headers, claims, key)  # type: ignore[no-any-return]
+        return jwt.encode(headers, claims, key)
 
     @pytest.mark.asyncio
     async def test_validate_token_aud_list_success(
-        self, validator: TokenValidator, mock_oidc_provider: Mock, key_pair: Any, jwks: Dict[str, Any]
+        self, validator: TokenValidator, mock_oidc_provider: Mock, key_pair: Any, jwks: dict[str, Any]
     ) -> None:
         """Test that validation succeeds when aud is a list containing the expected audience."""
         mock_oidc_provider.get_jwks.return_value = jwks
@@ -80,7 +79,7 @@ class TestTokenValidatorComplex:
 
     @pytest.mark.asyncio
     async def test_validate_token_aud_list_fail(
-        self, validator: TokenValidator, mock_oidc_provider: Mock, key_pair: Any, jwks: Dict[str, Any]
+        self, validator: TokenValidator, mock_oidc_provider: Mock, key_pair: Any, jwks: dict[str, Any]
     ) -> None:
         """Test that validation fails when aud is a list NOT containing the expected audience."""
         mock_oidc_provider.get_jwks.return_value = jwks
@@ -100,7 +99,7 @@ class TestTokenValidatorComplex:
 
     @pytest.mark.asyncio
     async def test_validate_token_whitespace(
-        self, validator: TokenValidator, mock_oidc_provider: Mock, key_pair: Any, jwks: Dict[str, Any]
+        self, validator: TokenValidator, mock_oidc_provider: Mock, key_pair: Any, jwks: dict[str, Any]
     ) -> None:
         """Test that validation handles whitespace."""
         mock_oidc_provider.get_jwks.return_value = jwks
@@ -144,7 +143,7 @@ class TestTokenValidatorComplex:
         # The validator calls get_jwks() initially (defaults force_refresh=False)
         # If it fails, it calls get_jwks(force_refresh=True)
 
-        async def get_jwks_side_effect(force_refresh: bool = False) -> Dict[str, Any]:
+        async def get_jwks_side_effect(force_refresh: bool = False) -> dict[str, Any]:
             if force_refresh:
                 return new_jwks
             return old_jwks
@@ -173,7 +172,7 @@ class TestTokenValidatorComplex:
 
     @pytest.mark.asyncio
     async def test_none_algorithm_rejected(
-        self, validator: TokenValidator, mock_oidc_provider: Mock, jwks: Dict[str, Any]
+        self, validator: TokenValidator, mock_oidc_provider: Mock, jwks: dict[str, Any]
     ) -> None:
         """Test that alg: none is rejected."""
         mock_oidc_provider.get_jwks.return_value = jwks
@@ -201,7 +200,7 @@ class TestTokenValidatorComplex:
 
     @pytest.mark.asyncio
     async def test_key_missing_after_retry(
-        self, validator: TokenValidator, mock_oidc_provider: Mock, key_pair: Any, jwks: Dict[str, Any]
+        self, validator: TokenValidator, mock_oidc_provider: Mock, jwks: dict[str, Any]
     ) -> None:
         """
         Test that if key is missing even after retry, it raises SignatureVerificationError.

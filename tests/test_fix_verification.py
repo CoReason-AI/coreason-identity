@@ -14,11 +14,12 @@ Ensures that validation failures raise InvalidTokenError (or subclass),
 allowing the consumer to catch a single exception type.
 """
 
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
 from authlib.jose import JsonWebKey, jwt
+
 from coreason_identity.config import CoreasonIdentityConfig
 from coreason_identity.exceptions import InvalidTokenError
 from coreason_identity.manager import IdentityManager
@@ -30,16 +31,16 @@ def key_pair() -> Any:
 
 
 @pytest.fixture
-def jwks(key_pair: Any) -> Dict[str, Any]:
+def jwks(key_pair: Any) -> dict[str, Any]:
     return {"keys": [key_pair.as_dict(private=False)]}
 
 
-def create_token(key: Any, claims: Dict[str, Any]) -> str:
+def create_token(key: Any, claims: dict[str, Any]) -> str:
     headers = {"alg": "RS256", "kid": key.as_dict()["kid"]}
-    return jwt.encode(headers, claims, key).decode("utf-8")  # type: ignore[no-any-return]
+    return jwt.encode(headers, claims, key).decode("utf-8")
 
 
-def test_missing_claim_raises_invalid_token_error(key_pair: Any, jwks: Dict[str, Any]) -> None:
+def test_missing_claim_raises_invalid_token_error(key_pair: Any, jwks: dict[str, Any]) -> None:
     """
     Test that a token missing a required claim (like 'exp') raises InvalidTokenError.
     """
@@ -75,7 +76,7 @@ def test_missing_claim_raises_invalid_token_error(key_pair: Any, jwks: Dict[str,
             pytest.fail(f"Raised unexpected exception type: {type(e).__name__}: {e}")
 
 
-def test_mapper_validation_raises_invalid_token_error(key_pair: Any, jwks: Dict[str, Any]) -> None:
+def test_mapper_validation_raises_invalid_token_error(key_pair: Any, jwks: dict[str, Any]) -> None:
     """
     Test that a token with valid crypto but missing mapping fields (like 'email')
     raises InvalidTokenError.

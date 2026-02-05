@@ -10,17 +10,18 @@
 
 import hashlib
 import time
-from typing import Any, List, Tuple
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from authlib.jose.errors import BadSignatureError
-from coreason_identity.oidc_provider import OIDCProvider
-from coreason_identity.utils.logger import logger
-from coreason_identity.validator import TokenValidator
 from opentelemetry.sdk.trace import Tracer, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+
+from coreason_identity.oidc_provider import OIDCProvider
+from coreason_identity.utils.logger import logger
+from coreason_identity.validator import TokenValidator
 
 
 class MockClaims(dict[str, Any]):
@@ -29,7 +30,7 @@ class MockClaims(dict[str, Any]):
 
 
 @pytest.fixture
-def telemetry_setup() -> Tuple[InMemorySpanExporter, Tracer]:
+def telemetry_setup() -> tuple[InMemorySpanExporter, Tracer]:
     exporter = InMemorySpanExporter()
     provider = TracerProvider()
     processor = SimpleSpanProcessor(exporter)
@@ -48,7 +49,7 @@ def mock_oidc_provider() -> MagicMock:
 
 @pytest.mark.asyncio
 async def test_telemetry_context_propagation(
-    telemetry_setup: Tuple[InMemorySpanExporter, Tracer],
+    telemetry_setup: tuple[InMemorySpanExporter, Tracer],
     mock_oidc_provider: MagicMock,
 ) -> None:
     """Verifies that the validation span is correctly parented if a span is active."""
@@ -59,10 +60,12 @@ async def test_telemetry_context_propagation(
         validator = TokenValidator(mock_oidc_provider, audience)
         claims = MockClaims({"sub": "user123", "aud": audience, "exp": time.time() + 3600})
 
-        with patch("authlib.jose.JsonWebToken.decode", return_value=claims):
-            with tracer.start_as_current_span("parent_span") as parent_span:
-                await validator.validate_token("dummy_token")
-                parent_context = parent_span.get_span_context()
+        with (
+            patch("authlib.jose.JsonWebToken.decode", return_value=claims),
+            tracer.start_as_current_span("parent_span") as parent_span,
+        ):
+            await validator.validate_token("dummy_token")
+            parent_context = parent_span.get_span_context()
 
     spans = exporter.get_finished_spans()
     # Should have 2 spans: parent and child
@@ -75,7 +78,7 @@ async def test_telemetry_context_propagation(
 
 @pytest.mark.asyncio
 async def test_telemetry_jwks_refresh_event(
-    telemetry_setup: Tuple[InMemorySpanExporter, Tracer],
+    telemetry_setup: tuple[InMemorySpanExporter, Tracer],
     mock_oidc_provider: MagicMock,
 ) -> None:
     """Verifies that the 'refreshing_jwks' event is added when retry logic triggers."""
@@ -105,14 +108,14 @@ async def test_telemetry_jwks_refresh_event(
 
 @pytest.mark.asyncio
 async def test_telemetry_unicode_user_id(
-    telemetry_setup: Tuple[InMemorySpanExporter, Tracer],
+    telemetry_setup: tuple[InMemorySpanExporter, Tracer],
     mock_oidc_provider: MagicMock,
     # caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Verifies handling of Unicode/Complex user IDs."""
 
     # Setup custom log capture because loguru
-    logs: List[Any] = []
+    logs: list[Any] = []
     logger.add(logs.append, level="INFO", format="{message}")
 
     exporter, tracer = telemetry_setup

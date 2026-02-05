@@ -13,7 +13,7 @@ IdentityMapper component for mapping IdP claims to internal UserContext.
 """
 
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, EmailStr, Field, SecretStr, ValidationError, field_validator
 
@@ -40,17 +40,17 @@ class RawIdPClaims(BaseModel):
     email: EmailStr
 
     # Optional raw fields
-    project_id_claim: Optional[str] = Field(default=None, alias="https://coreason.com/project_id")
+    project_id_claim: str | None = Field(default=None, alias="https://coreason.com/project_id")
 
     # Normalized lists from potentially diverse keys
     # We will use a root validator or specific field validators to populate these
-    groups: List[str] = Field(default_factory=list)
-    permissions: List[str] = Field(default_factory=list)
-    scopes: List[str] = Field(default_factory=list)
+    groups: list[str] = Field(default_factory=list)
+    permissions: list[str] = Field(default_factory=list)
+    scopes: list[str] = Field(default_factory=list)
 
     @field_validator("groups", "permissions", "scopes", mode="before")
     @classmethod
-    def ensure_list_of_strings(cls, v: Any) -> List[str]:
+    def ensure_list_of_strings(cls, v: Any) -> list[str]:
         """Ensures the value is a list of strings, filtering out None values."""
         if v is None:
             return []
@@ -92,7 +92,7 @@ class IdentityMapper:
     Maps validated IdP claims to the standardized internal UserContext.
     """
 
-    def map_claims(self, claims: Dict[str, Any], token: Optional[str] = None) -> UserContext:
+    def map_claims(self, claims: dict[str, Any], token: str | None = None) -> UserContext:
         """
         Transform raw IdP claims into a UserContext object.
 

@@ -13,12 +13,14 @@ Final verification tests covering complex scenarios and edge cases identified du
 """
 
 import time
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
 from authlib.jose.errors import BadSignatureError, JoseError
+from httpx import Request, Response
+
 from coreason_identity.device_flow_client import DeviceFlowClient
 from coreason_identity.exceptions import (
     CoreasonIdentityError,
@@ -28,7 +30,6 @@ from coreason_identity.identity_mapper import IdentityMapper
 from coreason_identity.models import DeviceFlowResponse
 from coreason_identity.oidc_provider import OIDCProvider
 from coreason_identity.validator import TokenValidator
-from httpx import Request, Response
 
 
 # --- Helper ---
@@ -57,7 +58,7 @@ async def test_validator_retry_fails() -> None:
         mock_decode.side_effect = BadSignatureError("bad_signature")
 
         # The error string from Authlib might contain "bad_signature: " or similar
-        with pytest.raises(SignatureVerificationError, match="Invalid signature:.*bad_signature"):
+        with pytest.raises(SignatureVerificationError, match=r"Invalid signature:.*bad_signature"):
             await validator.validate_token("bad_token")
 
     # Ensure refresh was called
@@ -120,7 +121,7 @@ def test_mapper_nested_groups_safely_handled() -> None:
     """
     mapper = IdentityMapper()
     # Input with nested list
-    claims: Dict[str, Any] = {
+    claims: dict[str, Any] = {
         "sub": "u1",
         "email": "u@e.com",
         "groups": [["nested_group"], "project:valid"],
@@ -145,7 +146,7 @@ def test_mapper_huge_input_strings() -> None:
     """
     mapper = IdentityMapper()
     huge_string = "a" * 10000 + "project:HIDDEN"
-    claims: Dict[str, Any] = {
+    claims: dict[str, Any] = {
         "sub": "u1",
         "email": "u@e.com",
         "groups": [huge_string],

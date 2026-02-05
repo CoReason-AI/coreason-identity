@@ -14,8 +14,9 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
-from coreason_identity.config import CoreasonIdentityConfig
 from pydantic import ValidationError
+
+from coreason_identity.config import CoreasonIdentityConfig
 
 
 # Helper to format getaddrinfo response
@@ -46,9 +47,11 @@ class TestSSRFComplexCases:
                 assert cfg.domain == unsafe_domain
 
             # 3. Disable Unsafe Mode (Explicit False) -> Should Fail
-            with patch.dict(os.environ, {"COREASON_DEV_UNSAFE_MODE": "false"}):
-                with pytest.raises(ValidationError):
-                    CoreasonIdentityConfig(domain=unsafe_domain, audience="aud")
+            with (
+                patch.dict(os.environ, {"COREASON_DEV_UNSAFE_MODE": "false"}),
+                pytest.raises(ValidationError),
+            ):
+                CoreasonIdentityConfig(domain=unsafe_domain, audience="aud")
 
     def test_dns_flake_then_success_fail_closed(self) -> None:
         """

@@ -8,10 +8,11 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import patch
 
 import pytest
+
 from coreason_identity.exceptions import CoreasonIdentityError
 from coreason_identity.identity_mapper import IdentityMapper, RawIdPClaims
 from coreason_identity.models import UserContext
@@ -24,7 +25,7 @@ def mapper() -> IdentityMapper:
 
 def test_map_claims_happy_path_explicit(mapper: IdentityMapper) -> None:
     """Test mapping with all explicit claims provided."""
-    claims: Dict[str, Any] = {
+    claims: dict[str, Any] = {
         "sub": "user|123",
         "email": "user@example.com",
         "https://coreason.com/project_id": "proj_123",
@@ -45,7 +46,7 @@ def test_map_claims_happy_path_explicit(mapper: IdentityMapper) -> None:
 
 def test_map_claims_with_token(mapper: IdentityMapper) -> None:
     """Test mapping with a downstream token."""
-    claims: Dict[str, Any] = {
+    claims: dict[str, Any] = {
         "sub": "user|123",
         "email": "user@example.com",
     }
@@ -56,7 +57,7 @@ def test_map_claims_with_token(mapper: IdentityMapper) -> None:
 
 def test_map_claims_project_fallback_to_groups(mapper: IdentityMapper) -> None:
     """Test extracting project context from groups."""
-    claims: Dict[str, Any] = {
+    claims: dict[str, Any] = {
         "sub": "user|456",
         "email": "dev@example.com",
         "groups": ["developers", "project:proj_ABC", "other"],
@@ -68,7 +69,7 @@ def test_map_claims_project_fallback_to_groups(mapper: IdentityMapper) -> None:
 
 def test_map_claims_permissions_fallback_admin_removed(mapper: IdentityMapper) -> None:
     """Test that implicit admin -> * permissions mapping is removed."""
-    claims: Dict[str, Any] = {
+    claims: dict[str, Any] = {
         "sub": "admin|789",
         "email": "admin@coreason.com",
         "https://coreason.com/groups": ["admin", "staff"],
@@ -83,30 +84,30 @@ def test_map_claims_permissions_fallback_admin_removed(mapper: IdentityMapper) -
 def test_map_claims_group_sources(mapper: IdentityMapper) -> None:
     """Test that groups are resolved from various sources (custom, standard, roles)."""
     # 1. Standard 'groups'
-    claims1: Dict[str, Any] = {"sub": "u1", "email": "u1@e.com", "groups": ["project:A"]}
+    claims1: dict[str, Any] = {"sub": "u1", "email": "u1@e.com", "groups": ["project:A"]}
     assert mapper.map_claims(claims1).claims["project_context"] == "A"
 
     # 2. Custom 'https://coreason.com/groups'
-    claims2: Dict[str, Any] = {"sub": "u2", "email": "u2@e.com", "https://coreason.com/groups": ["project:B"]}
+    claims2: dict[str, Any] = {"sub": "u2", "email": "u2@e.com", "https://coreason.com/groups": ["project:B"]}
     assert mapper.map_claims(claims2).claims["project_context"] == "B"
 
     # 3. 'roles'
-    claims3: Dict[str, Any] = {"sub": "u3", "email": "u3@e.com", "roles": ["project:C"]}
+    claims3: dict[str, Any] = {"sub": "u3", "email": "u3@e.com", "roles": ["project:C"]}
     assert mapper.map_claims(claims3).claims["project_context"] == "C"
 
 
 def test_map_claims_scopes(mapper: IdentityMapper) -> None:
     """Test scope parsing."""
     # 1. 'scope' string
-    claims1: Dict[str, Any] = {"sub": "u1", "email": "u@e.com", "scope": "a b c"}
+    claims1: dict[str, Any] = {"sub": "u1", "email": "u@e.com", "scope": "a b c"}
     assert mapper.map_claims(claims1).scopes == ["a", "b", "c"]
 
     # 2. 'scp' list
-    claims2: Dict[str, Any] = {"sub": "u1", "email": "u@e.com", "scp": ["d", "e"]}
+    claims2: dict[str, Any] = {"sub": "u1", "email": "u@e.com", "scp": ["d", "e"]}
     assert mapper.map_claims(claims2).scopes == ["d", "e"]
 
     # 3. 'scopes' explicit
-    claims3: Dict[str, Any] = {"sub": "u1", "email": "u@e.com", "scopes": ["f", "g"]}
+    claims3: dict[str, Any] = {"sub": "u1", "email": "u@e.com", "scopes": ["f", "g"]}
     assert mapper.map_claims(claims3).scopes == ["f", "g"]
 
 
@@ -123,7 +124,7 @@ def test_map_claims_missing_required_fields(mapper: IdentityMapper) -> None:
 
 def test_map_claims_invalid_email_format(mapper: IdentityMapper) -> None:
     """Test that invalid email format raises CoreasonIdentityError (via Pydantic)."""
-    claims: Dict[str, Any] = {
+    claims: dict[str, Any] = {
         "sub": "123",
         "email": "not-an-email",
     }
@@ -133,7 +134,7 @@ def test_map_claims_invalid_email_format(mapper: IdentityMapper) -> None:
 
 def test_map_claims_generic_exception(mapper: IdentityMapper) -> None:
     """Test that a generic exception is caught and wrapped."""
-    claims: Dict[str, Any] = {
+    claims: dict[str, Any] = {
         "sub": "user|123",
         "email": "user@example.com",
     }
@@ -150,7 +151,7 @@ def test_mapper_multiple_project_groups_precedence(mapper: IdentityMapper) -> No
     """
     Test precedence when multiple groups match the 'project:' pattern.
     """
-    claims: Dict[str, Any] = {
+    claims: dict[str, Any] = {
         "sub": "u1",
         "email": "u@e.com",
         "groups": ["project:PRIMARY", "project:SECONDARY"],
@@ -161,7 +162,7 @@ def test_mapper_multiple_project_groups_precedence(mapper: IdentityMapper) -> No
 
 def test_complex_groups_as_string(mapper: IdentityMapper) -> None:
     """Test if 'groups' is provided as a single string instead of list."""
-    claims: Dict[str, Any] = {
+    claims: dict[str, Any] = {
         "sub": "u1",
         "email": "u@e.com",
         "groups": "project:SINGLE",

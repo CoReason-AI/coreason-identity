@@ -14,8 +14,9 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
-from coreason_identity.config import CoreasonIdentityConfig
 from pydantic import ValidationError
+
+from coreason_identity.config import CoreasonIdentityConfig
 
 
 # Helper to format getaddrinfo response
@@ -79,24 +80,29 @@ class TestSSRFProtection:
 
     def test_ssrf_bypass_mode(self) -> None:
         """Test that validation is bypassed when COREASON_DEV_UNSAFE_MODE is true."""
-        with patch.dict(os.environ, {"COREASON_DEV_UNSAFE_MODE": "true"}):
-            # Should normally fail for localhost, but pass with bypass
-            with patch("socket.getaddrinfo", return_value=mock_addr_info("127.0.0.1")):
-                config = CoreasonIdentityConfig(domain="localhost", audience="aud")
-                assert config.domain == "localhost"
+        with (
+            patch.dict(os.environ, {"COREASON_DEV_UNSAFE_MODE": "true"}),
+            patch("socket.getaddrinfo", return_value=mock_addr_info("127.0.0.1")),
+        ):
+            config = CoreasonIdentityConfig(domain="localhost", audience="aud")
+            assert config.domain == "localhost"
 
     def test_ssrf_bypass_mode_false_default(self) -> None:
         """Test that validation is NOT bypassed if env var is missing or false."""
         # Case 1: missing (already covered by other tests, but explicit check here)
-        with patch("socket.getaddrinfo", return_value=mock_addr_info("127.0.0.1")):
-            with pytest.raises(ValidationError):
-                CoreasonIdentityConfig(domain="localhost", audience="aud")
+        with (
+            patch("socket.getaddrinfo", return_value=mock_addr_info("127.0.0.1")),
+            pytest.raises(ValidationError),
+        ):
+            CoreasonIdentityConfig(domain="localhost", audience="aud")
 
         # Case 2: false
-        with patch.dict(os.environ, {"COREASON_DEV_UNSAFE_MODE": "false"}):
-            with patch("socket.getaddrinfo", return_value=mock_addr_info("127.0.0.1")):
-                with pytest.raises(ValidationError):
-                    CoreasonIdentityConfig(domain="localhost", audience="aud")
+        with (
+            patch.dict(os.environ, {"COREASON_DEV_UNSAFE_MODE": "false"}),
+            patch("socket.getaddrinfo", return_value=mock_addr_info("127.0.0.1")),
+            pytest.raises(ValidationError),
+        ):
+            CoreasonIdentityConfig(domain="localhost", audience="aud")
 
     def test_ssrf_invalid_ip_format(self) -> None:
         """Test that invalid IP formats returned by DNS are ignored (robustness)."""

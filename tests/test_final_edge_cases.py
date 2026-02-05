@@ -13,11 +13,12 @@ Final edge case tests for coreason-identity.
 """
 
 import time
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from authlib.jose import JsonWebKey, jwt
+
 from coreason_identity.config import CoreasonIdentityConfig
 from coreason_identity.exceptions import (
     InvalidAudienceError,
@@ -73,11 +74,11 @@ class TestTokenValidatorTimeClaims:
         return JsonWebKey.generate_key("RSA", 2048, is_private=True)
 
     @pytest.fixture
-    def jwks(self, key_pair: Any) -> Dict[str, Any]:
+    def jwks(self, key_pair: Any) -> dict[str, Any]:
         return {"keys": [key_pair.as_dict(private=False)]}
 
     @pytest.fixture
-    def validator(self, mock_oidc_provider: Mock, jwks: Dict[str, Any]) -> TokenValidator:
+    def validator(self, mock_oidc_provider: Mock, jwks: dict[str, Any]) -> TokenValidator:
         mock_oidc_provider.get_jwks.return_value = jwks
         return TokenValidator(
             oidc_provider=mock_oidc_provider,
@@ -88,10 +89,10 @@ class TestTokenValidatorTimeClaims:
     def create_token(
         self,
         key: Any,
-        claims: Dict[str, Any],
+        claims: dict[str, Any],
     ) -> str:
         headers = {"alg": "RS256", "kid": key.as_dict()["kid"]}
-        return jwt.encode(headers, claims, key).decode("utf-8")  # type: ignore[no-any-return]
+        return jwt.encode(headers, claims, key).decode("utf-8")
 
     @pytest.mark.asyncio
     async def test_iat_in_future(self, validator: TokenValidator, key_pair: Any) -> None:
