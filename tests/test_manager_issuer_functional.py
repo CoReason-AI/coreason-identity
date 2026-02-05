@@ -19,18 +19,19 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from authlib.jose import JsonWebKey, jwt
+
 from coreason_identity.config import CoreasonIdentityConfig
 from coreason_identity.exceptions import CoreasonIdentityError
 from coreason_identity.manager import IdentityManager
 
 
-@pytest.fixture()
+@pytest.fixture
 def key_pair() -> Any:
     # Generate a key pair for testing
     return JsonWebKey.generate_key("RSA", 2048, is_private=True)
 
 
-@pytest.fixture()
+@pytest.fixture
 def jwks(key_pair: Any) -> dict[str, Any]:
     # Return public key in JWKS format
     return {"keys": [key_pair.as_dict(private=False)]}

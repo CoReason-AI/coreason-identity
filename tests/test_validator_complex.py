@@ -14,6 +14,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 from authlib.jose import JsonWebKey, jwt
+
 from coreason_identity.exceptions import (
     CoreasonIdentityError,
     InvalidAudienceError,
@@ -24,29 +25,29 @@ from coreason_identity.validator import TokenValidator
 
 
 class TestTokenValidatorComplex:
-    @pytest.fixture()
+    @pytest.fixture
     def mock_oidc_provider(self) -> Mock:
         provider = Mock(spec=OIDCProvider)
         provider.get_jwks = AsyncMock()
         provider.get_issuer = AsyncMock(return_value="https://valid-issuer.com")
         return provider
 
-    @pytest.fixture()
+    @pytest.fixture
     def key_pair(self) -> Any:
         # Generate a key pair for testing
         return JsonWebKey.generate_key("RSA", 2048, is_private=True)
 
-    @pytest.fixture()
+    @pytest.fixture
     def second_key_pair(self) -> Any:
         # Generate a second key pair for key rotation testing
         return JsonWebKey.generate_key("RSA", 2048, is_private=True)
 
-    @pytest.fixture()
+    @pytest.fixture
     def jwks(self, key_pair: Any) -> dict[str, Any]:
         # Return public key in JWKS format
         return {"keys": [key_pair.as_dict(private=False)]}
 
-    @pytest.fixture()
+    @pytest.fixture
     def validator(self, mock_oidc_provider: Mock) -> TokenValidator:
         return TokenValidator(oidc_provider=mock_oidc_provider, audience="my-audience")
 
@@ -55,7 +56,7 @@ class TestTokenValidatorComplex:
             headers = {"alg": "RS256", "kid": key.as_dict()["kid"]}
         return jwt.encode(headers, claims, key)
 
-    @pytest.mark.asyncio()
+    @pytest.mark.asyncio
     async def test_validate_token_aud_list_success(
         self, validator: TokenValidator, mock_oidc_provider: Mock, key_pair: Any, jwks: dict[str, Any]
     ) -> None:
@@ -76,7 +77,7 @@ class TestTokenValidatorComplex:
         result = await validator.validate_token(token_str)
         assert result["sub"] == "user123"
 
-    @pytest.mark.asyncio()
+    @pytest.mark.asyncio
     async def test_validate_token_aud_list_fail(
         self, validator: TokenValidator, mock_oidc_provider: Mock, key_pair: Any, jwks: dict[str, Any]
     ) -> None:
@@ -96,7 +97,7 @@ class TestTokenValidatorComplex:
         with pytest.raises(InvalidAudienceError):
             await validator.validate_token(token_str)
 
-    @pytest.mark.asyncio()
+    @pytest.mark.asyncio
     async def test_validate_token_whitespace(
         self, validator: TokenValidator, mock_oidc_provider: Mock, key_pair: Any, jwks: dict[str, Any]
     ) -> None:
@@ -120,7 +121,7 @@ class TestTokenValidatorComplex:
         except CoreasonIdentityError:
             pytest.fail("Should handle whitespace")
 
-    @pytest.mark.asyncio()
+    @pytest.mark.asyncio
     async def test_key_rotation_retry(
         self, validator: TokenValidator, mock_oidc_provider: Mock, key_pair: Any, second_key_pair: Any
     ) -> None:
@@ -169,7 +170,7 @@ class TestTokenValidatorComplex:
         assert mock_oidc_provider.get_jwks.call_count == 2
         mock_oidc_provider.get_jwks.assert_any_call(force_refresh=True)
 
-    @pytest.mark.asyncio()
+    @pytest.mark.asyncio
     async def test_none_algorithm_rejected(
         self, validator: TokenValidator, mock_oidc_provider: Mock, jwks: dict[str, Any]
     ) -> None:
@@ -197,7 +198,7 @@ class TestTokenValidatorComplex:
         with pytest.raises(CoreasonIdentityError):
             await validator.validate_token(token_str)
 
-    @pytest.mark.asyncio()
+    @pytest.mark.asyncio
     async def test_key_missing_after_retry(
         self, validator: TokenValidator, mock_oidc_provider: Mock, jwks: dict[str, Any]
     ) -> None:
