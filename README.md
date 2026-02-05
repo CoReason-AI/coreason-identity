@@ -26,6 +26,7 @@ Based on the [Product Requirements](docs/product_requirements.md):
 *   **IdentityMapper:** Maps IdP claims to a standardized `UserContext` model, handling project context extraction and group-to-permission mapping.
 *   **DeviceFlowClient:** Implements RFC 8628 OAuth 2.0 Device Authorization Grant for headless CLI authentication.
 *   **Observability:** Emits OpenTelemetry spans and secure logs (PII hashed).
+*   **Security:** DNS-based SSRF protection for OIDC discovery URLs (configurable bypass for development).
 
 ## Installation
 
