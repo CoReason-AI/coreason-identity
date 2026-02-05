@@ -12,6 +12,7 @@ from typing import Any, Generator
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
+
 from coreason_identity.config import CoreasonIdentityConfig
 from coreason_identity.exceptions import (
     CoreasonIdentityError,
