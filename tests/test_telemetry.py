@@ -15,15 +15,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from authlib.jose.errors import ExpiredTokenError
-from opentelemetry.sdk.trace import Tracer, TracerProvider
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
-from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-from opentelemetry.trace import StatusCode
-
 from coreason_identity.exceptions import TokenExpiredError
 from coreason_identity.oidc_provider import OIDCProvider
 from coreason_identity.utils.logger import logger
 from coreason_identity.validator import TokenValidator
+from opentelemetry.sdk.trace import Tracer, TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+from opentelemetry.trace import StatusCode
 
 
 class MockClaims(dict[str, Any]):
