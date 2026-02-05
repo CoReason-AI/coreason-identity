@@ -9,7 +9,7 @@
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
 import asyncio
-from typing import Any, Dict, cast
+from typing import Any, Dict
 from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
