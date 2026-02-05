@@ -31,7 +31,13 @@ class OIDCProvider:
         cache_ttl (int): The cache time-to-live in seconds.
     """
 
-    def __init__(self, discovery_url: str, client: httpx.AsyncClient, cache_ttl: int = 3600, refresh_cooldown: float = 30.0) -> None:
+    def __init__(
+        self,
+        discovery_url: str,
+        client: httpx.AsyncClient,
+        cache_ttl: int = 3600,
+        refresh_cooldown: float = 30.0,
+    ) -> None:
         """
         Initialize the OIDCProvider.
 
@@ -111,10 +117,13 @@ class OIDCProvider:
             current_time = time.time()
 
             # DoS Protection: Rate Limit Check
-            if force_refresh and self._jwks_cache is not None:
-                if (current_time - self._last_update) < self.refresh_cooldown:
-                    logger.warning("JWKS refresh cooldown active. Returning cached keys.")
-                    return self._jwks_cache
+            if (
+                force_refresh
+                and self._jwks_cache is not None
+                and (current_time - self._last_update) < self.refresh_cooldown
+            ):
+                logger.warning("JWKS refresh cooldown active. Returning cached keys.")
+                return self._jwks_cache
 
             if (
                 not force_refresh

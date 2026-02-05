@@ -26,7 +26,7 @@ def provider(mock_client: AsyncMock) -> OIDCProvider:
     return OIDCProvider(
         "https://idp/.well-known/openid-configuration",
         mock_client,
-        refresh_cooldown=10.0  # Set explicit cooldown
+        refresh_cooldown=10.0,  # Set explicit cooldown
     )
 
 
@@ -53,12 +53,12 @@ async def test_get_jwks_rate_limiting(provider: OIDCProvider, mock_client: Async
     # Force time to be just 1 second after last update
     with patch("time.time", return_value=last_update + 1.0):
         jwks2 = await provider.get_jwks(force_refresh=True)
-        assert jwks2 == {"keys": ["key1"]} # Should return cached
-        assert mock_client.get.call_count == 2 # No new calls
+        assert jwks2 == {"keys": ["key1"]}  # Should return cached
+        assert mock_client.get.call_count == 2  # No new calls
 
     # 3. After cooldown
     # Force time to be 11 seconds after last update (cooldown is 10s)
     with patch("time.time", return_value=last_update + 11.0):
         jwks3 = await provider.get_jwks(force_refresh=True)
-        assert jwks3 == {"keys": ["key2"]} # Should fetch new
+        assert jwks3 == {"keys": ["key2"]}  # Should fetch new
         assert mock_client.get.call_count == 4
