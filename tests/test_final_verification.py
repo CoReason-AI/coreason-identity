@@ -19,6 +19,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 from authlib.jose.errors import BadSignatureError, JoseError
+from httpx import Request, Response
+
 from coreason_identity.device_flow_client import DeviceFlowClient
 from coreason_identity.exceptions import (
     CoreasonIdentityError,
@@ -28,7 +30,6 @@ from coreason_identity.identity_mapper import IdentityMapper
 from coreason_identity.models import DeviceFlowResponse
 from coreason_identity.oidc_provider import OIDCProvider
 from coreason_identity.validator import TokenValidator
-from httpx import Request, Response
 
 
 # --- Helper ---
@@ -40,7 +41,7 @@ def create_response(status_code: int, json_data: Any = None) -> Response:
 # --- 1. TokenValidator Verification ---
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_validator_retry_fails() -> None:
     """
     Verify that if validation fails (BadSignature), and we refresh keys,
@@ -64,7 +65,7 @@ async def test_validator_retry_fails() -> None:
     mock_provider.get_jwks.assert_called_with(force_refresh=True)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_validator_refresh_network_error() -> None:
     """
     Verify that if the first validation fails (triggering refresh),
@@ -91,7 +92,7 @@ async def test_validator_refresh_network_error() -> None:
             await validator.validate_token("token_triggering_refresh")
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_validator_jose_error_generic() -> None:
     """
     Verify a generic JoseError (not signature/expired) raises InvalidTokenError.
@@ -166,7 +167,7 @@ def test_mapper_huge_input_strings() -> None:
 # --- 3. DeviceFlowClient Verification ---
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_device_flow_mixed_errors() -> None:
     """
     Test a sequence of: slow_down -> authorization_pending -> expired_token.

@@ -14,8 +14,9 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
-from coreason_identity.config import CoreasonIdentityConfig
 from pydantic import ValidationError
+
+from coreason_identity.config import CoreasonIdentityConfig
 
 
 # Helper to format getaddrinfo response

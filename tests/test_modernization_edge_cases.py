@@ -18,6 +18,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 from authlib.jose import JsonWebKey, jwt
+
 from coreason_identity.exceptions import CoreasonIdentityError, InvalidTokenError
 from coreason_identity.identity_mapper import IdentityMapper, RawIdPClaims
 from coreason_identity.oidc_provider import OIDCProvider
@@ -98,21 +99,21 @@ class TestTokenValidatorTypeStress:
     Test TokenValidator with inputs that stress type checking assumptions (though checked at runtime).
     """
 
-    @pytest.fixture()
+    @pytest.fixture
     def mock_oidc_provider(self) -> Mock:
         provider = Mock(spec=OIDCProvider)
         provider.get_jwks = AsyncMock()
         return provider
 
-    @pytest.fixture()
+    @pytest.fixture
     def key_pair(self) -> Any:
         return JsonWebKey.generate_key("RSA", 2048, is_private=True)
 
-    @pytest.fixture()
+    @pytest.fixture
     def jwks(self, key_pair: Any) -> dict[str, Any]:
         return {"keys": [key_pair.as_dict(private=False)]}
 
-    @pytest.fixture()
+    @pytest.fixture
     def validator(self, mock_oidc_provider: Mock, jwks: dict[str, Any]) -> TokenValidator:
         mock_oidc_provider.get_jwks.return_value = jwks
         return TokenValidator(
@@ -125,7 +126,7 @@ class TestTokenValidatorTypeStress:
         headers = {"alg": "RS256", "kid": key.as_dict()["kid"]}
         return jwt.encode(headers, claims, key).decode("utf-8")
 
-    @pytest.mark.asyncio()
+    @pytest.mark.asyncio
     async def test_validate_token_with_boolean_audience(self, validator: TokenValidator, key_pair: Any) -> None:
         """
         Test token with boolean 'aud' claim.
@@ -143,7 +144,7 @@ class TestTokenValidatorTypeStress:
         with pytest.raises(CoreasonIdentityError):
             await validator.validate_token(token)
 
-    @pytest.mark.asyncio()
+    @pytest.mark.asyncio
     async def test_validate_token_with_numeric_string_audience(self, validator: TokenValidator, key_pair: Any) -> None:
         """
         Test token with 'aud' as numeric string "123".
@@ -160,7 +161,7 @@ class TestTokenValidatorTypeStress:
         with pytest.raises(InvalidTokenError):
             await validator.validate_token(token)
 
-    @pytest.mark.asyncio()
+    @pytest.mark.asyncio
     async def test_validate_token_with_none_payload_value(self, validator: TokenValidator, key_pair: Any) -> None:
         """
         Test token where a standard claim is explicitly None (if encoded).
