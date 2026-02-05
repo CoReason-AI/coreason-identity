@@ -8,7 +8,6 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
-import time
 from unittest.mock import AsyncMock, Mock, patch
 
 import httpx

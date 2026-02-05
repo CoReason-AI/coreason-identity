@@ -54,6 +54,7 @@ class OIDCProvider:
         self._jwks_cache: Optional[Dict[str, Any]] = None
         self._oidc_config_cache: Optional[Dict[str, Any]] = None
         self._last_update: float = 0.0
+        self._last_refresh_attempt: float = 0.0
         self._lock = anyio.Lock()
 
     async def _fetch_oidc_config(self) -> Dict[str, Any]:
@@ -123,13 +124,18 @@ class OIDCProvider:
                 return self._jwks_cache
 
             # Rate limiting logic: Prevent refreshing too often
+            # We use _last_refresh_attempt to track attempts (successful or not)
+            # to prevent hammering the IdP if it's down or returning errors.
             if (
                 force_refresh
                 and self._jwks_cache is not None
-                and (current_time - self._last_update) < self.refresh_cooldown
+                and (current_time - self._last_refresh_attempt) < self.refresh_cooldown
             ):
                 logger.warning("JWKS refresh rate limit hit. Returning cached keys.")
                 return self._jwks_cache
+
+            # Update attempt timestamp before network call
+            self._last_refresh_attempt = current_time
 
             # Fetch fresh keys
             oidc_config = await self._fetch_oidc_config()
