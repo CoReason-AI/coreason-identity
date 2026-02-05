@@ -13,7 +13,6 @@ from typing import Any, cast
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
-
 from coreason_identity.config import CoreasonIdentityConfig
 from coreason_identity.exceptions import CoreasonIdentityError, InvalidTokenError
 from coreason_identity.manager import IdentityManager
@@ -27,12 +26,12 @@ MOCK_TOKEN = "valid.token.string"
 MOCK_AUTH_HEADER = f"Bearer {MOCK_TOKEN}"
 
 
-@pytest.fixture
+@pytest.fixture()
 def config() -> CoreasonIdentityConfig:
     return CoreasonIdentityConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id=MOCK_CLIENT_ID)
 
 
-@pytest.fixture
+@pytest.fixture()
 def manager(config: CoreasonIdentityConfig) -> Generator[IdentityManager, Any, None]:
     # Mock internal components during initialization
     with (

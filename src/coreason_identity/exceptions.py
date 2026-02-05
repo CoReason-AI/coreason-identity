@@ -17,7 +17,6 @@ class CoreasonIdentityError(Exception):
     """Base exception for all coreason-identity errors."""
 
 
-
 class InvalidTokenError(CoreasonIdentityError):
     """
     Raised when the token is invalid (expired, bad signature, wrong audience, etc.).
@@ -25,22 +24,17 @@ class InvalidTokenError(CoreasonIdentityError):
     """
 
 
-
 class TokenExpiredError(InvalidTokenError):
     """Raised when the provided token has expired."""
-
 
 
 class InvalidAudienceError(InvalidTokenError):
     """Raised when the token's audience does not match the expected value."""
 
 
-
 class SignatureVerificationError(InvalidTokenError):
     """Raised when the token's signature cannot be verified."""
 
 
-
 class InsufficientPermissionsError(CoreasonIdentityError):
     """Raised when the user does not have the required permissions."""
-

@@ -60,7 +60,7 @@ class RawIdPClaims(BaseModel):
             # If it's a single string, we treat it as one item here.
             # Splitting happens in __init__ for scopes.
             return [v]
-        if isinstance(v, (list, tuple)):
+        if isinstance(v, list | tuple):
             return [str(item) for item in v if item is not None]
         return []
 

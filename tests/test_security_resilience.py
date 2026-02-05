@@ -15,7 +15,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from authlib.jose.errors import InvalidClaimError
-
 from coreason_identity.config import CoreasonIdentityConfig
 from coreason_identity.exceptions import (
     CoreasonIdentityError,
@@ -26,7 +25,7 @@ from coreason_identity.manager import IdentityManager
 from coreason_identity.utils.logger import logger
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_config() -> CoreasonIdentityConfig:
     return CoreasonIdentityConfig(
         domain="auth.coreason.com",
@@ -35,7 +34,7 @@ def mock_config() -> CoreasonIdentityConfig:
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def identity_manager(mock_config: CoreasonIdentityConfig) -> Generator[IdentityManager, Any, None]:
     # We patch OIDCProvider to avoid network calls during init
     with (
@@ -47,7 +46,7 @@ def identity_manager(mock_config: CoreasonIdentityConfig) -> Generator[IdentityM
         yield manager
 
 
-@pytest.fixture
+@pytest.fixture()
 def log_capture() -> Generator[list[str], None, None]:
     """Fixture to capture loguru logs."""
     logs = []
@@ -77,7 +76,7 @@ def test_audience_mismatch_rejection(identity_manager: IdentityManager) -> None:
     assert "Invalid audience" in str(exc_info.value)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_audience_mismatch_real_validator_behavior() -> None:
     """
     Security Verification (Deep):
@@ -103,7 +102,7 @@ async def test_audience_mismatch_real_validator_behavior() -> None:
         assert "Invalid audience" in str(exc_info.value)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_pii_redaction_in_logs(log_capture: list[str]) -> None:
     """
     Security Verification:
@@ -213,7 +212,7 @@ class TestSecurityEdgeCases:
         with pytest.raises(CoreasonIdentityError, match="Failed to fetch JWKS"):
             identity_manager.validate_token("Bearer token")
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_unicode_pii_logging(self, log_capture: list[str]) -> None:
         """
         Logging Edge Case: Verify that Unicode characters in PII are handled and hashed correctly.

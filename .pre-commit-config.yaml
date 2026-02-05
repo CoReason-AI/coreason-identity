@@ -22,6 +22,7 @@ repos:
           - pydantic-settings
           - pytest
           - authlib
+          - types-authlib
           - httpx
           - email-validator
           - opentelemetry-api

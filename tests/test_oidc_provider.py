@@ -14,22 +14,21 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
 import pytest
-
 from coreason_identity.exceptions import CoreasonIdentityError
 from coreason_identity.oidc_provider import OIDCProvider
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_client() -> AsyncMock:
     return AsyncMock(spec=httpx.AsyncClient)
 
 
-@pytest.fixture
+@pytest.fixture()
 def provider(mock_client: AsyncMock) -> OIDCProvider:
     return OIDCProvider("https://idp/.well-known/openid-configuration", mock_client)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_get_jwks_success(provider: OIDCProvider, mock_client: AsyncMock) -> None:
     # Mock OIDC config response
     mock_client.get.side_effect = [
@@ -42,7 +41,7 @@ async def test_get_jwks_success(provider: OIDCProvider, mock_client: AsyncMock) 
     assert mock_client.get.call_count == 2
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_get_jwks_cache_hit(provider: OIDCProvider, mock_client: AsyncMock) -> None:
     # Populate cache
     provider._jwks_cache = {"keys": ["cached"]}
@@ -53,7 +52,7 @@ async def test_get_jwks_cache_hit(provider: OIDCProvider, mock_client: AsyncMock
     assert mock_client.get.call_count == 0
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_get_jwks_force_refresh(provider: OIDCProvider, mock_client: AsyncMock) -> None:
     provider._jwks_cache = {"keys": ["cached"]}
     provider._last_update = time.time()
@@ -67,7 +66,7 @@ async def test_get_jwks_force_refresh(provider: OIDCProvider, mock_client: Async
     assert jwks == {"keys": ["fresh"]}
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_get_jwks_expired_cache(provider: OIDCProvider, mock_client: AsyncMock) -> None:
     provider._jwks_cache = {"keys": ["cached"]}
     provider._last_update = time.time() - 3601  # Expired
@@ -81,7 +80,7 @@ async def test_get_jwks_expired_cache(provider: OIDCProvider, mock_client: Async
     assert jwks == {"keys": ["fresh"]}
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_fetch_oidc_config_error(provider: OIDCProvider, mock_client: AsyncMock) -> None:
     mock_client.get.side_effect = httpx.HTTPError("Network error")
 
@@ -89,7 +88,7 @@ async def test_fetch_oidc_config_error(provider: OIDCProvider, mock_client: Asyn
         await provider.get_jwks()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_missing_jwks_uri(provider: OIDCProvider, mock_client: AsyncMock) -> None:
     mock_client.get.return_value = Mock(status_code=200, json=dict)
 
@@ -97,7 +96,7 @@ async def test_missing_jwks_uri(provider: OIDCProvider, mock_client: AsyncMock) 
         await provider.get_jwks()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_fetch_jwks_error(provider: OIDCProvider, mock_client: AsyncMock) -> None:
     mock_client.get.side_effect = [
         Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks"}),
@@ -108,7 +107,7 @@ async def test_fetch_jwks_error(provider: OIDCProvider, mock_client: AsyncMock) 
         await provider.get_jwks()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_get_issuer_success(provider: OIDCProvider, mock_client: AsyncMock) -> None:
     """Test retrieving issuer from fresh fetch."""
     mock_client.get.side_effect = [
@@ -126,7 +125,7 @@ async def test_get_issuer_success(provider: OIDCProvider, mock_client: AsyncMock
     assert provider._jwks_cache is not None
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_get_issuer_from_cache(provider: OIDCProvider, mock_client: AsyncMock) -> None:
     """Test retrieving issuer from existing valid cache."""
     provider._oidc_config_cache = {"issuer": "https://cached-idp.com", "jwks_uri": "..."}
@@ -138,7 +137,7 @@ async def test_get_issuer_from_cache(provider: OIDCProvider, mock_client: AsyncM
     mock_client.get.assert_not_called()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_get_issuer_missing_in_config(provider: OIDCProvider, mock_client: AsyncMock) -> None:
     """Test error when 'issuer' is missing from OIDC config."""
     mock_client.get.side_effect = [
@@ -150,7 +149,7 @@ async def test_get_issuer_missing_in_config(provider: OIDCProvider, mock_client:
         await provider.get_issuer()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_get_issuer_refreshes_if_expired(provider: OIDCProvider, mock_client: AsyncMock) -> None:
     """Test that it refreshes if cache is expired."""
     provider._oidc_config_cache = {"issuer": "old", "jwks_uri": "..."}
@@ -170,7 +169,7 @@ async def test_get_issuer_refreshes_if_expired(provider: OIDCProvider, mock_clie
     assert mock_client.get.call_count == 2
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_get_issuer_fails_if_config_none(provider: OIDCProvider) -> None:
     """
     Test fallback error if config remains None after attempt.
@@ -186,7 +185,7 @@ async def test_get_issuer_fails_if_config_none(provider: OIDCProvider) -> None:
         await provider.get_issuer()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_get_jwks_double_check_locking(provider: OIDCProvider, mock_client: AsyncMock) -> None:
     """
     Test the double-checked locking inside the lock.

@@ -19,10 +19,6 @@ from unittest.mock import AsyncMock, Mock, patch
 import httpx
 import pytest
 from authlib.jose import JsonWebKey
-
-# Helper for httpx mocks
-from httpx import Request, Response
-
 from coreason_identity.device_flow_client import DeviceFlowClient
 from coreason_identity.exceptions import (
     CoreasonIdentityError,
@@ -32,6 +28,9 @@ from coreason_identity.identity_mapper import IdentityMapper
 from coreason_identity.models import DeviceFlowResponse
 from coreason_identity.oidc_provider import OIDCProvider
 from coreason_identity.validator import TokenValidator
+
+# Helper for httpx mocks
+from httpx import Request, Response
 
 
 def create_response(status_code: int, json_data: Any | None = None) -> Response:
@@ -95,11 +94,11 @@ class TestIdentityMapperSuperEdgeCases:
 
 
 class TestDeviceFlowSuperEdgeCases:
-    @pytest.fixture
+    @pytest.fixture()
     def mock_client(self) -> AsyncMock:
         return AsyncMock(spec=httpx.AsyncClient)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_poll_token_missing_access_token_field(self, mock_client: AsyncMock) -> None:
         """
         Verify behavior when IdP returns 200 OK but the JSON is missing 'access_token'.
@@ -128,19 +127,19 @@ class TestDeviceFlowSuperEdgeCases:
 
 
 class TestTokenValidatorSuperEdgeCases:
-    @pytest.fixture
+    @pytest.fixture()
     def mock_oidc_provider(self) -> Mock:
         return Mock(spec=OIDCProvider)
 
-    @pytest.fixture
+    @pytest.fixture()
     def key_pair(self) -> Any:
         return JsonWebKey.generate_key("RSA", 2048, is_private=True)
 
-    @pytest.fixture
+    @pytest.fixture()
     def jwks(self, key_pair: Any) -> dict[str, Any]:
         return {"keys": [key_pair.as_dict(private=False)]}
 
-    @pytest.fixture
+    @pytest.fixture()
     def validator(self, mock_oidc_provider: Mock, jwks: dict[str, Any]) -> TokenValidator:
         mock_oidc_provider.get_jwks = AsyncMock(return_value=jwks)
         return TokenValidator(
@@ -149,7 +148,7 @@ class TestTokenValidatorSuperEdgeCases:
             issuer="https://valid-issuer.com/",
         )
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_malformed_json_payload_after_signature_check(self, validator: TokenValidator) -> None:
         """
         Simulate a scenario where JWT signature is valid (hypothetically) but payload is not valid JSON.

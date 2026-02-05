@@ -15,15 +15,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from authlib.jose.errors import ExpiredTokenError
-from opentelemetry.sdk.trace import Tracer, TracerProvider
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
-from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-from opentelemetry.trace import StatusCode
-
 from coreason_identity.exceptions import TokenExpiredError
 from coreason_identity.oidc_provider import OIDCProvider
 from coreason_identity.utils.logger import logger
 from coreason_identity.validator import TokenValidator
+from opentelemetry.sdk.trace import Tracer, TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+from opentelemetry.trace import StatusCode
 
 
 class MockClaims(dict[str, Any]):
@@ -33,7 +32,7 @@ class MockClaims(dict[str, Any]):
         pass
 
 
-@pytest.fixture
+@pytest.fixture()
 def telemetry_setup() -> tuple[InMemorySpanExporter, Tracer]:
     """Sets up an OpenTelemetry tracer with an in-memory exporter."""
     exporter = InMemorySpanExporter()
@@ -44,7 +43,7 @@ def telemetry_setup() -> tuple[InMemorySpanExporter, Tracer]:
     return exporter, tracer  # type: ignore[return-value]
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_oidc_provider() -> MagicMock:
     provider = MagicMock(spec=OIDCProvider)
     # Mock public key
@@ -53,7 +52,7 @@ def mock_oidc_provider() -> MagicMock:
     return provider
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_validate_token_success_telemetry(
     telemetry_setup: tuple[InMemorySpanExporter, Tracer],
     mock_oidc_provider: MagicMock,
@@ -83,7 +82,7 @@ async def test_validate_token_success_telemetry(
     assert span.attributes["user.id"] == "user123"
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_validate_token_failure_telemetry(
     telemetry_setup: tuple[InMemorySpanExporter, Tracer],
     mock_oidc_provider: MagicMock,
@@ -112,7 +111,7 @@ async def test_validate_token_failure_telemetry(
     assert span.events[0].name == "exception"
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_logging_strictness(mock_oidc_provider: MagicMock) -> None:
     """Verifies that the user ID is hashed in the logs."""
     # Ensure we capture logs from our logger

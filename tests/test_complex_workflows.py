@@ -17,7 +17,6 @@ from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
-
 from coreason_identity.config import CoreasonIdentityConfig
 from coreason_identity.manager import IdentityManager
 from coreason_identity.models import UserContext
@@ -27,7 +26,7 @@ MOCK_DOMAIN = "auth.example.com"
 MOCK_AUDIENCE = "api://test"
 
 
-@pytest.fixture
+@pytest.fixture()
 def identity_manager() -> Generator[IdentityManager, Any, None]:
     config = CoreasonIdentityConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id="cid")
 
@@ -115,7 +114,7 @@ def test_legacy_migration_flow(identity_manager: IdentityManager) -> None:
 
 
 # Redefine fixture to use REAL IdentityMapper for better integration tests
-@pytest.fixture
+@pytest.fixture()
 def integration_manager() -> Generator[IdentityManager, Any, None]:
     config = CoreasonIdentityConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id="cid")
 
