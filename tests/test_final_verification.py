@@ -13,7 +13,7 @@ Final verification tests covering complex scenarios and edge cases identified du
 """
 
 import time
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
@@ -40,7 +40,7 @@ def create_response(status_code: int, json_data: Any = None) -> Response:
 # --- 1. TokenValidator Verification ---
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_validator_retry_fails() -> None:
     """
     Verify that if validation fails (BadSignature), and we refresh keys,
@@ -57,14 +57,14 @@ async def test_validator_retry_fails() -> None:
         mock_decode.side_effect = BadSignatureError("bad_signature")
 
         # The error string from Authlib might contain "bad_signature: " or similar
-        with pytest.raises(SignatureVerificationError, match="Invalid signature:.*bad_signature"):
+        with pytest.raises(SignatureVerificationError, match=r"Invalid signature:.*bad_signature"):
             await validator.validate_token("bad_token")
 
     # Ensure refresh was called
     mock_provider.get_jwks.assert_called_with(force_refresh=True)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_validator_refresh_network_error() -> None:
     """
     Verify that if the first validation fails (triggering refresh),
@@ -91,7 +91,7 @@ async def test_validator_refresh_network_error() -> None:
             await validator.validate_token("token_triggering_refresh")
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_validator_jose_error_generic() -> None:
     """
     Verify a generic JoseError (not signature/expired) raises InvalidTokenError.
@@ -120,7 +120,7 @@ def test_mapper_nested_groups_safely_handled() -> None:
     """
     mapper = IdentityMapper()
     # Input with nested list
-    claims: Dict[str, Any] = {
+    claims: dict[str, Any] = {
         "sub": "u1",
         "email": "u@e.com",
         "groups": [["nested_group"], "project:valid"],
@@ -145,7 +145,7 @@ def test_mapper_huge_input_strings() -> None:
     """
     mapper = IdentityMapper()
     huge_string = "a" * 10000 + "project:HIDDEN"
-    claims: Dict[str, Any] = {
+    claims: dict[str, Any] = {
         "sub": "u1",
         "email": "u@e.com",
         "groups": [huge_string],
@@ -166,7 +166,7 @@ def test_mapper_huge_input_strings() -> None:
 # --- 3. DeviceFlowClient Verification ---
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_device_flow_mixed_errors() -> None:
     """
     Test a sequence of: slow_down -> authorization_pending -> expired_token.

@@ -12,7 +12,7 @@
 Data models for the coreason-identity package.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr
 
@@ -45,20 +45,20 @@ class UserContext(BaseModel):
     email: EmailStr = Field(
         ..., description="The user's email address. Verified and strictly typed.", examples=["alice@coreason.ai"]
     )
-    groups: List[str] = Field(
+    groups: list[str] = Field(
         default_factory=list,
         description="Security group IDs. Used for Row-Level Security (RLS).",
         examples=[["admin", "project:apollo"]],
     )
-    scopes: List[str] = Field(
+    scopes: list[str] = Field(
         default_factory=list,
         description="OAuth 2.0 scopes for coarse-grained API permission checks.",
         examples=[["openid", "profile"]],
     )
-    downstream_token: Optional[SecretStr] = Field(
+    downstream_token: SecretStr | None = Field(
         default=None, description="The On-Behalf-Of (OBO) token for downstream API calls. Protected from logging."
     )
-    claims: Dict[str, Any] = Field(default_factory=dict, description="Extended attributes and legacy field mappings.")
+    claims: dict[str, Any] = Field(default_factory=dict, description="Extended attributes and legacy field mappings.")
 
 
 class DeviceFlowResponse(BaseModel):
@@ -77,7 +77,7 @@ class DeviceFlowResponse(BaseModel):
     device_code: str
     user_code: str
     verification_uri: str
-    verification_uri_complete: Optional[str] = None
+    verification_uri_complete: str | None = None
     expires_in: int
     interval: int = 5
 
@@ -95,7 +95,7 @@ class TokenResponse(BaseModel):
     """
 
     access_token: str
-    refresh_token: Optional[str] = None
-    id_token: Optional[str] = None
+    refresh_token: str | None = None
+    id_token: str | None = None
     token_type: str
     expires_in: int

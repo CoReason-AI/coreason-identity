@@ -13,7 +13,7 @@ OIDC Provider component for fetching and caching JWKS.
 """
 
 import time
-from typing import Any, Dict, Optional
+from typing import Any
 
 import anyio
 import httpx
@@ -42,12 +42,12 @@ class OIDCProvider:
         self.discovery_url = discovery_url
         self.client = client
         self.cache_ttl = cache_ttl
-        self._jwks_cache: Optional[Dict[str, Any]] = None
-        self._oidc_config_cache: Optional[Dict[str, Any]] = None
+        self._jwks_cache: dict[str, Any] | None = None
+        self._oidc_config_cache: dict[str, Any] | None = None
         self._last_update: float = 0.0
         self._lock = anyio.Lock()
 
-    async def _fetch_oidc_config(self) -> Dict[str, Any]:
+    async def _fetch_oidc_config(self) -> dict[str, Any]:
         """
         Fetches the OIDC configuration to find the jwks_uri.
 
@@ -64,7 +64,7 @@ class OIDCProvider:
         except httpx.HTTPError as e:
             raise CoreasonIdentityError(f"Failed to fetch OIDC configuration from {self.discovery_url}: {e}") from e
 
-    async def _fetch_jwks(self, jwks_uri: str) -> Dict[str, Any]:
+    async def _fetch_jwks(self, jwks_uri: str) -> dict[str, Any]:
         """
         Fetches the JWKS from the given URI.
 
@@ -84,7 +84,7 @@ class OIDCProvider:
         except httpx.HTTPError as e:
             raise CoreasonIdentityError(f"Failed to fetch JWKS from {jwks_uri}: {e}") from e
 
-    async def get_jwks(self, force_refresh: bool = False) -> Dict[str, Any]:
+    async def get_jwks(self, force_refresh: bool = False) -> dict[str, Any]:
         """
         Returns the JWKS, using the cache if valid.
 

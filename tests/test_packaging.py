@@ -79,9 +79,8 @@ def test_sdist_contents(build_artifacts: Path) -> None:
     ]
 
     for pattern in excluded_patterns:
-        assert not has_file(pattern) and not any(
-            f.endswith(pattern.lstrip("/")) for f in filenames
-        ), f"{pattern} should be excluded from sdist"
+        assert not has_file(pattern), f"{pattern} should be excluded from sdist"
+        assert not any(f.endswith(pattern.lstrip("/")) for f in filenames), f"{pattern} should be excluded from sdist"
 
 
 def test_wheel_contents(build_artifacts: Path) -> None:

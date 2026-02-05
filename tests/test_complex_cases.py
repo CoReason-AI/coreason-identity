@@ -12,7 +12,7 @@
 Complex and edge case tests for coreason-identity.
 """
 
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
@@ -29,22 +29,22 @@ from coreason_identity.validator import TokenValidator
 
 
 class TestTokenValidatorComplex:
-    @pytest.fixture
+    @pytest.fixture()
     def mock_oidc_provider(self) -> Mock:
         provider = Mock(spec=OIDCProvider)
         provider.get_jwks = AsyncMock()
         return provider
 
-    @pytest.fixture
+    @pytest.fixture()
     def key_pair(self) -> Any:
         return JsonWebKey.generate_key("RSA", 2048, is_private=True)
 
-    @pytest.fixture
-    def jwks(self, key_pair: Any) -> Dict[str, Any]:
+    @pytest.fixture()
+    def jwks(self, key_pair: Any) -> dict[str, Any]:
         return {"keys": [key_pair.as_dict(private=False)]}
 
-    @pytest.fixture
-    def validator(self, mock_oidc_provider: Mock, jwks: Dict[str, Any]) -> TokenValidator:
+    @pytest.fixture()
+    def validator(self, mock_oidc_provider: Mock, jwks: dict[str, Any]) -> TokenValidator:
         mock_oidc_provider.get_jwks.return_value = jwks
         return TokenValidator(
             oidc_provider=mock_oidc_provider,
@@ -55,15 +55,15 @@ class TestTokenValidatorComplex:
     def create_token(
         self,
         key: Any,
-        claims: Dict[str, Any],
-        headers: Dict[str, Any] | None = None,
+        claims: dict[str, Any],
+        headers: dict[str, Any] | None = None,
         alg: str = "RS256",
     ) -> str:
         if headers is None:
             headers = {"alg": alg, "kid": key.as_dict()["kid"] if key else "none"}
-        return jwt.encode(headers, claims, key).decode("utf-8")  # type: ignore[no-any-return]
+        return jwt.encode(headers, claims, key).decode("utf-8")
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_alg_none_attack(self, validator: TokenValidator) -> None:
         """
         Security Test: Verify 'alg': 'none' is rejected.
@@ -82,7 +82,7 @@ class TestTokenValidatorComplex:
         with pytest.raises(CoreasonIdentityError, match="Token validation failed"):
             await validator.validate_token(token)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_audience_as_list(
         self,
         validator: TokenValidator,
@@ -104,7 +104,7 @@ class TestTokenValidatorComplex:
         validated = await validator.validate_token(token)
         assert validated["sub"] == "user123"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_key_rotation_recovery(
         self,
         validator: TokenValidator,
@@ -190,11 +190,11 @@ class TestIdentityMapperComplex:
 
 
 class TestDeviceFlowClientComplex:
-    @pytest.fixture
+    @pytest.fixture()
     def mock_client(self) -> AsyncMock:
         return AsyncMock(spec=httpx.AsyncClient)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_poll_token_slow_down_logic(
         self,
         mock_client: AsyncMock,

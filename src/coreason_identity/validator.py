@@ -13,7 +13,7 @@ TokenValidator component for validating JWT signatures and claims.
 """
 
 import hashlib
-from typing import Any, Dict, Optional
+from typing import Any
 
 from authlib.jose import JsonWebToken
 from authlib.jose.errors import (
@@ -49,7 +49,7 @@ class TokenValidator:
         issuer (Optional[str]): The expected issuer claim.
     """
 
-    def __init__(self, oidc_provider: OIDCProvider, audience: str, issuer: Optional[str] = None) -> None:
+    def __init__(self, oidc_provider: OIDCProvider, audience: str, issuer: str | None = None) -> None:
         """
         Initialize the TokenValidator.
 
@@ -64,7 +64,7 @@ class TokenValidator:
         # Use a specific JsonWebToken instance to enforce RS256 and reject 'none'
         self.jwt = JsonWebToken(["RS256"])
 
-    async def validate_token(self, token: str) -> Dict[str, Any]:
+    async def validate_token(self, token: str) -> dict[str, Any]:
         """
         Validates the JWT signature and claims.
 
@@ -96,7 +96,7 @@ class TokenValidator:
                     expected_issuer = await self.oidc_provider.get_issuer()
 
                 # Define claim options factory
-                def get_claims_options(iss: str) -> Dict[str, Any]:
+                def get_claims_options(iss: str) -> dict[str, Any]:
                     return {
                         "exp": {"essential": True},
                         "aud": {"essential": True, "value": self.audience},
@@ -105,8 +105,8 @@ class TokenValidator:
 
                 claims_options = get_claims_options(expected_issuer)
 
-                def _decode(jwks_data: Dict[str, Any], opts: Dict[str, Any]) -> Any:
-                    claims = self.jwt.decode(token, jwks_data, claims_options=opts)
+                def _decode(jwks_data: dict[str, Any], opts: dict[str, Any]) -> Any:
+                    claims = self.jwt.decode(token, jwks_data, claims_options=opts)  # type: ignore[call-overload]
                     claims.validate()
                     return claims
 

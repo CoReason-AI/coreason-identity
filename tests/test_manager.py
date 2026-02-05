@@ -8,7 +8,8 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
-from typing import Any, Generator, cast
+from collections.abc import Generator
+from typing import Any, cast
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -25,12 +26,12 @@ MOCK_TOKEN = "valid.token.string"
 MOCK_AUTH_HEADER = f"Bearer {MOCK_TOKEN}"
 
 
-@pytest.fixture
+@pytest.fixture()
 def config() -> CoreasonIdentityConfig:
     return CoreasonIdentityConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id=MOCK_CLIENT_ID)
 
 
-@pytest.fixture
+@pytest.fixture()
 def manager(config: CoreasonIdentityConfig) -> Generator[IdentityManager, Any, None]:
     # Mock internal components during initialization
     with (
@@ -65,7 +66,7 @@ def test_validate_token_success(manager: IdentityManager) -> None:
     manager._async.validator.validate_token = AsyncMock(return_value=mock_claims)  # type: ignore[method-assign]
 
     # Cast identity_mapper to Mock for type safety or use ignore
-    mock_mapper = cast(Mock, manager._async.identity_mapper)
+    mock_mapper = cast("Mock", manager._async.identity_mapper)
     mock_mapper.map_claims.return_value = mock_user_context
 
     result = manager.validate_token(MOCK_AUTH_HEADER)

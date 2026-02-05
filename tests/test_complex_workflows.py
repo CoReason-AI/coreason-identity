@@ -12,7 +12,8 @@
 Complex workflow simulations for the Identity Passport.
 """
 
-from typing import Any, Generator
+from collections.abc import Generator
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -25,7 +26,7 @@ MOCK_DOMAIN = "auth.example.com"
 MOCK_AUDIENCE = "api://test"
 
 
-@pytest.fixture
+@pytest.fixture()
 def identity_manager() -> Generator[IdentityManager, Any, None]:
     config = CoreasonIdentityConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id="cid")
 
@@ -110,11 +111,10 @@ def test_legacy_migration_flow(identity_manager: IdentityManager) -> None:
     # We want to test the MAPPER logic here too, ideally.
     # But since we mocked the mapper class, we have to mock the return.
     # To test integration, we should probably NOT mock the mapper class, only Validator/Provider.
-    pass
 
 
 # Redefine fixture to use REAL IdentityMapper for better integration tests
-@pytest.fixture
+@pytest.fixture()
 def integration_manager() -> Generator[IdentityManager, Any, None]:
     config = CoreasonIdentityConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id="cid")
 
