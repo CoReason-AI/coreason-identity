@@ -14,7 +14,6 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
 import pytest
-
 from coreason_identity.exceptions import CoreasonIdentityError
 from coreason_identity.oidc_provider import OIDCProvider
 

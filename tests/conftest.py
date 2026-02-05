@@ -27,9 +27,7 @@ def mock_dns_resolution() -> Generator[MagicMock, None, None]:
     """
     # Default safe response: 8.8.8.8 (Google DNS)
     # getaddrinfo returns list of (family, type, proto, canonname, sockaddr)
-    safe_response = [
-        (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("8.8.8.8", 443))
-    ]
+    safe_response = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("8.8.8.8", 443))]
 
     with patch("socket.getaddrinfo", return_value=safe_response) as mock:
         yield mock

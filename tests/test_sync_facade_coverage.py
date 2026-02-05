@@ -12,7 +12,6 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
 import pytest
-
 from coreason_identity.config import CoreasonIdentityConfig
 from coreason_identity.manager import IdentityManager, IdentityManagerAsync
 from coreason_identity.models import DeviceFlowResponse, TokenResponse, UserContext

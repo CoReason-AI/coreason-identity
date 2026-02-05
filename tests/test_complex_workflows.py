@@ -16,7 +16,6 @@ from typing import Any, Generator
 from unittest.mock import AsyncMock, patch
 
 import pytest
-
 from coreason_identity.config import CoreasonIdentityConfig
 from coreason_identity.manager import IdentityManager
 from coreason_identity.models import UserContext

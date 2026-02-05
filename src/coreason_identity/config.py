@@ -103,8 +103,6 @@ class CoreasonIdentityConfig(BaseSettings):
                 or ip_obj.is_reserved
                 or ip_obj.is_multicast
             ):
-                raise ValueError(
-                    f"Security violation: Domain '{v}' resolves to a prohibited IP ({ip_str})"
-                )
+                raise ValueError(f"Security violation: Domain '{v}' resolves to a prohibited IP ({ip_str})")
 
         return v
