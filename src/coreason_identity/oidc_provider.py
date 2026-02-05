@@ -19,6 +19,7 @@ import anyio
 import httpx
 
 from coreason_identity.exceptions import CoreasonIdentityError
+from coreason_identity.utils.logger import logger
 
 
 class OIDCProvider:
@@ -30,7 +31,7 @@ class OIDCProvider:
         cache_ttl (int): The cache time-to-live in seconds.
     """
 
-    def __init__(self, discovery_url: str, client: httpx.AsyncClient, cache_ttl: int = 3600) -> None:
+    def __init__(self, discovery_url: str, client: httpx.AsyncClient, cache_ttl: int = 3600, refresh_cooldown: float = 30.0) -> None:
         """
         Initialize the OIDCProvider.
 
@@ -38,10 +39,12 @@ class OIDCProvider:
             discovery_url: The OIDC discovery URL (e.g., https://my-tenant.auth0.com/.well-known/openid-configuration).
             client: The async HTTP client to use for requests.
             cache_ttl: Time-to-live for the JWKS cache in seconds. Defaults to 3600 (1 hour).
+            refresh_cooldown: Minimum seconds between forced refreshes to prevent DoS. Defaults to 30.0.
         """
         self.discovery_url = discovery_url
         self.client = client
         self.cache_ttl = cache_ttl
+        self.refresh_cooldown = refresh_cooldown
         self._jwks_cache: dict[str, Any] | None = None
         self._oidc_config_cache: dict[str, Any] | None = None
         self._last_update: float = 0.0
@@ -106,6 +109,13 @@ class OIDCProvider:
         async with self._lock:
             # Check again inside lock
             current_time = time.time()
+
+            # DoS Protection: Rate Limit Check
+            if force_refresh and self._jwks_cache is not None:
+                if (current_time - self._last_update) < self.refresh_cooldown:
+                    logger.warning("JWKS refresh cooldown active. Returning cached keys.")
+                    return self._jwks_cache
+
             if (
                 not force_refresh
                 and self._jwks_cache is not None
