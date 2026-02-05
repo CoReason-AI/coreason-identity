@@ -8,20 +8,20 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
-import time
 from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
 import pytest
+
 from coreason_identity.oidc_provider import OIDCProvider
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_client() -> AsyncMock:
     return AsyncMock(spec=httpx.AsyncClient)
 
 
-@pytest.fixture()
+@pytest.fixture
 def provider(mock_client: AsyncMock) -> OIDCProvider:
     return OIDCProvider(
         "https://idp/.well-known/openid-configuration",
@@ -30,7 +30,7 @@ def provider(mock_client: AsyncMock) -> OIDCProvider:
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_get_jwks_rate_limiting(provider: OIDCProvider, mock_client: AsyncMock) -> None:
     # Setup mocks
     mock_client.get.side_effect = [
