@@ -13,7 +13,6 @@ DeviceFlowClient component for handling OAuth 2.0 Device Authorization Grant.
 """
 
 import time
-from typing import Dict, Optional
 from urllib.parse import urljoin
 
 import anyio
@@ -51,9 +50,9 @@ class DeviceFlowClient:
         self.idp_url = idp_url.rstrip("/")
         self.client = client
         self.scope = scope
-        self._endpoints: Optional[Dict[str, str]] = None
+        self._endpoints: dict[str, str] | None = None
 
-    async def _get_endpoints(self) -> Dict[str, str]:
+    async def _get_endpoints(self) -> dict[str, str]:
         """
         Discover OIDC endpoints from the IdP.
 
@@ -90,7 +89,7 @@ class DeviceFlowClient:
         except httpx.HTTPError as e:
             raise CoreasonIdentityError(f"Failed to discover OIDC endpoints: {e}") from e
 
-    async def initiate_flow(self, audience: Optional[str] = None) -> DeviceFlowResponse:
+    async def initiate_flow(self, audience: str | None = None) -> DeviceFlowResponse:
         """
         Initiates the Device Authorization Flow.
 
@@ -205,7 +204,6 @@ class DeviceFlowClient:
                     raise
                 logger.warning(f"Polling attempt failed: {e}")
                 # Continue polling unless it's a critical error
-                pass
 
             # Use anyio.sleep for async non-blocking sleep
             await anyio.sleep(interval)

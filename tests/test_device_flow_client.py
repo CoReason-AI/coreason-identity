@@ -8,7 +8,7 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
-from typing import Any, Optional
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import httpx
@@ -19,24 +19,24 @@ from coreason_identity.models import DeviceFlowResponse, TokenResponse
 from httpx import Request, Response
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_client() -> AsyncMock:
     return AsyncMock(spec=httpx.AsyncClient)
 
 
-@pytest.fixture
+@pytest.fixture()
 def client(mock_client: AsyncMock) -> DeviceFlowClient:
     return DeviceFlowClient(client_id="test-client", idp_url="https://test.auth0.com", client=mock_client)
 
 
-def create_response(status_code: int, json_data: Optional[Any] = None, content: Optional[bytes] = None) -> Response:
+def create_response(status_code: int, json_data: Any | None = None, content: bytes | None = None) -> Response:
     request = Request("GET", "https://example.com")
     if json_data is not None:
         return Response(status_code, json=json_data, request=request)
     return Response(status_code, content=content, request=request)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_get_endpoints_success(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
     mock_client.get.return_value = create_response(
         200,
@@ -57,7 +57,7 @@ async def test_get_endpoints_success(client: DeviceFlowClient, mock_client: Asyn
     assert mock_client.get.call_count == 1
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_get_endpoints_fallback(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
     """Test fallback when specific keys are missing in config."""
     mock_client.get.return_value = create_response(200, {})  # Empty config
@@ -67,7 +67,7 @@ async def test_get_endpoints_fallback(client: DeviceFlowClient, mock_client: Asy
     assert endpoints["token_endpoint"] == "https://test.auth0.com/oauth/token"
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_get_endpoints_failure(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
     mock_client.get.return_value = create_response(500, "Internal Server Error")
 
@@ -75,7 +75,7 @@ async def test_get_endpoints_failure(client: DeviceFlowClient, mock_client: Asyn
         await client._get_endpoints()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_initiate_flow_success(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
     # Mock discovery
     mock_client.get.return_value = create_response(
@@ -111,7 +111,7 @@ async def test_initiate_flow_success(client: DeviceFlowClient, mock_client: Asyn
     assert kwargs["data"]["audience"] == "api://test"
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_initiate_flow_http_error(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
     mock_client.get.return_value = create_response(200, {})
     mock_client.post.return_value = create_response(500, "Error")
@@ -120,7 +120,7 @@ async def test_initiate_flow_http_error(client: DeviceFlowClient, mock_client: A
         await client.initiate_flow()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_initiate_flow_validation_error(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
     mock_client.get.return_value = create_response(200, {})
     mock_client.post.return_value = create_response(200, {})  # Missing fields
@@ -129,7 +129,7 @@ async def test_initiate_flow_validation_error(client: DeviceFlowClient, mock_cli
         await client.initiate_flow()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_poll_token_success(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
     # Discovery
     mock_client.get.return_value = create_response(
@@ -158,7 +158,7 @@ async def test_poll_token_success(client: DeviceFlowClient, mock_client: AsyncMo
     mock_sleep.assert_called_once_with(1)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_poll_token_slow_down(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
     mock_client.get.return_value = create_response(200, {"token_endpoint": "url"})
 
@@ -177,7 +177,7 @@ async def test_poll_token_slow_down(client: DeviceFlowClient, mock_client: Async
         mock_sleep.assert_called_once_with(6)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_poll_token_access_denied(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
     mock_client.get.return_value = create_response(200, {"token_endpoint": "url"})
 
@@ -187,12 +187,14 @@ async def test_poll_token_access_denied(client: DeviceFlowClient, mock_client: A
         device_code="dc", user_code="uc", verification_uri="url", expires_in=10, interval=1
     )
 
-    with pytest.raises(CoreasonIdentityError, match="User denied access"):
-        with patch("anyio.sleep", new_callable=AsyncMock):
-            await client.poll_token(device_resp)
+    with (
+        pytest.raises(CoreasonIdentityError, match="User denied access"),
+        patch("anyio.sleep", new_callable=AsyncMock),
+    ):
+        await client.poll_token(device_resp)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_poll_token_expired_token(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
     mock_client.get.return_value = create_response(200, {"token_endpoint": "url"})
 
@@ -202,12 +204,14 @@ async def test_poll_token_expired_token(client: DeviceFlowClient, mock_client: A
         device_code="dc", user_code="uc", verification_uri="url", expires_in=10, interval=1
     )
 
-    with pytest.raises(CoreasonIdentityError, match="Device code expired"):
-        with patch("anyio.sleep", new_callable=AsyncMock):
-            await client.poll_token(device_resp)
+    with (
+        pytest.raises(CoreasonIdentityError, match="Device code expired"),
+        patch("anyio.sleep", new_callable=AsyncMock),
+    ):
+        await client.poll_token(device_resp)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_poll_token_timeout(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
     mock_client.get.return_value = create_response(200, {"token_endpoint": "url"})
     mock_client.post.return_value = create_response(400, {"error": "authorization_pending"})
@@ -222,7 +226,7 @@ async def test_poll_token_timeout(client: DeviceFlowClient, mock_client: AsyncMo
             await client.poll_token(device_resp)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_poll_token_unexpected_error(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
     """Test when polling receives a 500 error."""
     mock_client.get.return_value = create_response(200, {"token_endpoint": "url"})
@@ -235,12 +239,11 @@ async def test_poll_token_unexpected_error(client: DeviceFlowClient, mock_client
         device_code="dc", user_code="uc", verification_uri="url", expires_in=10, interval=1
     )
 
-    with pytest.raises(CoreasonIdentityError, match="Polling failed"):
-        with patch("anyio.sleep", new_callable=AsyncMock):
-            await client.poll_token(device_resp)
+    with pytest.raises(CoreasonIdentityError, match="Polling failed"), patch("anyio.sleep", new_callable=AsyncMock):
+        await client.poll_token(device_resp)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_poll_token_invalid_json_type(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
     """Test when polling receives a valid JSON that isn't a dict (e.g. list)."""
     mock_client.get.return_value = create_response(200, {"token_endpoint": "url"})
@@ -252,12 +255,14 @@ async def test_poll_token_invalid_json_type(client: DeviceFlowClient, mock_clien
         device_code="dc", user_code="uc", verification_uri="url", expires_in=10, interval=1
     )
 
-    with pytest.raises(CoreasonIdentityError, match="Received invalid JSON response"):
-        with patch("anyio.sleep", new_callable=AsyncMock):
-            await client.poll_token(device_resp)
+    with (
+        pytest.raises(CoreasonIdentityError, match="Received invalid JSON response"),
+        patch("anyio.sleep", new_callable=AsyncMock),
+    ):
+        await client.poll_token(device_resp)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_poll_token_non_json_500(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
     """Test when polling receives non-JSON content with 500 error."""
     mock_client.get.return_value = create_response(200, {"token_endpoint": "url"})
@@ -269,12 +274,11 @@ async def test_poll_token_non_json_500(client: DeviceFlowClient, mock_client: As
         device_code="dc", user_code="uc", verification_uri="url", expires_in=10, interval=1
     )
 
-    with pytest.raises(CoreasonIdentityError, match="Polling failed"):
-        with patch("anyio.sleep", new_callable=AsyncMock):
-            await client.poll_token(device_resp)
+    with pytest.raises(CoreasonIdentityError, match="Polling failed"), patch("anyio.sleep", new_callable=AsyncMock):
+        await client.poll_token(device_resp)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_poll_token_non_json_200(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
     """Test when polling receives non-JSON content with 200 OK (Unexpected)."""
     mock_client.get.return_value = create_response(200, {"token_endpoint": "url"})
@@ -286,12 +290,14 @@ async def test_poll_token_non_json_200(client: DeviceFlowClient, mock_client: As
         device_code="dc", user_code="uc", verification_uri="url", expires_in=10, interval=1
     )
 
-    with pytest.raises(CoreasonIdentityError, match="Received invalid JSON response on 200 OK"):
-        with patch("anyio.sleep", new_callable=AsyncMock):
-            await client.poll_token(device_resp)
+    with (
+        pytest.raises(CoreasonIdentityError, match="Received invalid JSON response on 200 OK"),
+        patch("anyio.sleep", new_callable=AsyncMock),
+    ):
+        await client.poll_token(device_resp)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_poll_token_204_empty(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
     """Test when polling receives 204 No Content (should trigger generic error)."""
     mock_client.get.return_value = create_response(200, {"token_endpoint": "url"})
@@ -303,12 +309,14 @@ async def test_poll_token_204_empty(client: DeviceFlowClient, mock_client: Async
         device_code="dc", user_code="uc", verification_uri="url", expires_in=10, interval=1
     )
 
-    with pytest.raises(CoreasonIdentityError, match="Received invalid response"):
-        with patch("anyio.sleep", new_callable=AsyncMock):
-            await client.poll_token(device_resp)
+    with (
+        pytest.raises(CoreasonIdentityError, match="Received invalid response"),
+        patch("anyio.sleep", new_callable=AsyncMock),
+    ):
+        await client.poll_token(device_resp)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_poll_token_generic_exception_retry(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
     """Test retry logic on generic exception."""
     mock_client.get.return_value = create_response(200, {"token_endpoint": "url"})

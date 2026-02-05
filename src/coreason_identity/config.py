@@ -15,7 +15,6 @@ Configuration for the coreason-identity package.
 import ipaddress
 import os
 import socket
-from typing import Optional
 from urllib.parse import urlparse
 
 from pydantic import field_validator
@@ -39,7 +38,7 @@ class CoreasonIdentityConfig(BaseSettings):
 
     domain: str
     audience: str
-    client_id: Optional[str] = None
+    client_id: str | None = None
 
     @field_validator("domain")
     @classmethod

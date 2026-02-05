@@ -8,7 +8,7 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -19,21 +19,21 @@ from coreason_identity.validator import TokenValidator
 
 
 class TestTokenValidatorEdgeCases:
-    @pytest.fixture
+    @pytest.fixture()
     def mock_oidc_provider(self) -> Mock:
         provider = Mock(spec=OIDCProvider)
         provider.get_jwks = AsyncMock()
         return provider
 
-    @pytest.fixture
+    @pytest.fixture()
     def key_pair(self) -> Any:
         return JsonWebKey.generate_key("RSA", 2048, is_private=True)
 
-    @pytest.fixture
-    def jwks(self, key_pair: Any) -> Dict[str, Any]:
+    @pytest.fixture()
+    def jwks(self, key_pair: Any) -> dict[str, Any]:
         return {"keys": [key_pair.as_dict(private=False)]}
 
-    @pytest.fixture
+    @pytest.fixture()
     def validator(self, mock_oidc_provider: Mock) -> TokenValidator:
         # Strict issuer validation
         return TokenValidator(
@@ -45,14 +45,14 @@ class TestTokenValidatorEdgeCases:
     def create_token(
         self,
         key: Any,
-        claims: Dict[str, Any],
-        headers: Dict[str, Any] | None = None,
+        claims: dict[str, Any],
+        headers: dict[str, Any] | None = None,
     ) -> str:
         if headers is None:
             headers = {"alg": "RS256", "kid": key.as_dict()["kid"]}
-        return jwt.encode(headers, claims, key).decode("utf-8")  # type: ignore[no-any-return]
+        return jwt.encode(headers, claims, key).decode("utf-8")
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_malformed_token_structure(self, validator: TokenValidator) -> None:
         """Test that a completely malformed token string raises CoreasonIdentityError."""
         # Not a JWT (no dots)
@@ -63,19 +63,19 @@ class TestTokenValidatorEdgeCases:
         with pytest.raises(CoreasonIdentityError, match="Token validation failed"):
             await validator.validate_token("header.payload")
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_invalid_base64(self, validator: TokenValidator) -> None:
         """Test token with invalid base64 characters."""
         with pytest.raises(CoreasonIdentityError, match="Token validation failed"):
             await validator.validate_token("header.payload.signature!")
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_issuer_mismatch(
         self,
         validator: TokenValidator,
         mock_oidc_provider: Mock,
         key_pair: Any,
-        jwks: Dict[str, Any],
+        jwks: dict[str, Any],
     ) -> None:
         """Test that token from wrong issuer is rejected."""
         mock_oidc_provider.get_jwks.return_value = jwks
@@ -91,13 +91,13 @@ class TestTokenValidatorEdgeCases:
         with pytest.raises(CoreasonIdentityError, match="Invalid claim"):
             await validator.validate_token(token)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_issuer_missing_in_token(
         self,
         validator: TokenValidator,
         mock_oidc_provider: Mock,
         key_pair: Any,
-        jwks: Dict[str, Any],
+        jwks: dict[str, Any],
     ) -> None:
         """Test that token missing 'iss' claim is rejected if issuer check is enabled."""
         mock_oidc_provider.get_jwks.return_value = jwks

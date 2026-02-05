@@ -13,7 +13,7 @@ Edge case tests for IdentityManager issuer validation.
 """
 
 import time
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -23,20 +23,20 @@ from coreason_identity.exceptions import CoreasonIdentityError
 from coreason_identity.manager import IdentityManager
 
 
-@pytest.fixture
+@pytest.fixture()
 def key_pair() -> Any:
     return JsonWebKey.generate_key("RSA", 2048, is_private=True)
 
 
-@pytest.fixture
-def jwks(key_pair: Any) -> Dict[str, Any]:
+@pytest.fixture()
+def jwks(key_pair: Any) -> dict[str, Any]:
     return {"keys": [key_pair.as_dict(private=False)]}
 
 
-def create_token(key: Any, claims: Dict[str, Any], headers: Dict[str, Any] | None = None) -> bytes:
+def create_token(key: Any, claims: dict[str, Any], headers: dict[str, Any] | None = None) -> bytes:
     if headers is None:
         headers = {"alg": "RS256", "kid": key.as_dict()["kid"]}
-    return jwt.encode(headers, claims, key)  # type: ignore[no-any-return]
+    return jwt.encode(headers, claims, key)
 
 
 def test_init_with_trailing_slash_in_domain() -> None:
@@ -54,7 +54,7 @@ def test_init_with_trailing_slash_in_domain() -> None:
         IdentityManager(config)
 
         MockValidator.assert_called_once()
-        args, kwargs = MockValidator.call_args
+        _, kwargs = MockValidator.call_args
         assert kwargs["issuer"] is None
 
 
@@ -73,11 +73,11 @@ def test_init_with_protocol_in_domain() -> None:
         IdentityManager(config)
 
         MockValidator.assert_called_once()
-        args, kwargs = MockValidator.call_args
+        _, kwargs = MockValidator.call_args
         assert kwargs["issuer"] is None
 
 
-def test_validate_token_missing_iss_claim(key_pair: Any, jwks: Dict[str, Any]) -> None:
+def test_validate_token_missing_iss_claim(key_pair: Any, jwks: dict[str, Any]) -> None:
     """Test validation when 'iss' claim is missing from token."""
     domain = "test.auth0.com"
     audience = "test-audience"
@@ -106,7 +106,7 @@ def test_validate_token_missing_iss_claim(key_pair: Any, jwks: Dict[str, Any]) -
             manager.validate_token(f"Bearer {token}")
 
 
-def test_validate_token_no_trailing_slash_match(key_pair: Any, jwks: Dict[str, Any]) -> None:
+def test_validate_token_no_trailing_slash_match(key_pair: Any, jwks: dict[str, Any]) -> None:
     """
     Test validation when token issuer is valid domain but missing trailing slash.
     Config expects: https://domain/ (usually)
@@ -141,7 +141,7 @@ def test_validate_token_no_trailing_slash_match(key_pair: Any, jwks: Dict[str, A
         manager.validate_token(f"Bearer {token}")
 
 
-def test_validate_token_http_protocol(key_pair: Any, jwks: Dict[str, Any]) -> None:
+def test_validate_token_http_protocol(key_pair: Any, jwks: dict[str, Any]) -> None:
     """Test token with http:// protocol vs https:// config."""
     domain = "test.auth0.com"
     audience = "test-audience"
@@ -186,5 +186,5 @@ def test_init_with_http_protocol_in_domain() -> None:
         IdentityManager(config)
 
         MockValidator.assert_called_once()
-        args, kwargs = MockValidator.call_args
+        _, kwargs = MockValidator.call_args
         assert kwargs["issuer"] is None

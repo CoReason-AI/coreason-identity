@@ -12,7 +12,7 @@
 IdentityManager component for orchestrating authentication and authorization.
 """
 
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import urljoin
 
 import anyio
@@ -33,7 +33,7 @@ class IdentityManagerAsync:
     Handles resources via async context manager.
     """
 
-    def __init__(self, config: CoreasonIdentityConfig, client: Optional[httpx.AsyncClient] = None) -> None:
+    def __init__(self, config: CoreasonIdentityConfig, client: httpx.AsyncClient | None = None) -> None:
         """
         Initialize the IdentityManagerAsync.
 
@@ -63,7 +63,7 @@ class IdentityManagerAsync:
             issuer=None,
         )
         self.identity_mapper = IdentityMapper()
-        self.device_client: Optional[DeviceFlowClient] = None
+        self.device_client: DeviceFlowClient | None = None
 
     async def __aenter__(self) -> "IdentityManagerAsync":
         return self
@@ -87,7 +87,7 @@ class IdentityManagerAsync:
         # Delegate to IdentityMapper
         return self.identity_mapper.map_claims(claims, token=token)
 
-    async def start_device_login(self, scope: Optional[str] = None) -> DeviceFlowResponse:
+    async def start_device_login(self, scope: str | None = None) -> DeviceFlowResponse:
         """
         Initiates the Device Authorization Flow.
         """
@@ -164,7 +164,7 @@ class IdentityManager:
         """
         return anyio.run(self._async.validate_token, auth_header)
 
-    def start_device_login(self, scope: Optional[str] = None) -> DeviceFlowResponse:
+    def start_device_login(self, scope: str | None = None) -> DeviceFlowResponse:
         """
         Initiates the Device Authorization Flow.
         """

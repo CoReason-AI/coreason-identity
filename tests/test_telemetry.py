@@ -10,7 +10,7 @@
 
 import hashlib
 import time
-from typing import Any, List, Tuple
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -32,8 +32,8 @@ class MockClaims(dict[str, Any]):
         pass
 
 
-@pytest.fixture
-def telemetry_setup() -> Tuple[InMemorySpanExporter, Tracer]:
+@pytest.fixture()
+def telemetry_setup() -> tuple[InMemorySpanExporter, Tracer]:
     """Sets up an OpenTelemetry tracer with an in-memory exporter."""
     exporter = InMemorySpanExporter()
     provider = TracerProvider()
@@ -43,7 +43,7 @@ def telemetry_setup() -> Tuple[InMemorySpanExporter, Tracer]:
     return exporter, tracer  # type: ignore[return-value]
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_oidc_provider() -> MagicMock:
     provider = MagicMock(spec=OIDCProvider)
     # Mock public key
@@ -52,9 +52,9 @@ def mock_oidc_provider() -> MagicMock:
     return provider
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_validate_token_success_telemetry(
-    telemetry_setup: Tuple[InMemorySpanExporter, Tracer],
+    telemetry_setup: tuple[InMemorySpanExporter, Tracer],
     mock_oidc_provider: MagicMock,
 ) -> None:
     """Verifies that a successful validation emits a correct span."""
@@ -82,9 +82,9 @@ async def test_validate_token_success_telemetry(
     assert span.attributes["user.id"] == "user123"
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_validate_token_failure_telemetry(
-    telemetry_setup: Tuple[InMemorySpanExporter, Tracer],
+    telemetry_setup: tuple[InMemorySpanExporter, Tracer],
     mock_oidc_provider: MagicMock,
 ) -> None:
     """Verifies that a failed validation emits an error span."""
@@ -111,8 +111,8 @@ async def test_validate_token_failure_telemetry(
     assert span.events[0].name == "exception"
 
 
-@pytest.mark.asyncio
-async def test_logging_strictness(mock_oidc_provider: MagicMock, caplog: pytest.LogCaptureFixture) -> None:
+@pytest.mark.asyncio()
+async def test_logging_strictness(mock_oidc_provider: MagicMock) -> None:
     """Verifies that the user ID is hashed in the logs."""
     # Ensure we capture logs from our logger
     # logger.add(caplog.handler, level="INFO")
@@ -120,7 +120,7 @@ async def test_logging_strictness(mock_oidc_provider: MagicMock, caplog: pytest.
     # However, standard pytest caplog might not catch loguru unless we sink it.
 
     # We'll sink to a list to be sure
-    logs: List[Any] = []
+    logs: list[Any] = []
     logger.add(logs.append, level="INFO", format="{message}")
 
     audience = "test-audience"

@@ -13,7 +13,7 @@ Super edge cases for coreason-identity.
 Testing missing claims, empty strings, and malformed responses.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
@@ -33,7 +33,7 @@ from coreason_identity.validator import TokenValidator
 from httpx import Request, Response
 
 
-def create_response(status_code: int, json_data: Optional[Any] = None) -> Response:
+def create_response(status_code: int, json_data: Any | None = None) -> Response:
     request = Request("GET", "https://example.com")
     return Response(status_code, json=json_data, request=request)
 
@@ -94,11 +94,11 @@ class TestIdentityMapperSuperEdgeCases:
 
 
 class TestDeviceFlowSuperEdgeCases:
-    @pytest.fixture
+    @pytest.fixture()
     def mock_client(self) -> AsyncMock:
         return AsyncMock(spec=httpx.AsyncClient)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_poll_token_missing_access_token_field(self, mock_client: AsyncMock) -> None:
         """
         Verify behavior when IdP returns 200 OK but the JSON is missing 'access_token'.
@@ -119,26 +119,28 @@ class TestDeviceFlowSuperEdgeCases:
             device_code="dc", user_code="uc", verification_uri="uri", expires_in=10, interval=1
         )
 
-        with pytest.raises(CoreasonIdentityError, match="Received invalid token response structure"):
-            with patch("anyio.sleep", new_callable=AsyncMock):
-                await client.poll_token(flow_resp)
+        with (
+            pytest.raises(CoreasonIdentityError, match="Received invalid token response structure"),
+            patch("anyio.sleep", new_callable=AsyncMock),
+        ):
+            await client.poll_token(flow_resp)
 
 
 class TestTokenValidatorSuperEdgeCases:
-    @pytest.fixture
+    @pytest.fixture()
     def mock_oidc_provider(self) -> Mock:
         return Mock(spec=OIDCProvider)
 
-    @pytest.fixture
+    @pytest.fixture()
     def key_pair(self) -> Any:
         return JsonWebKey.generate_key("RSA", 2048, is_private=True)
 
-    @pytest.fixture
-    def jwks(self, key_pair: Any) -> Dict[str, Any]:
+    @pytest.fixture()
+    def jwks(self, key_pair: Any) -> dict[str, Any]:
         return {"keys": [key_pair.as_dict(private=False)]}
 
-    @pytest.fixture
-    def validator(self, mock_oidc_provider: Mock, jwks: Dict[str, Any]) -> TokenValidator:
+    @pytest.fixture()
+    def validator(self, mock_oidc_provider: Mock, jwks: dict[str, Any]) -> TokenValidator:
         mock_oidc_provider.get_jwks = AsyncMock(return_value=jwks)
         return TokenValidator(
             oidc_provider=mock_oidc_provider,
@@ -146,7 +148,7 @@ class TestTokenValidatorSuperEdgeCases:
             issuer="https://valid-issuer.com/",
         )
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_malformed_json_payload_after_signature_check(self, validator: TokenValidator) -> None:
         """
         Simulate a scenario where JWT signature is valid (hypothetically) but payload is not valid JSON.
@@ -156,9 +158,11 @@ class TestTokenValidatorSuperEdgeCases:
         If JSON parsing fails, it usually raises generic decode error.
         We can mock the jwt.decode to raise ValueError to simulate this internal failure.
         """
-        with patch.object(validator.jwt, "decode", side_effect=ValueError("Invalid payload JSON")):
-            with pytest.raises(CoreasonIdentityError, match="Invalid signature or key not found"):
-                # Wait, validator catches ValueError and raises SignatureVerificationError
-                # with "Invalid signature or key not found: ..."
-                # Let's verify exact mapping.
-                await validator.validate_token("some.token.here")
+        with (
+            patch.object(validator.jwt, "decode", side_effect=ValueError("Invalid payload JSON")),
+            pytest.raises(CoreasonIdentityError, match="Invalid signature or key not found"),
+        ):
+            # Wait, validator catches ValueError and raises SignatureVerificationError
+            # with "Invalid signature or key not found: ..."
+            # Let's verify exact mapping.
+            await validator.validate_token("some.token.here")
