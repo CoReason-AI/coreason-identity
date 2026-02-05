@@ -46,8 +46,10 @@ async def test_concurrent_force_refresh_calls(provider: OIDCProvider, mock_clien
     ]
 
     async def delayed_fetch(force: bool) -> Dict[str, Any]:
-        # Explicitly cast to avoid mypy issues across different versions
-        return cast(Dict[str, Any], await provider.get_jwks(force_refresh=force))
+        # Explicit assignment to typed variable to satisfy both strict mypy envs (no-any-return)
+        # and envs where inference works (avoiding redundant-cast)
+        result: Dict[str, Any] = await provider.get_jwks(force_refresh=force)
+        return result
 
     # Launch 5 concurrent requests
     # We use a custom sleep in the mock to ensure they overlap
