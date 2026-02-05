@@ -9,7 +9,7 @@
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
 import asyncio
-from typing import Any, Dict
+from typing import Any, Dict, cast
 from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
@@ -46,8 +46,8 @@ async def test_concurrent_force_refresh_calls(provider: OIDCProvider, mock_clien
     ]
 
     async def delayed_fetch(force: bool) -> Dict[str, Any]:
-        # Explicit type ignore for the async return
-        return await provider.get_jwks(force_refresh=force)  # type: ignore[no-any-return]
+        # Explicitly cast to avoid mypy issues across different versions
+        return cast(Dict[str, Any], await provider.get_jwks(force_refresh=force))
 
     # Launch 5 concurrent requests
     # We use a custom sleep in the mock to ensure they overlap
