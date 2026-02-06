@@ -1,169 +1,122 @@
 # **AGENTS.md**
 
-**Note to Agent:** This file contains strict rules and context for this repository. Read this before planning or executing tasks.
+**Note to Agent:** This file contains the **Supreme Law** for this repository. It defines the architectural constraints of the "Identity Bouncer." Read this before planning or executing *any* task.
 
-# **PRIMARY DIRECTIVE: STRICT DEVELOPMENT PROTOCOL**
+# **PRIMARY DIRECTIVE: THE SECURITY MIDDLEWARE PROTOCOL**
 
-**You are an advanced coding LLM tasked with implementing changes in this repository. It is imperative that you adhere strictly to this iterative, atomic, and test-driven development protocol. Do not attempt to implement the entire specification at once.**
+**Current Status:** Active Authentication Middleware & CLI
+**Role:** The "Bouncer" — Verify identities, enforce access lists, but NEVER issue credentials.
 
-## **The Protocol:**
+## **1. The "Bouncer" Directives**
 
-1. **Comprehensive Analysis:** Thoroughly review the user's request and the detailed specifications provided. Examine the current state of the existing codebase to understand the existing architecture and what has already been implemented.
-2. **Decomposition and Planning:** Identify the delta between the current codebase and the specification. Break down all pending work into a list of small, atomic units. An atomic unit must be independently implementable and testable. **You MUST print all pending work as atomic units prior to selecting the first task.**
-3. **Select ONE Atomic Unit (The "One Step" Rule):** Choose one and only one atomic unit from your list to implement in this iteration. Select the smallest possible increment that moves the project toward the goal.
-4. **Implementation:** Build the functionality for this single atomic unit, ensuring it adheres strictly to the architectural patterns defined in this document.
-5. **Rigorous Testing:** Write comprehensive unit tests specifically for the implemented unit. This must include positive tests, negative tests, boundary conditions, and all foreseeable edge cases.
-6. **Validation and Regression Check:** Ensure all newly added tests pass. Crucially, verify that all pre-existing tests still pass. There must be zero regressions.
-   * *Constraint:* If a test fails more than twice after attempted fixes, STOP and re-evaluate the implementation strategy. Do not loop endlessly.
-7. **Commit:** Deliver the complete, high-quality implementation and its corresponding tests, ready for an atomic commit.
+You are tasked with maintaining the security perimeter. Adhere to the following architectural laws without exception:
 
-## **1. Project Overview**
+### **Law 1: The "Zero-Copy" Security Rule (PII Containment)**
 
-* **Type:** Python Application / Library
-* **Language:** Python 3.11, 3.12, 3.13, 3.14
-* **Package Manager:** Poetry
-* **License:** Prosperity Public License 3.0 (Proprietary/Dual-licensed)
-* **Project Structure:** src layout (source code resides in src/coreason_identity)
+* **Constraint:** Sensitive data (raw claims, PII) MUST NEVER leak into logs or string representations.
+* **Forbidden:**
+* Logging raw `UserContext` objects without redaction.
+* Printing complete tokens or claims dictionaries to stdout/stderr.
+* Implementing `__repr__` methods that simply dump `self.__dict__`.
 
-## **2. Environment & Commands**
 
-The project is managed via Poetry. Do not use pip directly unless inside a Docker build stage.
+* **Mandatory:** `UserContext` and similar models must override `__repr__` to mask sensitive fields (e.g., `claims='<REDACTED>'`).
 
-* **Install Dependencies:** poetry install
-* **Run Linter (Pre-commit):** poetry run pre-commit run --all-files
-* **Run Tests:** poetry run pytest
-* **Build Docs:** poetry run mkdocs build --strict
-* **Build Package:** poetry build (or python -m build in CI)
+### **Law 2: Container-Native Observability (The "No-Disk" Rule)**
 
-## **3. Development Rules**
+* **Constraint:** This application runs in ephemeral containers. Log files are a liability (Disk Exhaustion).
+* **Forbidden:**
+* Creating local log files (e.g., `logger.add("app.log")`).
+* Creating `logs/` directories.
+* Rotating files locally.
 
-### **Code Style & Quality**
 
-This project uses **Ruff** for Python linting/formatting, **Mypy** for typing, and **Hadolint** for Dockerfiles. It adheres to strict modernization standards (see `docs/design/007_modernization_and_strictness.md`).
+* **Allowed:**
+* Logging to `sys.stderr` (Human-readable).
+* Logging to `sys.stdout` (JSON structured, if env var `COREASON_LOG_JSON=true`).
 
-* **Formatting:** Do not manually format. Run `poetry run ruff format .`
-* **Linting:**
-  * Uses strict rules (UP, SIM, RUF, ARG, C4, PT, etc.).
-  * Fix violations automatically where possible: `poetry run ruff check --fix .`
-* **Docker Linting:** Checked via pre-commit (hadolint).
-* **Typing:**
-  * **Strict Mode:** Mypy `strict = true` is enforced.
-  * **No Implicit Ignores:** `ignore_missing_imports = false`. If a dependency lacks types, install the stub package (e.g., `types-authlib`).
-  * Run checks with: `poetry run mypy .`
-  * Avoid `Any` wherever possible.
-* **Logging:** Use the project's centralized logging configuration.
-  * *Good:* from src.utils.logger import logger -> logger.info("...")
-* **Licensing:** Every .py file must start with the standard license header.
 
-### **Legal & Intellectual Property**
 
-Strict Prohibition on External Code:
-You are strictly forbidden from copying, reproducing, imitating, or drawing from any external codebases, especially GPL, AGPL, or other non-permissive licenses or copy left licenses. All generated logic must be original or derived from permissively licensed (e.g., MIT, Apache 2.0) sources and properly attributed.
+### **Law 3: "Borrow Over Build" (The Crypto Rule)**
 
-### **File Structure**
+* **Constraint:** Do NOT invent cryptography or protocol logic.
+* **Forbidden:**
+* Writing custom JWT parsers.
+* Implementing OIDC discovery logic manually.
+* Parsing `Authorization` headers with raw string splitting (unless wrapping a library).
 
-* **Source Code:** src/coreason_identity/
-  * main.py: Entry point.
-  * __init__.py: Package definition.
-* **Tests:** tests/
-  * Test files must start with test_.
-  * Use pytest fixtures where appropriate.
 
-### **Testing Guidelines**
+* **Mandatory:** Use **Authlib** for all OIDC/OAuth2 interactions. Use **Pydantic** for all data validation.
 
-**Mandatory Requirement: 100% Test Coverage.**
+---
 
-* **Test Strategy (Redundancy & Depth):**
-  * **Redundant Coverage:** Verify critical logic via multiple vectors (e.g., unit tests for isolation AND integration tests for workflow). Overlap is desired.
-  * **Simple Tests:** Verify happy paths and basic functionality.
-  * **Complex Tests:** Verify multi-step workflows, state mutations, and heavy computation.
-  * **Edge Cases:** Explicitly test boundary values, empty inputs, null states, and error handling.
-  * **Exclusions:** Use # pragma: no cover sparingly and **only** for defensive code that is unreachable in standard execution.
-  * **No Throwaway Scripts:** Never create temporary test files (e.g., temp.py). Always add proper tests to the tests/ directory.
-* **External Services & APIs:**
-  * **Scenario A (Default):** Use mocks (unittest.mock, pytest-mock, or respx) for ALL external calls.
-  * **Scenario B (Credentials Provided):** If the user provides API keys or connection strings:
-    * **DO NOT** remove the mocks.
-    * **ADD** a separate suite of live integration tests marked with @pytest.mark.live.
-    * **Standard Env Vars:** Expect Postgres credentials in PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE.
-* **Safety:** Never hardcode credentials in tests. Use environment variables.
+## **2. Development Protocol**
 
-## **4. Architecture & Security**
+**You MUST follow this iterative process for every task:**
 
-### **Logging & Observability**
+1. **Security Impact Analysis:** Before writing code, ask: *"Could this change allow a 'Confused Deputy' attack or leak PII?"*
+2. **Atomic Implementation:** Break tasks into the smallest testable units.
+3. **Strict Typing:** Mypy `strict = true` is enforced. No `Any` allowed in public interfaces.
+4. **Test Coverage:** Maintain 100% coverage. Tests must verify *security failures* (e.g., "What happens if the token is expired?"), not just happy paths.
 
-This project enforces a centralized logging architecture using the `loguru` library.
+---
 
-*   **Standard:** `loguru` is the exclusive logging library. Do not use the built-in `logging` module or `print` statements.
-*   **Outputs (Sinks):**
-    *   **Console:** `stderr` (Human-readable text) or `stdout` (JSON-formatted if `COREASON_LOG_JSON=true`).
-    *   **File:** Disabled by default to prevent disk exhaustion (Finding #7).
-*   **Usage Example:**
+## **3. Technical Standards**
 
-    ```python
-    from src.utils.logger import logger
+### **Environment & Package Management**
 
-    # Inside an Agent or Module
-    logger.info("Agent started task", task_id="123")
-    try:
-        ...
-    except Exception:
-        logger.exception("Agent failed to execute task")
-    ```
+* **Manager:** Poetry.
+* **Language:** Python 3.12+.
+* **License:** Prosperity Public License 3.0. Every file must include the license header.
 
-### **Configuration Standards (Environment Variables)**
+### **Code Style & Typing**
 
-Adhere to 12-Factor App principles. Use these standard variable names:
+* **Linting:** `ruff check --fix` (Strict).
+* **Formatting:** `ruff format`.
+* **Typing:** Strict `mypy`.
 
-* **Core:**
-  * APP_ENV: development, testing, production.
-  * DEBUG: true or false.
-  * SECRET_KEY: For cryptographic signing/sessions.
-* **Logging:**
-  * LOG_LEVEL: DEBUG, INFO, WARNING, ERROR (Configure loguru with this).
-* **Infrastructure (if applicable):**
-  * DOCKER_HOST: If interacting with the Docker engine.
-  * SSH_PRIVATE_KEY / SSH_USER: If managing remote connections.
-  * AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY: For AWS services.
+### **Logging (Active Pattern)**
 
-### **CI/CD Context**
+* **Library Responsibility:** Configure logging based on environment variables (`COREASON_LOG_LEVEL`, `COREASON_LOG_JSON`).
+* **Pattern:**
+```python
+# src/coreason_identity/utils/logger.py
+# This module IS allowed to configure sinks because it manages the application's observability contract.
+logger.configure(handlers=[{"sink": sys.stdout, "serialize": True}])
 
-* **CI Environment:** GitHub Actions (Matrix testing on Ubuntu, Windows, MacOS).
-* **Python Versions:** Tests run against Python 3.12, 3.13, and 3.14.
+```
 
-### **Docker Strategy**
 
-* **Multi-stage Build:** The Dockerfile has a builder stage and a runtime stage.
-* **User:** The app runs as a non-root user (appuser). **DO NOT** change this to root.
-* **Base Image:** Uses python:3.12-slim.
 
-### **Dependencies**
+## **4. File Structure Constraints**
 
-* **Management:** Always add dependencies via poetry add <package>.
-* **Lock File:** poetry.lock must be committed.
-* **Vulnerability Scanning:** CI uses Trivy. Ensure no Critical/High vulnerabilities are introduced.
+* **`src/coreason_identity/`**:
+* **`main.py`**: The CLI entry point (Allowed here, unlike the manifest repo).
+* **`manager.py`**: The high-level orchestrator.
+* **`device_flow_client.py`**: Logic for RFC 8628.
+* **`models.py`**: Pydantic models with strict PII redaction.
 
-## **5. Documentation**
 
-* Documentation is built with **MkDocs Material**.
-* Update docs/index.md or add new markdown files in docs/ when adding features.
-* Ensure all public functions have docstrings (Google or NumPy style).
+* **Root**:
+* **Allowed:** `Dockerfile` (Used for demos or specific CLI builds).
+* **Allowed:** `docker-compose.yml` (For local dev/testing mocks).
 
-## **6. Workflow & Debugging Protocol**
 
-If you encounter an error (e.g., test failure, linting error), follow this STRICT sequence:
 
-1. **Read the Logs:** Do not guess. Read the complete error message.
-2. **Isolate:** If multiple tests fail, focus on the simplest failure first.
-3. **Reproduction:** If the error is obscure, create a minimal reproduction case within the test suite (not a temp file).
-4. **Fix:** Apply the fix.
-5. **Verify:** Run the specific test case again.
+## **5. Testing Guidelines**
 
-## **7. Human-in-the-Loop Triggers**
+* **Mock The World:** Unit tests MUST NOT make real network calls to Auth0/Keycloak.
+* Use `respx` or `unittest.mock` to simulate OIDC discovery and JWKS endpoints.
 
-STOP and ASK the user before:
 
-* Modifying database migrations or schema files.
-* Deleting any file outside of src/ or tests/.
-* Adding a dependency that requires OS-level libraries (e.g., libpq-dev).
-* Committing any secrets or API keys (even for testing).
+* **Crypto-Valid Tests:** When testing validation, use real signed JWTs (generated by a test keypair), not just random strings, to prove `Authlib` integration works.
+* **PII Regression Tests:** Specific tests must exist to PROVE that `str(user_context)` does not contain the raw claims dictionary.
+
+## **6. Human-in-the-Loop Triggers**
+
+**STOP and ASK the user if:**
+
+* You need to change the hashing algorithm for PII obfuscation.
+* You encounter a scenario where "Bypass Mode" (ignoring signatures) seems necessary for development.
+* You are tempted to add a "God Mode" or "Admin Override" that bypasses the Bouncer logic.
+* You need to add a dependency that is not `authlib`, `httpx`, `pydantic`, or `loguru`.

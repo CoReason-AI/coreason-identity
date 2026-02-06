@@ -54,10 +54,10 @@ def test_multiple_configure_calls() -> None:
     does not duplicate handlers or crash.
     """
     configure_logging()
-    handler_count_1 = len(logger._core.handlers)
+    handler_count_1 = len(logger._core.handlers)  # type: ignore[attr-defined]
 
     configure_logging()
-    handler_count_2 = len(logger._core.handlers)
+    handler_count_2 = len(logger._core.handlers)  # type: ignore[attr-defined]
 
     # It should remain constant (1 sink) because configure_logging calls logger.configure(handlers=[])
     assert handler_count_1 == handler_count_2
