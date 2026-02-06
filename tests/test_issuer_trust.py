@@ -3,9 +3,11 @@ Tests for explicit issuer trust mitigation.
 Verifies that the issuer is correctly configured and enforced.
 """
 
-from unittest.mock import AsyncMock, Mock, patch
+from typing import Any
+from unittest.mock import AsyncMock, patch
 
 import pytest
+
 from coreason_identity.config import CoreasonIdentityConfig
 from coreason_identity.validator import TokenValidator
 
@@ -26,9 +28,7 @@ class TestIssuerTrust:
         Initialize CoreasonIdentityConfig(domain="auth.example.com", issuer="https://other.com").
         Assert config.issuer == "https://other.com".
         """
-        config = CoreasonIdentityConfig(
-            domain="auth.example.com", audience="aud", issuer="https://other.com"
-        )
+        config = CoreasonIdentityConfig(domain="auth.example.com", audience="aud", issuer="https://other.com")
         assert config.issuer == "https://other.com"
 
     @pytest.mark.asyncio
@@ -48,14 +48,13 @@ class TestIssuerTrust:
         mock_oidc.get_issuer.return_value = "https://malicious.com"
 
         expected_issuer = "https://trustworthy.com"
-        validator = TokenValidator(
-            oidc_provider=mock_oidc, audience="aud", issuer=expected_issuer
-        )
+        validator = TokenValidator(oidc_provider=mock_oidc, audience="aud", issuer=expected_issuer)
 
         # Mock JWT decode to avoid actual crypto
         # We want to verify that claims_options['iss']['value'] == expected_issuer
         with patch.object(validator.jwt, "decode") as mock_decode:
-            class MockClaims(dict):
+
+            class MockClaims(dict[str, Any]):
                 def validate(self) -> None:
                     pass
 

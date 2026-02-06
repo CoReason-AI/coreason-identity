@@ -9,9 +9,9 @@ Two significant issues were identified in the previous implementation of `coreas
 
 ## 2. Solution
 
-### 2.1 Dynamic Issuer Discovery
+### 2.1 Dynamic Issuer Discovery (Deprecated)
 
-Instead of statically constructing the issuer string, the system now leverages the standard OIDC Discovery mechanism.
+**Update (2026-02-06):** This section is partially superseded by [010_explicit_issuer_trust.md](./010_explicit_issuer_trust.md). While dynamic discovery of keys (JWKS) remains, dynamic discovery of the *issuer string* for validation purposes has been removed to mitigate Implicit Issuer Trust vulnerabilities. The application now requires an explicit issuer (configured or derived locally).
 
 *   **Mechanism:** The `OIDCProvider` fetches the `.well-known/openid-configuration` document from the IdP.
 *   **Validation:** The `issuer` field from this document is treated as the source of truth.
