@@ -93,6 +93,43 @@ class OIDCProvider:
         except httpx.HTTPError as e:
             raise CoreasonIdentityError(f"Failed to fetch JWKS from {jwks_uri}: {e}") from e
 
+    async def _refresh_jwks_critical_section(self, force_refresh: bool) -> dict[str, Any]:
+        """
+        Critical section for refreshing JWKS.
+        Must be called while holding the lock.
+        """
+        current_time = time.time()
+
+        # Check existing cache validity (Double check inside lock)
+        is_cache_valid = self._jwks_cache is not None and (current_time - self._last_update) < self.cache_ttl
+
+        # Check DoS protection cooldown
+        is_in_cooldown = self._jwks_cache is not None and (current_time - self._last_update) < self.refresh_cooldown
+
+        # 1. Normal cache hit (no force refresh)
+        if not force_refresh and is_cache_valid:
+            return self._jwks_cache  # type: ignore[return-value]
+
+        # 2. DoS Protection: If force_refresh is requested but we are in cooldown, return cached data
+        if force_refresh and is_in_cooldown:
+            logger.warning("JWKS refresh cooldown active. Returning cached keys despite force_refresh request.")
+            return self._jwks_cache  # type: ignore[return-value]
+
+        # Fetch fresh keys
+        oidc_config = await self._fetch_oidc_config()
+        jwks_uri = oidc_config.get("jwks_uri")
+        if not jwks_uri:
+            raise CoreasonIdentityError("OIDC configuration does not contain 'jwks_uri'")
+
+        jwks = await self._fetch_jwks(jwks_uri)
+
+        # Update cache
+        self._jwks_cache = jwks
+        self._oidc_config_cache = oidc_config
+        self._last_update = current_time
+
+        return jwks
+
     async def get_jwks(self, force_refresh: bool = False) -> dict[str, Any]:
         """
         Returns the JWKS, using the cache if valid.
@@ -109,44 +146,27 @@ class OIDCProvider:
         if self._lock is None:
             self._lock = anyio.Lock()
 
-        # Double-checked locking pattern optimization
+        # Double-checked locking pattern optimization (Check 1: No lock)
         if not force_refresh:
             current_time = time.time()
             if self._jwks_cache is not None and (current_time - self._last_update) < self.cache_ttl:
                 return self._jwks_cache
 
-        async with self._lock:
-            current_time = time.time()
-
-            # Check existing cache validity
-            is_cache_valid = self._jwks_cache is not None and (current_time - self._last_update) < self.cache_ttl
-
-            # Check DoS protection cooldown
-            is_in_cooldown = self._jwks_cache is not None and (current_time - self._last_update) < self.refresh_cooldown
-
-            # 1. Normal cache hit (no force refresh)
-            if not force_refresh and is_cache_valid:
-                return self._jwks_cache  # type: ignore[return-value]
-
-            # 2. DoS Protection: If force_refresh is requested but we are in cooldown, return cached data
-            if force_refresh and is_in_cooldown:
-                logger.warning("JWKS refresh cooldown active. Returning cached keys despite force_refresh request.")
-                return self._jwks_cache  # type: ignore[return-value]
-
-            # Fetch fresh keys
-            oidc_config = await self._fetch_oidc_config()
-            jwks_uri = oidc_config.get("jwks_uri")
-            if not jwks_uri:
-                raise CoreasonIdentityError("OIDC configuration does not contain 'jwks_uri'")
-
-            jwks = await self._fetch_jwks(jwks_uri)
-
-            # Update cache
-            self._jwks_cache = jwks
-            self._oidc_config_cache = oidc_config
-            self._last_update = current_time
-
-            return jwks
+        # Robust Locking:
+        # If the lock belongs to a different loop (e.g. OIDCProvider reused across anyio.run calls),
+        # acquiring it will raise RuntimeError. We must catch this and recreate the lock.
+        try:
+            async with self._lock:
+                return await self._refresh_jwks_critical_section(force_refresh)
+        except RuntimeError as e:
+            if "attached to a different loop" in str(e):
+                logger.warning(
+                    f"OIDCProvider lock loop mismatch detected ('{e}'). Recreating lock for current loop."
+                )
+                self._lock = anyio.Lock()
+                async with self._lock:
+                    return await self._refresh_jwks_critical_section(force_refresh)
+            raise
 
     async def get_issuer(self) -> str:
         """
