@@ -8,7 +8,7 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
-from unittest.mock import AsyncMock, Mock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, Mock
 
 import anyio
 import httpx
@@ -110,20 +110,18 @@ def test_lock_recreation_on_loop_error(mock_client: AsyncMock) -> None:
             provider._lock = anyio.Lock()
 
         # 2. Corrupt the lock to simulate "attached to different loop"
-        # We wrap the lock to raise error on acquire
-        original_lock = provider._lock
 
         # Create a mock that raises RuntimeError on __aenter__ ONCE, then works
         flaky_lock = MagicMock()
 
         # __aenter__ is async, so it returns an awaitable.
-        async def fail_then_succeed(*args, **kwargs):
+        async def fail_then_succeed() -> None:
             raise RuntimeError("Task <...> got Future <...> attached to a different loop")
 
         flaky_lock.__aenter__.side_effect = fail_then_succeed
 
         # Replace the lock
-        provider._lock = flaky_lock # type: ignore
+        provider._lock = flaky_lock
 
         # 3. Call get_jwks
         # We expect it to catch the error, create a NEW lock (real anyio.Lock), and succeed.
@@ -140,7 +138,6 @@ def test_lock_recreation_on_loop_error(mock_client: AsyncMock) -> None:
         assert provider._lock is not flaky_lock
         assert isinstance(provider._lock, anyio.Lock)
 
-    # This test will FAIL until we implement the fix
     try:
         anyio.run(scenario)
     except RuntimeError as e:
