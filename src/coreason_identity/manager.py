@@ -55,13 +55,15 @@ class IdentityManagerAsync:
         discovery_url = urljoin(base_url, "/.well-known/openid-configuration")
 
         self.oidc_provider = OIDCProvider(discovery_url, self._client)
-        # Initialize TokenValidator with dynamic issuer resolution (issuer=None)
-        # This allows the validator to fetch the correct issuer from the OIDC config
+        # Initialize TokenValidator with strict issuer from config
+        if not self.config.issuer:
+            raise CoreasonIdentityError("Issuer configuration is missing")
+
         self.validator = TokenValidator(
             oidc_provider=self.oidc_provider,
             audience=self.config.audience,
-            issuer=None,
             pii_salt=self.config.pii_salt,
+            issuer=self.config.issuer,
         )
         self.identity_mapper = IdentityMapper()
         self.device_client: DeviceFlowClient | None = None

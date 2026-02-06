@@ -58,7 +58,7 @@ async def test_telemetry_context_propagation(
     audience = "test-audience"
 
     with patch("coreason_identity.validator.tracer", tracer):
-        validator = TokenValidator(mock_oidc_provider, audience)
+        validator = TokenValidator(mock_oidc_provider, audience, issuer="https://test-issuer.com")
         claims = MockClaims({"sub": "user123", "aud": audience, "exp": time.time() + 3600})
 
         with (
@@ -87,7 +87,7 @@ async def test_telemetry_jwks_refresh_event(
     audience = "test-audience"
 
     with patch("coreason_identity.validator.tracer", tracer):
-        validator = TokenValidator(mock_oidc_provider, audience)
+        validator = TokenValidator(mock_oidc_provider, audience, issuer="https://test-issuer.com")
         claims = MockClaims({"sub": "user123", "aud": audience, "exp": time.time() + 3600})
 
         # Simulate first decode failing with BadSignatureError, then second succeeding
@@ -125,7 +125,7 @@ async def test_telemetry_unicode_user_id(
     user_id = "user_🚀_ñ"
 
     with patch("coreason_identity.validator.tracer", tracer):
-        validator = TokenValidator(mock_oidc_provider, audience)
+        validator = TokenValidator(mock_oidc_provider, audience, issuer="https://test-issuer.com")
         claims = MockClaims({"sub": user_id, "aud": audience, "exp": time.time() + 3600})
 
         with patch("authlib.jose.JsonWebToken.decode", return_value=claims):
@@ -157,7 +157,7 @@ async def test_telemetry_noop_tracer_safety(mock_oidc_provider: MagicMock) -> No
     audience = "test-audience"
 
     with patch("coreason_identity.validator.tracer", noop_tracer):
-        validator = TokenValidator(mock_oidc_provider, audience)
+        validator = TokenValidator(mock_oidc_provider, audience, issuer="https://test-issuer.com")
         claims = MockClaims({"sub": "user123", "aud": audience, "exp": time.time() + 3600})
 
         with patch("authlib.jose.JsonWebToken.decode", return_value=claims):

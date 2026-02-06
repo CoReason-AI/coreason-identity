@@ -224,8 +224,8 @@ def test_await_device_token_missing_client_id() -> None:
             mgr.await_device_token(mock_flow)
 
 
-def test_init_dynamic_issuer() -> None:
-    """Test that IdentityManager initializes TokenValidator with dynamic issuer resolution (issuer=None)."""
+def test_init_strict_issuer() -> None:
+    """Test that IdentityManager initializes TokenValidator with strict issuer from config."""
     config = CoreasonIdentityConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id=MOCK_CLIENT_ID)
 
     with (
@@ -235,9 +235,22 @@ def test_init_dynamic_issuer() -> None:
         IdentityManager(config)
 
         MockOIDC.assert_called_once()
+        # Should match derived issuer
+        expected_issuer = f"https://{MOCK_DOMAIN}/"
         MockValidator.assert_called_once_with(
             oidc_provider=MockOIDC.return_value,
             audience=MOCK_AUDIENCE,
-            issuer=None,
+            issuer=expected_issuer,
             pii_salt=config.pii_salt,
         )
+
+
+def test_init_missing_issuer_raises_error() -> None:
+    """Test that IdentityManager raises error if issuer configuration is missing."""
+    config = Mock(spec=CoreasonIdentityConfig)
+    config.domain = "example.com"
+    config.issuer = None  # Force None
+    config.audience = "aud"
+
+    with pytest.raises(CoreasonIdentityError, match="Issuer configuration is missing"):
+        IdentityManager(config)

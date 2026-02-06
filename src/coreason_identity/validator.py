@@ -48,7 +48,7 @@ class TokenValidator:
     Attributes:
         oidc_provider (OIDCProvider): The OIDCProvider instance.
         audience (str): The expected audience claim.
-        issuer (Optional[str]): The expected issuer claim.
+        issuer (str): The expected issuer claim.
     """
 
     def __init__(
@@ -116,11 +116,6 @@ class TokenValidator:
                 # This ensures OIDC config is also fetched/cached
                 jwks = await self.oidc_provider.get_jwks()
 
-                # Determine expected issuer
-                expected_issuer = self.issuer
-                if not expected_issuer:
-                    expected_issuer = await self.oidc_provider.get_issuer()
-
                 # Define claim options factory
                 def get_claims_options(iss: str) -> dict[str, Any]:
                     return {
@@ -129,7 +124,7 @@ class TokenValidator:
                         "iss": {"essential": True, "value": iss},
                     }
 
-                claims_options = get_claims_options(expected_issuer)
+                claims_options = get_claims_options(self.issuer)
 
                 def _decode(jwks_data: dict[str, Any], opts: dict[str, Any]) -> Any:
                     claims = self.jwt.decode(token, jwks_data, claims_options=opts)  # type: ignore[call-overload]
@@ -143,11 +138,6 @@ class TokenValidator:
                     logger.info("Validation failed with cached keys, refreshing JWKS and retrying...")
                     span.add_event("refreshing_jwks")
                     jwks = await self.oidc_provider.get_jwks(force_refresh=True)
-
-                    # Update issuer if dynamic, as config might have changed (rare but possible)
-                    if not self.issuer:
-                        expected_issuer = await self.oidc_provider.get_issuer()
-                        claims_options = get_claims_options(expected_issuer)
 
                     claims = _decode(jwks, claims_options)
 
