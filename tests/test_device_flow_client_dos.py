@@ -20,6 +20,8 @@ async def test_poll_token_enforces_minimum_interval() -> None:
     discovery_resp.json.return_value = {
         "token_endpoint": "https://idp.example.com/oauth/token",
         "device_authorization_endpoint": "https://idp.example.com/oauth/device/code",
+        "issuer": "https://idp",
+        "jwks_uri": "https://idp/jwks",
     }
     client_mock.get.return_value = discovery_resp
 
@@ -73,6 +75,8 @@ async def test_poll_token_enforces_max_duration() -> None:
     discovery_resp.json.return_value = {
         "token_endpoint": "https://idp.example.com/oauth/token",
         "device_authorization_endpoint": "https://idp.example.com/oauth/device/code",
+        "issuer": "https://idp",
+        "jwks_uri": "https://idp/jwks",
     }
     client_mock.get.return_value = discovery_resp
 

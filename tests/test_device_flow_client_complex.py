@@ -40,7 +40,9 @@ def create_response(status_code: int, json_data: Any | None = None, content: byt
 @pytest.mark.asyncio
 async def test_poll_token_flaky_network(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
     """Test polling where requests fail intermittently (network error) but eventually succeed."""
-    mock_client.get.return_value = create_response(200, {"token_endpoint": "url"})
+    mock_client.get.return_value = create_response(
+        200, {"token_endpoint": "url", "issuer": "https://idp", "jwks_uri": "https://idp/jwks"}
+    )
 
     # Fail, Pending, Fail, Success
     mock_client.post.side_effect = [
@@ -67,7 +69,9 @@ async def test_poll_token_flaky_network(client: DeviceFlowClient, mock_client: A
 @pytest.mark.asyncio
 async def test_poll_token_compounding_slow_down(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
     """Test multiple slow_down responses increasing the interval."""
-    mock_client.get.return_value = create_response(200, {"token_endpoint": "url"})
+    mock_client.get.return_value = create_response(
+        200, {"token_endpoint": "url", "issuer": "https://idp", "jwks_uri": "https://idp/jwks"}
+    )
 
     # slow_down, slow_down, success
     mock_client.post.side_effect = [
@@ -97,7 +101,9 @@ async def test_poll_token_compounding_slow_down(client: DeviceFlowClient, mock_c
 @pytest.mark.asyncio
 async def test_poll_token_malformed_success(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
     """Test 200 OK but missing required fields (access_token)."""
-    mock_client.get.return_value = create_response(200, {"token_endpoint": "url"})
+    mock_client.get.return_value = create_response(
+        200, {"token_endpoint": "url", "issuer": "https://idp", "jwks_uri": "https://idp/jwks"}
+    )
 
     # 200 OK but missing 'access_token'
     mock_client.post.return_value = create_response(200, {"foo": "bar", "expires_in": 3600})
@@ -116,7 +122,9 @@ async def test_poll_token_malformed_success(client: DeviceFlowClient, mock_clien
 @pytest.mark.asyncio
 async def test_poll_token_legacy_error_in_200(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
     """Test 200 OK containing an error field (legacy behavior)."""
-    mock_client.get.return_value = create_response(200, {"token_endpoint": "url"})
+    mock_client.get.return_value = create_response(
+        200, {"token_endpoint": "url", "issuer": "https://idp", "jwks_uri": "https://idp/jwks"}
+    )
 
     # 200 OK with error payload
     mock_client.post.return_value = create_response(200, {"error": "access_denied", "error_description": "Legacy"})

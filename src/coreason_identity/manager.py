@@ -12,6 +12,7 @@
 IdentityManager component for orchestrating authentication and authorization.
 """
 
+import re
 from typing import Any
 from urllib.parse import urljoin
 
@@ -55,12 +56,15 @@ class IdentityManagerAsync:
         discovery_url = urljoin(base_url, "/.well-known/openid-configuration")
 
         self.oidc_provider = OIDCProvider(discovery_url, self._client)
-        # Initialize TokenValidator with dynamic issuer resolution (issuer=None)
-        # This allows the validator to fetch the correct issuer from the OIDC config
+        # Initialize TokenValidator with strict issuer from config
+        if not self.config.issuer:
+            raise CoreasonIdentityError("Issuer configuration is missing")
+
         self.validator = TokenValidator(
             oidc_provider=self.oidc_provider,
             audience=self.config.audience,
-            issuer=None,
+            pii_salt=self.config.pii_salt,
+            issuer=self.config.issuer,
         )
         self.identity_mapper = IdentityMapper()
         self.device_client: DeviceFlowClient | None = None
@@ -76,10 +80,15 @@ class IdentityManagerAsync:
         """
         Validates the Bearer token and returns the UserContext.
         """
-        if not auth_header or not auth_header.startswith("Bearer "):
-            raise InvalidTokenError("Missing or invalid Authorization header format. Must start with 'Bearer '.")
+        if not auth_header:
+            raise InvalidTokenError("Missing Authorization header.")
 
-        token = auth_header[7:]  # Strip "Bearer "
+        # Strict regex validation to avoid raw string splitting
+        match = re.match(r"^Bearer\s+(.+)$", auth_header)
+        if not match:
+            raise InvalidTokenError("Invalid Authorization header format. Must start with 'Bearer '.")
+
+        token = match.group(1).strip()
 
         # Delegate to TokenValidator
         claims = await self.validator.validate_token(token)

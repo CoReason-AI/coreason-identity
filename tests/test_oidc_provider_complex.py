@@ -48,7 +48,7 @@ async def test_startup_refresh_bypass_cooldown(provider: OIDCProvider, mock_clie
     provider._jwks_cache = None
 
     mock_client.get.side_effect = [
-        Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks"}),
+        Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks", "issuer": "https://idp"}),
         Mock(status_code=200, json=lambda: {"keys": ["startup"]}),
     ]
 
@@ -73,7 +73,7 @@ async def test_concurrent_refreshes_dos_protection(provider: OIDCProvider, mock_
     # This ensures multiple tasks stack up on the lock
     async def delayed_config() -> Any:
         await asyncio.sleep(0.1)
-        return Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks"})
+        return Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks", "issuer": "https://idp"})
 
     async def delayed_jwks() -> Any:
         await asyncio.sleep(0.1)
@@ -90,7 +90,7 @@ async def test_concurrent_refreshes_dos_protection(provider: OIDCProvider, mock_
     # We need side_effect to be an iterable or function.
     # To handle async delay correctly in mock:
     mock_client.get.side_effect = [
-        Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks"}),
+        Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks", "issuer": "https://idp"}),
         Mock(status_code=200, json=lambda: {"keys": ["refreshed"]}),
     ]
     # We rely on asyncio.sleep in the test to yield, but we need the fetch itself to be slow
@@ -138,7 +138,7 @@ async def test_failed_refresh_does_not_update_timestamp(provider: OIDCProvider, 
     # 2. Attempt Refresh again immediately - Should proceed (try to fetch)
     # Because timestamp is still old.
     mock_client.get.side_effect = [
-        Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks"}),
+        Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks", "issuer": "https://idp"}),
         Mock(status_code=200, json=lambda: {"keys": ["new"]}),
     ]
 

@@ -13,6 +13,7 @@ TokenValidator component for validating JWT signatures and claims.
 """
 
 import hashlib
+import hmac
 from typing import Any
 
 from authlib.jose import JsonWebToken
@@ -25,6 +26,7 @@ from authlib.jose.errors import (
 )
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
+from pydantic import SecretStr
 
 from coreason_identity.exceptions import (
     CoreasonIdentityError,
@@ -46,10 +48,16 @@ class TokenValidator:
     Attributes:
         oidc_provider (OIDCProvider): The OIDCProvider instance.
         audience (str): The expected audience claim.
-        issuer (Optional[str]): The expected issuer claim.
+        issuer (str): The expected issuer claim.
     """
 
-    def __init__(self, oidc_provider: OIDCProvider, audience: str, issuer: str | None = None) -> None:
+    def __init__(
+        self,
+        oidc_provider: OIDCProvider,
+        audience: str,
+        issuer: str | None = None,
+        pii_salt: SecretStr | None = None,
+    ) -> None:
         """
         Initialize the TokenValidator.
 
@@ -57,12 +65,30 @@ class TokenValidator:
             oidc_provider: The OIDCProvider instance to fetch JWKS.
             audience: The expected audience (aud) claim.
             issuer: The expected issuer (iss) claim. If None, it will be fetched dynamically from OIDCProvider.
+            pii_salt: Salt for anonymizing PII. Defaults to unsafe static salt if not provided.
         """
         self.oidc_provider = oidc_provider
         self.audience = audience
         self.issuer = issuer
+        self.pii_salt = pii_salt or SecretStr("coreason-unsafe-default-salt")
         # Use a specific JsonWebToken instance to enforce RS256 and reject 'none'
         self.jwt = JsonWebToken(["RS256"])
+
+    def _anonymize(self, value: str) -> str:
+        """
+        Anonymizes a value using HMAC-SHA256 with the configured salt.
+
+        Args:
+            value: The value to anonymize.
+
+        Returns:
+            The anonymized hex digest.
+        """
+        return hmac.new(
+            self.pii_salt.get_secret_value().encode("utf-8"),
+            value.encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
 
     async def validate_token(self, token: str) -> dict[str, Any]:
         """
@@ -90,11 +116,6 @@ class TokenValidator:
                 # This ensures OIDC config is also fetched/cached
                 jwks = await self.oidc_provider.get_jwks()
 
-                # Determine expected issuer
-                expected_issuer = self.issuer
-                if not expected_issuer:
-                    expected_issuer = await self.oidc_provider.get_issuer()
-
                 # Define claim options factory
                 def get_claims_options(iss: str) -> dict[str, Any]:
                     return {
@@ -103,7 +124,26 @@ class TokenValidator:
                         "iss": {"essential": True, "value": iss},
                     }
 
-                claims_options = get_claims_options(expected_issuer)
+                # Ensure issuer is not None before passing to get_claims_options
+                # self.issuer should be populated if initialized correctly,
+                # otherwise we fetch it or raise.
+                # However, type hint says str | None.
+                # If dynamic discovery is disabled (implicit in current design), issuer MUST be present.
+                # We can fallback to fetching if None, or assume it's set if we are enforcing it.
+                # Given previous context, we might want to fetch it if missing.
+                # But Config validator sets default.
+                # So we can assert or handle it.
+                # Let's use the fetched/configured issuer.
+
+                # For MyPy, we need to ensure it's not None.
+                # If we are here, we might have skipped dynamic fetch if self.issuer was set.
+                # If self.issuer is None, we need to handle it.
+
+                final_issuer = self.issuer
+                if not final_issuer:
+                    final_issuer = await self.oidc_provider.get_issuer()
+
+                claims_options = get_claims_options(final_issuer)
 
                 def _decode(jwks_data: dict[str, Any], opts: dict[str, Any]) -> Any:
                     claims = self.jwt.decode(token, jwks_data, claims_options=opts)  # type: ignore[call-overload]
@@ -118,11 +158,6 @@ class TokenValidator:
                     span.add_event("refreshing_jwks")
                     jwks = await self.oidc_provider.get_jwks(force_refresh=True)
 
-                    # Update issuer if dynamic, as config might have changed (rare but possible)
-                    if not self.issuer:
-                        expected_issuer = await self.oidc_provider.get_issuer()
-                        claims_options = get_claims_options(expected_issuer)
-
                     claims = _decode(jwks, claims_options)
 
                 payload = dict(claims)
@@ -130,11 +165,11 @@ class TokenValidator:
                 # Log success
                 user_sub = payload.get("sub", "unknown")
                 # Hash the user ID for strict privacy logging
-                user_hash = hashlib.sha256(str(user_sub).encode("utf-8")).hexdigest()
+                user_hash = self._anonymize(str(user_sub))
                 logger.info(f"Token validated for user {user_hash}")
 
                 # Set span attributes
-                span.set_attribute("user.id", str(user_sub))
+                span.set_attribute("user.id", user_hash)
                 span.set_status(Status(StatusCode.OK))
 
                 return payload

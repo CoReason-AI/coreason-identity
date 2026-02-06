@@ -16,6 +16,7 @@ import httpx
 import pytest
 
 from coreason_identity.exceptions import CoreasonIdentityError
+from coreason_identity.models_internal import OIDCConfig
 from coreason_identity.oidc_provider import OIDCProvider
 
 
@@ -33,7 +34,7 @@ def provider(mock_client: AsyncMock) -> OIDCProvider:
 async def test_get_jwks_success(provider: OIDCProvider, mock_client: AsyncMock) -> None:
     # Mock OIDC config response
     mock_client.get.side_effect = [
-        Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks"}),
+        Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks", "issuer": "https://idp"}),
         Mock(status_code=200, json=lambda: {"keys": []}),
     ]
 
@@ -60,7 +61,7 @@ async def test_get_jwks_force_refresh(provider: OIDCProvider, mock_client: Async
     provider._last_update = time.time() - 31.0
 
     mock_client.get.side_effect = [
-        Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks"}),
+        Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks", "issuer": "https://idp"}),
         Mock(status_code=200, json=lambda: {"keys": ["fresh"]}),
     ]
 
@@ -74,7 +75,7 @@ async def test_get_jwks_expired_cache(provider: OIDCProvider, mock_client: Async
     provider._last_update = time.time() - 3601  # Expired
 
     mock_client.get.side_effect = [
-        Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks"}),
+        Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks", "issuer": "https://idp"}),
         Mock(status_code=200, json=lambda: {"keys": ["fresh"]}),
     ]
 
@@ -94,14 +95,14 @@ async def test_fetch_oidc_config_error(provider: OIDCProvider, mock_client: Asyn
 async def test_missing_jwks_uri(provider: OIDCProvider, mock_client: AsyncMock) -> None:
     mock_client.get.return_value = Mock(status_code=200, json=dict)
 
-    with pytest.raises(CoreasonIdentityError, match="OIDC configuration does not contain 'jwks_uri'"):
+    with pytest.raises(CoreasonIdentityError, match="Invalid OIDC configuration"):
         await provider.get_jwks()
 
 
 @pytest.mark.asyncio
 async def test_fetch_jwks_error(provider: OIDCProvider, mock_client: AsyncMock) -> None:
     mock_client.get.side_effect = [
-        Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks"}),
+        Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks", "issuer": "https://idp"}),
         httpx.HTTPError("Network error"),
     ]
 
@@ -130,7 +131,7 @@ async def test_get_issuer_success(provider: OIDCProvider, mock_client: AsyncMock
 @pytest.mark.asyncio
 async def test_get_issuer_from_cache(provider: OIDCProvider, mock_client: AsyncMock) -> None:
     """Test retrieving issuer from existing valid cache."""
-    provider._oidc_config_cache = {"issuer": "https://cached-idp.com", "jwks_uri": "..."}
+    provider._oidc_config_cache = OIDCConfig(issuer="https://cached-idp.com", jwks_uri="...")
     provider._jwks_cache = {"keys": []}
     provider._last_update = time.time()
 
@@ -147,14 +148,14 @@ async def test_get_issuer_missing_in_config(provider: OIDCProvider, mock_client:
         Mock(status_code=200, json=lambda: {"keys": []}),
     ]
 
-    with pytest.raises(CoreasonIdentityError, match="does not contain 'issuer'"):
+    with pytest.raises(CoreasonIdentityError, match="Invalid OIDC configuration"):
         await provider.get_issuer()
 
 
 @pytest.mark.asyncio
 async def test_get_issuer_refreshes_if_expired(provider: OIDCProvider, mock_client: AsyncMock) -> None:
     """Test that it refreshes if cache is expired."""
-    provider._oidc_config_cache = {"issuer": "old", "jwks_uri": "..."}
+    provider._oidc_config_cache = OIDCConfig(issuer="old", jwks_uri="...")
     provider._jwks_cache = {}
     provider._last_update = time.time() - 3601  # Expired
 

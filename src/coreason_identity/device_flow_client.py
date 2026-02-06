@@ -21,6 +21,7 @@ from pydantic import ValidationError
 
 from coreason_identity.exceptions import CoreasonIdentityError
 from coreason_identity.models import DeviceFlowResponse, TokenResponse
+from coreason_identity.models_internal import OIDCConfig
 from coreason_identity.utils.logger import logger
 
 
@@ -81,15 +82,16 @@ class DeviceFlowClient:
             response = await self.client.get(discovery_url)
             response.raise_for_status()
             try:
-                config = response.json()
-            except ValueError as e:
+                # Use strict Pydantic model but allow flexible fallback for optional fields
+                # We interpret the response as OIDCConfig. If it fails validation (e.g. missing issuer),
+                # we wrap it.
+                config = OIDCConfig(**response.json())
+            except (ValueError, ValidationError) as e:
                 raise CoreasonIdentityError(f"Invalid JSON response from OIDC discovery: {e}") from e
 
             # Fallback to standard Auth0 paths if not in config
-            device_endpoint = config.get(
-                "device_authorization_endpoint", urljoin(f"{self.idp_url}/", "oauth/device/code")
-            )
-            token_endpoint = config.get("token_endpoint", urljoin(f"{self.idp_url}/", "oauth/token"))
+            device_endpoint = config.device_authorization_endpoint or urljoin(f"{self.idp_url}/", "oauth/device/code")
+            token_endpoint = config.token_endpoint or urljoin(f"{self.idp_url}/", "oauth/token")
 
             self._endpoints = {
                 "device_authorization_endpoint": device_endpoint,
