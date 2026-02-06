@@ -10,7 +10,8 @@
 
 import asyncio
 import time
-from unittest.mock import AsyncMock, Mock, patch
+from typing import Any
+from unittest.mock import AsyncMock, Mock
 
 import httpx
 import pytest
@@ -57,9 +58,7 @@ async def test_startup_refresh_bypass_cooldown(provider: OIDCProvider, mock_clie
 
 
 @pytest.mark.asyncio
-async def test_concurrent_refreshes_dos_protection(
-    provider: OIDCProvider, mock_client: AsyncMock
-) -> None:
+async def test_concurrent_refreshes_dos_protection(provider: OIDCProvider, mock_client: AsyncMock) -> None:
     """
     Complex Case: Concurrent Refreshes
     Simulate multiple concurrent tasks calling get_jwks(force_refresh=True).
@@ -72,11 +71,11 @@ async def test_concurrent_refreshes_dos_protection(
 
     # 2. Setup Mock with delays to simulate network latency
     # This ensures multiple tasks stack up on the lock
-    async def delayed_config(*args, **kwargs):
+    async def delayed_config() -> Any:
         await asyncio.sleep(0.1)
         return Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks"})
 
-    async def delayed_jwks(*args, **kwargs):
+    async def delayed_jwks() -> Any:
         await asyncio.sleep(0.1)
         return Mock(status_code=200, json=lambda: {"keys": ["refreshed"]})
 
@@ -116,9 +115,7 @@ async def test_concurrent_refreshes_dos_protection(
 
 
 @pytest.mark.asyncio
-async def test_failed_refresh_does_not_update_timestamp(
-    provider: OIDCProvider, mock_client: AsyncMock
-) -> None:
+async def test_failed_refresh_does_not_update_timestamp(provider: OIDCProvider, mock_client: AsyncMock) -> None:
     """
     Complex Case: Failure Handling
     If a refresh fails, _last_update should NOT be updated.
