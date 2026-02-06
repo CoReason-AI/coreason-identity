@@ -9,6 +9,7 @@
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
 import hashlib
+import hmac
 import time
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -134,10 +135,12 @@ async def test_telemetry_unicode_user_id(
     span = spans[0]
     # Check attribute
     assert span.attributes is not None
-    assert span.attributes["user.id"] == user_id
+    expected_hash = hmac.new(
+        b"coreason-unsafe-default-salt", user_id.encode("utf-8"), hashlib.sha256
+    ).hexdigest()
+    assert span.attributes["user.id"] == expected_hash
 
     # Check log hash
-    expected_hash = hashlib.sha256(user_id.encode("utf-8")).hexdigest()
     assert any(f"Token validated for user {expected_hash}" in record.record["message"] for record in logs)
 
 

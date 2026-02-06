@@ -9,6 +9,7 @@
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
 import hashlib
+import hmac
 import time
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -80,7 +81,8 @@ async def test_validate_token_success_telemetry(
     assert span.status.status_code == StatusCode.OK
     # The attributes might be None if empty, but we set it, so it should be a BoundedAttributes
     assert span.attributes is not None
-    assert span.attributes["user.id"] == "user123"
+    expected_hash = hmac.new(b"coreason-unsafe-default-salt", b"user123", hashlib.sha256).hexdigest()
+    assert span.attributes["user.id"] == expected_hash
 
 
 @pytest.mark.asyncio
@@ -135,7 +137,9 @@ async def test_logging_strictness(mock_oidc_provider: MagicMock) -> None:
         await validator.validate_token("dummy_token")
 
     # Calculate expected hash
-    expected_hash = hashlib.sha256(user_id.encode("utf-8")).hexdigest()
+    expected_hash = hmac.new(
+        b"coreason-unsafe-default-salt", user_id.encode("utf-8"), hashlib.sha256
+    ).hexdigest()
 
     # Check if the message is in the captured logs
     assert any(f"Token validated for user {expected_hash}" in record.record["message"] for record in logs)

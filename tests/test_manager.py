@@ -239,4 +239,5 @@ def test_init_dynamic_issuer() -> None:
             oidc_provider=MockOIDC.return_value,
             audience=MOCK_AUDIENCE,
             issuer=None,
+            pii_salt=config.pii_salt,
         )
