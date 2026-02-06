@@ -158,11 +158,9 @@ class OIDCProvider:
         try:
             async with self._lock:
                 return await self._refresh_jwks_critical_section(force_refresh)
-        except RuntimeError as e:
+        except RuntimeError as e:  # pragma: no cover
             if "attached to a different loop" in str(e):
-                logger.warning(
-                    f"OIDCProvider lock loop mismatch detected ('{e}'). Recreating lock for current loop."
-                )  # pragma: no cover
+                logger.warning(f"OIDCProvider lock loop mismatch detected ('{e}'). Recreating lock for current loop.")
                 self._lock = anyio.Lock()
                 async with self._lock:
                     return await self._refresh_jwks_critical_section(force_refresh)
