@@ -61,6 +61,7 @@ class IdentityManagerAsync:
             oidc_provider=self.oidc_provider,
             audience=self.config.audience,
             issuer=None,
+            pii_salt=self.config.pii_salt,
         )
         self.identity_mapper = IdentityMapper()
         self.device_client: DeviceFlowClient | None = None

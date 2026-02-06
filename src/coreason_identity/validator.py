@@ -13,6 +13,7 @@ TokenValidator component for validating JWT signatures and claims.
 """
 
 import hashlib
+import hmac
 from typing import Any
 
 from authlib.jose import JsonWebToken
@@ -33,6 +34,8 @@ from coreason_identity.exceptions import (
     SignatureVerificationError,
     TokenExpiredError,
 )
+from pydantic import SecretStr
+
 from coreason_identity.oidc_provider import OIDCProvider
 from coreason_identity.utils.logger import logger
 
@@ -49,7 +52,13 @@ class TokenValidator:
         issuer (Optional[str]): The expected issuer claim.
     """
 
-    def __init__(self, oidc_provider: OIDCProvider, audience: str, issuer: str | None = None) -> None:
+    def __init__(
+        self,
+        oidc_provider: OIDCProvider,
+        audience: str,
+        issuer: str | None = None,
+        pii_salt: SecretStr | None = None,
+    ) -> None:
         """
         Initialize the TokenValidator.
 
@@ -57,12 +66,30 @@ class TokenValidator:
             oidc_provider: The OIDCProvider instance to fetch JWKS.
             audience: The expected audience (aud) claim.
             issuer: The expected issuer (iss) claim. If None, it will be fetched dynamically from OIDCProvider.
+            pii_salt: Salt for anonymizing PII. Defaults to unsafe static salt if not provided.
         """
         self.oidc_provider = oidc_provider
         self.audience = audience
         self.issuer = issuer
+        self.pii_salt = pii_salt or SecretStr("coreason-unsafe-default-salt")
         # Use a specific JsonWebToken instance to enforce RS256 and reject 'none'
         self.jwt = JsonWebToken(["RS256"])
+
+    def _anonymize(self, value: str) -> str:
+        """
+        Anonymizes a value using HMAC-SHA256 with the configured salt.
+
+        Args:
+            value: The value to anonymize.
+
+        Returns:
+            The anonymized hex digest.
+        """
+        return hmac.new(
+            self.pii_salt.get_secret_value().encode("utf-8"),
+            value.encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
 
     async def validate_token(self, token: str) -> dict[str, Any]:
         """
@@ -130,11 +157,11 @@ class TokenValidator:
                 # Log success
                 user_sub = payload.get("sub", "unknown")
                 # Hash the user ID for strict privacy logging
-                user_hash = hashlib.sha256(str(user_sub).encode("utf-8")).hexdigest()
+                user_hash = self._anonymize(str(user_sub))
                 logger.info(f"Token validated for user {user_hash}")
 
                 # Set span attributes
-                span.set_attribute("user.id", str(user_sub))
+                span.set_attribute("user.id", user_hash)
                 span.set_status(Status(StatusCode.OK))
 
                 return payload

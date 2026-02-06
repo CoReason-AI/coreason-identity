@@ -17,7 +17,7 @@ import os
 import socket
 from urllib.parse import urlparse
 
-from pydantic import field_validator
+from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,6 +29,7 @@ class CoreasonIdentityConfig(BaseSettings):
         domain (str): The domain of the Identity Provider (e.g. auth.coreason.com).
         audience (str): The expected audience for the token.
         client_id (Optional[str]): The OIDC Client ID (required for device flow).
+        pii_salt (SecretStr): Salt for anonymizing PII in logs/traces.
     """
 
     model_config = SettingsConfigDict(
@@ -39,6 +40,7 @@ class CoreasonIdentityConfig(BaseSettings):
     domain: str
     audience: str
     client_id: str | None = None
+    pii_salt: SecretStr = SecretStr("coreason-unsafe-default-salt")
 
     @field_validator("domain")
     @classmethod
