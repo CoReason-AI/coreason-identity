@@ -31,7 +31,7 @@ class InterceptHandler(logging.Handler):
             level = logger.level(record.levelname).name
         except ValueError:
             # If the level name isn't registered in loguru, use the integer value
-            level = record.levelno  # type: ignore[assignment]
+            level = record.levelno
 
         # Find caller from where originated the logged message
         frame = logging.currentframe()
@@ -76,7 +76,7 @@ def configure_logging() -> None:
     # Remove default handler and any previously added handlers
     # logger.configure(handlers=[]) ensures no default handler is added back
     # and sets the patcher in one go.
-    logger.configure(handlers=[], patcher=trace_id_injector)  # type: ignore[arg-type]
+    logger.configure(handlers=[], patcher=trace_id_injector)
 
     # Sink 1: Console (Stdout/Stderr)
     if log_json:
