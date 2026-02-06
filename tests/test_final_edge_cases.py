@@ -49,7 +49,7 @@ class TestIdentityManagerEdgeCases:
             manager = IdentityManager(config)
 
             # Mock validator just in case, but it shouldn't be reached
-            manager._async.validator.validate_token = AsyncMock()
+            manager._async.validator.validate_token = AsyncMock()  # type: ignore[method-assign]
 
             # Now IdentityManager rejects "Bearer " strictly via regex
             with pytest.raises(InvalidTokenError, match="Invalid Authorization header format"):

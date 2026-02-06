@@ -90,9 +90,7 @@ class DeviceFlowClient:
                 raise CoreasonIdentityError(f"Invalid JSON response from OIDC discovery: {e}") from e
 
             # Fallback to standard Auth0 paths if not in config
-            device_endpoint = config.device_authorization_endpoint or urljoin(
-                f"{self.idp_url}/", "oauth/device/code"
-            )
+            device_endpoint = config.device_authorization_endpoint or urljoin(f"{self.idp_url}/", "oauth/device/code")
             token_endpoint = config.token_endpoint or urljoin(f"{self.idp_url}/", "oauth/token")
 
             self._endpoints = {

@@ -109,12 +109,13 @@ class TestDeviceFlowSuperEdgeCases:
 
         # Discovery
         mock_client.get.return_value = create_response(
-            200, {
+            200,
+            {
                 "device_authorization_endpoint": "https://idp.com/device",
                 "token_endpoint": "https://idp.com/token",
                 "issuer": "https://idp",
                 "jwks_uri": "https://idp/jwks",
-            }
+            },
         )
 
         # Polling response: 200 OK but missing access_token
