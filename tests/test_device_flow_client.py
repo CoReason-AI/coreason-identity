@@ -27,7 +27,12 @@ def mock_client() -> AsyncMock:
 
 @pytest.fixture
 def client(mock_client: AsyncMock) -> DeviceFlowClient:
-    return DeviceFlowClient(client_id="test-client", idp_url="https://test.auth0.com", client=mock_client)
+    return DeviceFlowClient(
+        client_id="test-client",
+        idp_url="https://test.auth0.com",
+        client=mock_client,
+        min_poll_interval=1.0,
+    )
 
 
 def create_response(status_code: int, json_data: Any | None = None, content: bytes | None = None) -> Response:
@@ -221,7 +226,7 @@ async def test_poll_token_timeout(client: DeviceFlowClient, mock_client: AsyncMo
     device_resp = DeviceFlowResponse(device_code="dc", user_code="uc", verification_uri="url", expires_in=1, interval=1)
 
     with patch("time.time") as mock_time, patch("anyio.sleep", new_callable=AsyncMock):
-        mock_time.side_effect = [0, 0, 2]
+        mock_time.side_effect = [0, 0, 2, 2, 2]
 
         with pytest.raises(CoreasonIdentityError, match="Polling timed out"):
             await client.poll_token(device_resp)
