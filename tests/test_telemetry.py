@@ -137,9 +137,7 @@ async def test_logging_strictness(mock_oidc_provider: MagicMock) -> None:
         await validator.validate_token("dummy_token")
 
     # Calculate expected hash
-    expected_hash = hmac.new(
-        b"coreason-unsafe-default-salt", user_id.encode("utf-8"), hashlib.sha256
-    ).hexdigest()
+    expected_hash = hmac.new(b"coreason-unsafe-default-salt", user_id.encode("utf-8"), hashlib.sha256).hexdigest()
 
     # Check if the message is in the captured logs
     assert any(f"Token validated for user {expected_hash}" in record.record["message"] for record in logs)
