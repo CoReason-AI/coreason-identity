@@ -10,19 +10,20 @@
 
 import hashlib
 import time
-from typing import Any, List, Tuple
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from authlib.jose.errors import ExpiredTokenError
-from coreason_identity.exceptions import TokenExpiredError
-from coreason_identity.oidc_provider import OIDCProvider
-from coreason_identity.utils.logger import logger
-from coreason_identity.validator import TokenValidator
 from opentelemetry.sdk.trace import Tracer, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import StatusCode
+
+from coreason_identity.exceptions import TokenExpiredError
+from coreason_identity.oidc_provider import OIDCProvider
+from coreason_identity.utils.logger import logger
+from coreason_identity.validator import TokenValidator
 
 
 class MockClaims(dict[str, Any]):
@@ -33,7 +34,7 @@ class MockClaims(dict[str, Any]):
 
 
 @pytest.fixture
-def telemetry_setup() -> Tuple[InMemorySpanExporter, Tracer]:
+def telemetry_setup() -> tuple[InMemorySpanExporter, Tracer]:
     """Sets up an OpenTelemetry tracer with an in-memory exporter."""
     exporter = InMemorySpanExporter()
     provider = TracerProvider()
@@ -54,7 +55,7 @@ def mock_oidc_provider() -> MagicMock:
 
 @pytest.mark.asyncio
 async def test_validate_token_success_telemetry(
-    telemetry_setup: Tuple[InMemorySpanExporter, Tracer],
+    telemetry_setup: tuple[InMemorySpanExporter, Tracer],
     mock_oidc_provider: MagicMock,
 ) -> None:
     """Verifies that a successful validation emits a correct span."""
@@ -84,7 +85,7 @@ async def test_validate_token_success_telemetry(
 
 @pytest.mark.asyncio
 async def test_validate_token_failure_telemetry(
-    telemetry_setup: Tuple[InMemorySpanExporter, Tracer],
+    telemetry_setup: tuple[InMemorySpanExporter, Tracer],
     mock_oidc_provider: MagicMock,
 ) -> None:
     """Verifies that a failed validation emits an error span."""
@@ -112,7 +113,7 @@ async def test_validate_token_failure_telemetry(
 
 
 @pytest.mark.asyncio
-async def test_logging_strictness(mock_oidc_provider: MagicMock, caplog: pytest.LogCaptureFixture) -> None:
+async def test_logging_strictness(mock_oidc_provider: MagicMock) -> None:
     """Verifies that the user ID is hashed in the logs."""
     # Ensure we capture logs from our logger
     # logger.add(caplog.handler, level="INFO")
@@ -120,7 +121,7 @@ async def test_logging_strictness(mock_oidc_provider: MagicMock, caplog: pytest.
     # However, standard pytest caplog might not catch loguru unless we sink it.
 
     # We'll sink to a list to be sure
-    logs: List[Any] = []
+    logs: list[Any] = []
     logger.add(logs.append, level="INFO", format="{message}")
 
     audience = "test-audience"

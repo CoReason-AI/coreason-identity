@@ -12,20 +12,21 @@
 Additional robustness tests for complex edge cases not explicitly covered by existing suites.
 """
 
-from typing import Any, Optional
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
+from httpx import Request, Response
+
 from coreason_identity.device_flow_client import DeviceFlowClient
 from coreason_identity.exceptions import CoreasonIdentityError, InvalidTokenError
 from coreason_identity.identity_mapper import IdentityMapper
 from coreason_identity.models import DeviceFlowResponse
-from httpx import Request, Response
 
 
 # Helper for httpx mocks
-def create_response(status_code: int, json_data: Optional[Any] = None) -> Response:
+def create_response(status_code: int, json_data: Any | None = None) -> Response:
     request = Request("GET", "https://example.com")
     return Response(status_code, json=json_data, request=request)
 
@@ -141,6 +142,8 @@ class TestDeviceFlowClientRobustness:
             device_code="dc", user_code="uc", verification_uri="uri", expires_in=10, interval=1
         )
 
-        with pytest.raises(CoreasonIdentityError, match="Device code expired"):
-            with patch("anyio.sleep", new_callable=AsyncMock):
-                await client.poll_token(flow_resp)
+        with (
+            pytest.raises(CoreasonIdentityError, match="Device code expired"),
+            patch("anyio.sleep", new_callable=AsyncMock),
+        ):
+            await client.poll_token(flow_resp)

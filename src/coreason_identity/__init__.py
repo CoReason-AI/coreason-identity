@@ -24,21 +24,21 @@ from coreason_identity.exceptions import (
 from coreason_identity.manager import IdentityManager, IdentityManagerAsync
 from coreason_identity.models import DeviceFlowResponse, TokenResponse, UserContext
 
-__version__ = "0.4.3"
+__version__ = "0.5.0"
 __author__ = "Gowtham A Rao"
 __email__ = "gowtham.rao@coreason.ai"
 
 __all__ = [
     "CoreasonIdentityConfig",
+    "CoreasonIdentityError",
+    "DeviceFlowResponse",
     "IdentityManager",
     "IdentityManagerAsync",
-    "UserContext",
-    "TokenResponse",
-    "DeviceFlowResponse",
-    "CoreasonIdentityError",
-    "InvalidTokenError",
+    "InsufficientPermissionsError",
     "InvalidAudienceError",
+    "InvalidTokenError",
     "SignatureVerificationError",
     "TokenExpiredError",
-    "InsufficientPermissionsError",
+    "TokenResponse",
+    "UserContext",
 ]

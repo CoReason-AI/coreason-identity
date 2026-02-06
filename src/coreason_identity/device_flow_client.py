@@ -13,7 +13,6 @@ DeviceFlowClient component for handling OAuth 2.0 Device Authorization Grant.
 """
 
 import time
-from typing import Dict, Optional
 from urllib.parse import urljoin
 
 import anyio
@@ -36,7 +35,13 @@ class DeviceFlowClient:
     """
 
     def __init__(
-        self, client_id: str, idp_url: str, client: httpx.AsyncClient, scope: str = "openid profile email"
+        self,
+        client_id: str,
+        idp_url: str,
+        client: httpx.AsyncClient,
+        scope: str = "openid profile email",
+        min_poll_interval: float = 5.0,
+        max_poll_duration: float = 900.0,
     ) -> None:
         """
         Initialize the DeviceFlowClient.
@@ -46,14 +51,18 @@ class DeviceFlowClient:
             idp_url: The base URL of the Identity Provider (e.g., https://my-tenant.auth0.com).
             client: The async HTTP client to use for requests.
             scope: The scopes to request (default: "openid profile email").
+            min_poll_interval: Minimum seconds to wait between requests (default: 5.0).
+            max_poll_duration: Maximum seconds to poll before giving up (default: 900.0).
         """
         self.client_id = client_id
         self.idp_url = idp_url.rstrip("/")
         self.client = client
         self.scope = scope
-        self._endpoints: Optional[Dict[str, str]] = None
+        self.min_poll_interval = min_poll_interval
+        self.max_poll_duration = max_poll_duration
+        self._endpoints: dict[str, str] | None = None
 
-    async def _get_endpoints(self) -> Dict[str, str]:
+    async def _get_endpoints(self) -> dict[str, str]:
         """
         Discover OIDC endpoints from the IdP.
 
@@ -90,7 +99,7 @@ class DeviceFlowClient:
         except httpx.HTTPError as e:
             raise CoreasonIdentityError(f"Failed to discover OIDC endpoints: {e}") from e
 
-    async def initiate_flow(self, audience: Optional[str] = None) -> DeviceFlowResponse:
+    async def initiate_flow(self, audience: str | None = None) -> DeviceFlowResponse:
         """
         Initiates the Device Authorization Flow.
 
@@ -149,10 +158,11 @@ class DeviceFlowClient:
 
         start_time = time.time()
         end_time = start_time + expires_in
+        safety_end_time = start_time + self.max_poll_duration
 
         logger.info(f"Polling for token. Expires in {expires_in}s. Interval: {interval}s")
 
-        while time.time() < end_time:
+        while time.time() < min(end_time, safety_end_time):
             data = {
                 "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
                 "device_code": device_code,
@@ -205,9 +215,16 @@ class DeviceFlowClient:
                     raise
                 logger.warning(f"Polling attempt failed: {e}")
                 # Continue polling unless it's a critical error
-                pass
 
             # Use anyio.sleep for async non-blocking sleep
-            await anyio.sleep(interval)
+            if interval < self.min_poll_interval:
+                logger.warning(
+                    f"IdP requested unsafe polling interval {interval}s. Enforcing minimum {self.min_poll_interval}s."
+                )
+            safe_interval = max(interval, self.min_poll_interval)
+            await anyio.sleep(safe_interval)
+
+        if time.time() >= safety_end_time:
+            raise CoreasonIdentityError("Polling timed out (safety limit reached).")
 
         raise CoreasonIdentityError("Polling timed out.")

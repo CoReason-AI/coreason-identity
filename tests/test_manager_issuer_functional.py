@@ -14,11 +14,12 @@ This test ensures that IdentityManager correctly configures TokenValidator to en
 """
 
 import time
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
 from authlib.jose import JsonWebKey, jwt
+
 from coreason_identity.config import CoreasonIdentityConfig
 from coreason_identity.exceptions import CoreasonIdentityError
 from coreason_identity.manager import IdentityManager
@@ -27,23 +28,22 @@ from coreason_identity.manager import IdentityManager
 @pytest.fixture
 def key_pair() -> Any:
     # Generate a key pair for testing
-    key = JsonWebKey.generate_key("RSA", 2048, is_private=True)
-    return key
+    return JsonWebKey.generate_key("RSA", 2048, is_private=True)
 
 
 @pytest.fixture
-def jwks(key_pair: Any) -> Dict[str, Any]:
+def jwks(key_pair: Any) -> dict[str, Any]:
     # Return public key in JWKS format
     return {"keys": [key_pair.as_dict(private=False)]}
 
 
-def create_token(key: Any, claims: Dict[str, Any], headers: Dict[str, Any] | None = None) -> bytes:
+def create_token(key: Any, claims: dict[str, Any], headers: dict[str, Any] | None = None) -> bytes:
     if headers is None:
         headers = {"alg": "RS256", "kid": key.as_dict()["kid"]}
-    return jwt.encode(headers, claims, key)  # type: ignore[no-any-return]
+    return jwt.encode(headers, claims, key)
 
 
-def test_manager_enforces_strict_issuer(key_pair: Any, jwks: Dict[str, Any]) -> None:
+def test_manager_enforces_strict_issuer(key_pair: Any, jwks: dict[str, Any]) -> None:
     """
     Verify that IdentityManager, when initialized, actually enforces issuer validation
     by performing a real validation (no mock TokenValidator).

@@ -39,15 +39,18 @@ The project is managed via Poetry. Do not use pip directly unless inside a Docke
 
 ### **Code Style & Quality**
 
-This project uses **Ruff** for Python linting/formatting, **Mypy** for typing, and **Hadolint** for Dockerfiles.
+This project uses **Ruff** for Python linting/formatting, **Mypy** for typing, and **Hadolint** for Dockerfiles. It adheres to strict modernization standards (see `docs/design/007_modernization_and_strictness.md`).
 
-* **Formatting:** Do not manually format. Run poetry run ruff format .
-* **Linting:** Fix violations automatically where possible: poetry run ruff check --fix .
+* **Formatting:** Do not manually format. Run `poetry run ruff format .`
+* **Linting:**
+  * Uses strict rules (UP, SIM, RUF, ARG, C4, PT, etc.).
+  * Fix violations automatically where possible: `poetry run ruff check --fix .`
 * **Docker Linting:** Checked via pre-commit (hadolint).
 * **Typing:**
-  * Strict static typing is encouraged.
-  * Run checks with: poetry run mypy .
-  * Avoid Any wherever possible.
+  * **Strict Mode:** Mypy `strict = true` is enforced.
+  * **No Implicit Ignores:** `ignore_missing_imports = false`. If a dependency lacks types, install the stub package (e.g., `types-authlib`).
+  * Run checks with: `poetry run mypy .`
+  * Avoid `Any` wherever possible.
 * **Logging:** Use the project's centralized logging configuration.
   * *Good:* from src.utils.logger import logger -> logger.info("...")
 * **Licensing:** Every .py file must start with the standard license header.

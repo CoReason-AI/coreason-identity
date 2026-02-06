@@ -12,10 +12,12 @@
 Complex workflow simulations for the Identity Passport.
 """
 
-from typing import Any, Generator
+from collections.abc import Generator
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
+
 from coreason_identity.config import CoreasonIdentityConfig
 from coreason_identity.manager import IdentityManager
 from coreason_identity.models import UserContext
@@ -110,7 +112,6 @@ def test_legacy_migration_flow(identity_manager: IdentityManager) -> None:
     # We want to test the MAPPER logic here too, ideally.
     # But since we mocked the mapper class, we have to mock the return.
     # To test integration, we should probably NOT mock the mapper class, only Validator/Provider.
-    pass
 
 
 # Redefine fixture to use REAL IdentityMapper for better integration tests

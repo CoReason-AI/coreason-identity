@@ -9,11 +9,13 @@
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
 import hashlib
-from typing import Any, Generator, List, cast
+from collections.abc import Generator
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from authlib.jose.errors import InvalidClaimError
+
 from coreason_identity.config import CoreasonIdentityConfig
 from coreason_identity.exceptions import (
     CoreasonIdentityError,
@@ -46,7 +48,7 @@ def identity_manager(mock_config: CoreasonIdentityConfig) -> Generator[IdentityM
 
 
 @pytest.fixture
-def log_capture() -> Generator[List[str], None, None]:
+def log_capture() -> Generator[list[str], None, None]:
     """Fixture to capture loguru logs."""
     logs = []
     # Add a sink that appends the formatted message to the list
@@ -65,7 +67,7 @@ def test_audience_mismatch_rejection(identity_manager: IdentityManager) -> None:
 
     # Configure the mock validator to raise InvalidAudienceError
     # Access via _async since IdentityManager is facade
-    mock_validator = cast(MagicMock, identity_manager._async.validator)
+    mock_validator = cast("MagicMock", identity_manager._async.validator)
     # validate_token is async
     mock_validator.validate_token = AsyncMock(side_effect=InvalidAudienceError("Invalid audience"))
 
@@ -102,7 +104,7 @@ async def test_audience_mismatch_real_validator_behavior() -> None:
 
 
 @pytest.mark.asyncio
-async def test_pii_redaction_in_logs(log_capture: List[str]) -> None:
+async def test_pii_redaction_in_logs(log_capture: list[str]) -> None:
     """
     Security Verification:
     Verify that PII (User ID) is never logged in plaintext.
@@ -187,7 +189,7 @@ class TestSecurityEdgeCases:
         # Let's check IdentityManager.validate_token implementation:
         # token = auth_header[7:] -> ""
         # Mock validator behaviour for empty string:
-        mock_validator = cast(MagicMock, identity_manager._async.validator)
+        mock_validator = cast("MagicMock", identity_manager._async.validator)
         mock_validator.validate_token = AsyncMock(side_effect=InvalidTokenError("Empty token"))
 
         with pytest.raises(InvalidTokenError):
@@ -205,14 +207,14 @@ class TestSecurityEdgeCases:
         """
         Resilience Edge Case: Verify behavior when JWKS cannot be fetched (e.g., IdP down).
         """
-        mock_validator = cast(MagicMock, identity_manager._async.validator)
+        mock_validator = cast("MagicMock", identity_manager._async.validator)
         mock_validator.validate_token = AsyncMock(side_effect=CoreasonIdentityError("Failed to fetch JWKS"))
 
         with pytest.raises(CoreasonIdentityError, match="Failed to fetch JWKS"):
             identity_manager.validate_token("Bearer token")
 
     @pytest.mark.asyncio
-    async def test_unicode_pii_logging(self, log_capture: List[str]) -> None:
+    async def test_unicode_pii_logging(self, log_capture: list[str]) -> None:
         """
         Logging Edge Case: Verify that Unicode characters in PII are handled and hashed correctly.
         """

@@ -8,15 +8,16 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
-from typing import Any, Optional
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
+from httpx import Request, Response
+
 from coreason_identity.device_flow_client import DeviceFlowClient
 from coreason_identity.exceptions import CoreasonIdentityError
 from coreason_identity.models import DeviceFlowResponse
-from httpx import Request, Response
 
 
 @pytest.fixture
@@ -29,7 +30,7 @@ def client(mock_client: AsyncMock) -> DeviceFlowClient:
     return DeviceFlowClient(client_id="test-client", idp_url="https://test.auth0.com", client=mock_client)
 
 
-def create_response(status_code: int, json_data: Optional[Any] = None, content: Optional[bytes] = None) -> Response:
+def create_response(status_code: int, json_data: Any | None = None, content: bytes | None = None) -> Response:
     request = Request("GET", "https://example.com")
     if json_data is not None:
         return Response(status_code, json=json_data, request=request)
@@ -105,9 +106,11 @@ async def test_poll_token_malformed_success(client: DeviceFlowClient, mock_clien
         device_code="dc", user_code="uc", verification_uri="url", expires_in=10, interval=1
     )
 
-    with pytest.raises(CoreasonIdentityError, match="Received invalid token response structure"):
-        with patch("anyio.sleep", new_callable=AsyncMock):
-            await client.poll_token(device_resp)
+    with (
+        pytest.raises(CoreasonIdentityError, match="Received invalid token response structure"),
+        patch("anyio.sleep", new_callable=AsyncMock),
+    ):
+        await client.poll_token(device_resp)
 
 
 @pytest.mark.asyncio
@@ -123,9 +126,11 @@ async def test_poll_token_legacy_error_in_200(client: DeviceFlowClient, mock_cli
     )
 
     # Should raise ValidationError because access_token is missing, caught and re-raised as CoreasonIdentityError
-    with pytest.raises(CoreasonIdentityError, match="Received invalid token response structure"):
-        with patch("anyio.sleep", new_callable=AsyncMock):
-            await client.poll_token(device_resp)
+    with (
+        pytest.raises(CoreasonIdentityError, match="Received invalid token response structure"),
+        patch("anyio.sleep", new_callable=AsyncMock),
+    ):
+        await client.poll_token(device_resp)
 
 
 @pytest.mark.asyncio
