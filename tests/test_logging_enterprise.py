@@ -11,7 +11,6 @@
 import json
 import logging
 import os
-from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -182,5 +181,3 @@ def test_success_log_level_fallback() -> None:
         # So logging.getLevelName("SUCCESS") returns string "Level SUCCESS" (or similar)
         # So it falls to else block -> logging.INFO
         assert logging.getLogger().level == logging.INFO
-
-

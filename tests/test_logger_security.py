@@ -1,11 +1,15 @@
 import shutil
 import sys
+from collections.abc import Generator
 from pathlib import Path
+
 import pytest
-from coreason_identity.utils.logger import logger, configure_logging
+
+from coreason_identity.utils.logger import configure_logging, logger
+
 
 @pytest.fixture(autouse=True)
-def cleanup_logs():
+def cleanup_logs() -> Generator[None, None, None]:
     """Ensure logs directory is clean before and after tests."""
     log_path = Path("logs")
     if log_path.exists():
@@ -14,7 +18,8 @@ def cleanup_logs():
     if log_path.exists():
         shutil.rmtree(log_path)
 
-def test_no_file_creation():
+
+def test_no_file_creation() -> None:
     """
     Test Case 1: Verify that logging does not create a file on disk.
     Finding #7 Mitigation.
@@ -33,7 +38,8 @@ def test_no_file_creation():
 
     assert not log_file.exists(), "logs/app.log should not be created"
 
-def test_stderr_output(capsys):
+
+def test_stderr_output(capsys: pytest.CaptureFixture[str]) -> None:
     """
     Test Case 2: Verify that logging outputs to stderr.
     Finding #7 Mitigation.
