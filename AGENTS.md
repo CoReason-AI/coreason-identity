@@ -96,8 +96,8 @@ This project enforces a centralized logging architecture using the `loguru` libr
 
 *   **Standard:** `loguru` is the exclusive logging library. Do not use the built-in `logging` module or `print` statements.
 *   **Outputs (Sinks):**
-    *   **Console:** `stderr` (Human-readable text).
-    *   **File:** `logs/app.log` (JSON-formatted, rotated every 500 MB or 1 day, retained for 10 days).
+    *   **Console:** `stderr` (Human-readable text) or `stdout` (JSON-formatted if `COREASON_LOG_JSON=true`).
+    *   **File:** Disabled by default to prevent disk exhaustion (Finding #7).
 *   **Usage Example:**
 
     ```python
