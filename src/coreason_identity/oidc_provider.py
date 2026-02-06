@@ -17,8 +17,10 @@ from typing import Any
 
 import anyio
 import httpx
+from pydantic import ValidationError
 
 from coreason_identity.exceptions import CoreasonIdentityError
+from coreason_identity.models_internal import OIDCConfig
 from coreason_identity.utils.logger import logger
 
 
@@ -52,16 +54,17 @@ class OIDCProvider:
         self.cache_ttl = cache_ttl
         self.refresh_cooldown = refresh_cooldown
         self._jwks_cache: dict[str, Any] | None = None
-        self._oidc_config_cache: dict[str, Any] | None = None
+        self._oidc_config_cache: OIDCConfig | None = None
         self._last_update: float = 0.0
         self._lock: anyio.Lock | None = None
 
-    async def _fetch_oidc_config(self) -> dict[str, Any]:
+    async def _fetch_oidc_config(self) -> OIDCConfig:
         """
         Fetches the OIDC configuration to find the jwks_uri.
+        Uses manual HTTP (Authlib AsyncOAuth2Client has limited metadata support) but strict Pydantic validation.
 
         Returns:
-            The OIDC configuration dictionary.
+            The OIDC configuration object.
 
         Raises:
             CoreasonIdentityError: If the request fails or returns invalid data.
@@ -69,9 +72,11 @@ class OIDCProvider:
         try:
             response = await self.client.get(self.discovery_url)
             response.raise_for_status()
-            return response.json()  # type: ignore[no-any-return]
+            return OIDCConfig(**response.json())
         except httpx.HTTPError as e:
             raise CoreasonIdentityError(f"Failed to fetch OIDC configuration from {self.discovery_url}: {e}") from e
+        except ValidationError as e:
+            raise CoreasonIdentityError(f"Invalid OIDC configuration from {self.discovery_url}: {e}") from e
 
     async def _fetch_jwks(self, jwks_uri: str) -> dict[str, Any]:
         """
@@ -117,9 +122,7 @@ class OIDCProvider:
 
         # Fetch fresh keys
         oidc_config = await self._fetch_oidc_config()
-        jwks_uri = oidc_config.get("jwks_uri")
-        if not jwks_uri:
-            raise CoreasonIdentityError("OIDC configuration does not contain 'jwks_uri'")
+        jwks_uri = oidc_config.jwks_uri
 
         jwks = await self._fetch_jwks(jwks_uri)
 
@@ -185,8 +188,4 @@ class OIDCProvider:
             # Should be unreachable if get_jwks succeeds
             raise CoreasonIdentityError("Failed to load OIDC configuration")
 
-        issuer = self._oidc_config_cache.get("issuer")
-        if not issuer:
-            raise CoreasonIdentityError("OIDC configuration does not contain 'issuer'")
-
-        return str(issuer)
+        return self._oidc_config_cache.issuer

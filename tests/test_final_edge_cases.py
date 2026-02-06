@@ -48,18 +48,15 @@ class TestIdentityManagerEdgeCases:
         ):
             manager = IdentityManager(config)
 
-            # Mock validator to raise error on empty string (simulating underlying lib)
-            # Access underlying async validator via _async
-            # But facade validate_token calls anyio.run(_async.validate_token)
+            # Mock validator just in case, but it shouldn't be reached
+            manager._async.validator.validate_token = AsyncMock()  # type: ignore[method-assign]
 
-            # We can mock the validator in _async
-            manager._async.validator.validate_token = AsyncMock(side_effect=InvalidTokenError("Empty token"))  # type: ignore[method-assign]
-
-            with pytest.raises(InvalidTokenError):
+            # Now IdentityManager rejects "Bearer " strictly via regex
+            with pytest.raises(InvalidTokenError, match="Invalid Authorization header format"):
                 manager.validate_token("Bearer ")
 
-            # Ensure validator was called with empty string
-            manager._async.validator.validate_token.assert_called_with("")
+            # Ensure validator was NOT called
+            manager._async.validator.validate_token.assert_not_called()
 
 
 class TestTokenValidatorTimeClaims:
