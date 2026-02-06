@@ -15,12 +15,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from authlib.jose.errors import BadSignatureError
-from coreason_identity.oidc_provider import OIDCProvider
-from coreason_identity.utils.logger import logger
-from coreason_identity.validator import TokenValidator
 from opentelemetry.sdk.trace import Tracer, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+
+from coreason_identity.oidc_provider import OIDCProvider
+from coreason_identity.utils.logger import logger
+from coreason_identity.validator import TokenValidator
 
 
 class MockClaims(dict[str, Any]):
@@ -28,7 +29,7 @@ class MockClaims(dict[str, Any]):
         pass
 
 
-@pytest.fixture()
+@pytest.fixture
 def telemetry_setup() -> tuple[InMemorySpanExporter, Tracer]:
     exporter = InMemorySpanExporter()
     provider = TracerProvider()
@@ -38,7 +39,7 @@ def telemetry_setup() -> tuple[InMemorySpanExporter, Tracer]:
     return exporter, tracer  # type: ignore[return-value]
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_oidc_provider() -> MagicMock:
     provider = MagicMock(spec=OIDCProvider)
     jwks = {"keys": [{"kty": "RSA", "kid": "123", "n": "abc", "e": "AQAB"}]}
@@ -46,7 +47,7 @@ def mock_oidc_provider() -> MagicMock:
     return provider
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_telemetry_context_propagation(
     telemetry_setup: tuple[InMemorySpanExporter, Tracer],
     mock_oidc_provider: MagicMock,
@@ -75,7 +76,7 @@ async def test_telemetry_context_propagation(
     assert child_span.parent.trace_id == parent_context.trace_id
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_telemetry_jwks_refresh_event(
     telemetry_setup: tuple[InMemorySpanExporter, Tracer],
     mock_oidc_provider: MagicMock,
@@ -105,7 +106,7 @@ async def test_telemetry_jwks_refresh_event(
     mock_oidc_provider.get_jwks.assert_called_with(force_refresh=True)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_telemetry_unicode_user_id(
     telemetry_setup: tuple[InMemorySpanExporter, Tracer],
     mock_oidc_provider: MagicMock,
@@ -140,7 +141,7 @@ async def test_telemetry_unicode_user_id(
     assert any(f"Token validated for user {expected_hash}" in record.record["message"] for record in logs)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_telemetry_noop_tracer_safety(mock_oidc_provider: MagicMock) -> None:
     """Verifies that the code runs safely with a ProxyTracer (No-Op)."""
     # Simply use trace.get_tracer without setting a provider, it returns a ProxyTracer/NoOp

@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
 import pytest
+
 from coreason_identity.config import CoreasonIdentityConfig
 from coreason_identity.manager import IdentityManager, IdentityManagerAsync
 from coreason_identity.models import DeviceFlowResponse, TokenResponse, UserContext
@@ -64,7 +65,7 @@ def test_sync_facade_methods() -> None:
         mock_instance.await_device_token.assert_called_with(flow_input)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_async_manager_internal_client_cleanup() -> None:
     """Test that IdentityManagerAsync closes the internal client on exit."""
     config = CoreasonIdentityConfig(domain="test.auth0.com", audience="aud", client_id="cid")
@@ -81,7 +82,7 @@ async def test_async_manager_internal_client_cleanup() -> None:
         mock_client_instance.aclose.assert_awaited_once()
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_async_manager_external_client_no_cleanup() -> None:
     """Test that IdentityManagerAsync does NOT close an external client on exit."""
     config = CoreasonIdentityConfig(domain="test.auth0.com", audience="aud", client_id="cid")

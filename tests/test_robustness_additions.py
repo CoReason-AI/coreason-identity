@@ -17,11 +17,12 @@ from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
+from httpx import Request, Response
+
 from coreason_identity.device_flow_client import DeviceFlowClient
 from coreason_identity.exceptions import CoreasonIdentityError, InvalidTokenError
 from coreason_identity.identity_mapper import IdentityMapper
 from coreason_identity.models import DeviceFlowResponse
-from httpx import Request, Response
 
 
 # Helper for httpx mocks
@@ -101,15 +102,15 @@ class TestIdentityMapperRobustness:
 
 
 class TestDeviceFlowClientRobustness:
-    @pytest.fixture()
+    @pytest.fixture
     def mock_client(self) -> AsyncMock:
         return AsyncMock(spec=httpx.AsyncClient)
 
-    @pytest.fixture()
+    @pytest.fixture
     def client(self, mock_client: AsyncMock) -> DeviceFlowClient:
         return DeviceFlowClient("client-id", "https://idp.com", client=mock_client)
 
-    @pytest.mark.asyncio()
+    @pytest.mark.asyncio
     async def test_initiate_flow_timeout(self, client: DeviceFlowClient, mock_client: AsyncMock) -> None:
         """
         Verify that a network timeout during initiation is caught and raised as CoreasonIdentityError.
@@ -125,7 +126,7 @@ class TestDeviceFlowClientRobustness:
         with pytest.raises(CoreasonIdentityError, match="Failed to initiate device flow"):
             await client.initiate_flow()
 
-    @pytest.mark.asyncio()
+    @pytest.mark.asyncio
     async def test_poll_token_expired_response_structure(
         self, client: DeviceFlowClient, mock_client: AsyncMock
     ) -> None:

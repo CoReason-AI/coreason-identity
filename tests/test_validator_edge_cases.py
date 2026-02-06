@@ -13,27 +13,28 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 from authlib.jose import JsonWebKey, jwt
+
 from coreason_identity.exceptions import CoreasonIdentityError
 from coreason_identity.oidc_provider import OIDCProvider
 from coreason_identity.validator import TokenValidator
 
 
 class TestTokenValidatorEdgeCases:
-    @pytest.fixture()
+    @pytest.fixture
     def mock_oidc_provider(self) -> Mock:
         provider = Mock(spec=OIDCProvider)
         provider.get_jwks = AsyncMock()
         return provider
 
-    @pytest.fixture()
+    @pytest.fixture
     def key_pair(self) -> Any:
         return JsonWebKey.generate_key("RSA", 2048, is_private=True)
 
-    @pytest.fixture()
+    @pytest.fixture
     def jwks(self, key_pair: Any) -> dict[str, Any]:
         return {"keys": [key_pair.as_dict(private=False)]}
 
-    @pytest.fixture()
+    @pytest.fixture
     def validator(self, mock_oidc_provider: Mock) -> TokenValidator:
         # Strict issuer validation
         return TokenValidator(
@@ -52,7 +53,7 @@ class TestTokenValidatorEdgeCases:
             headers = {"alg": "RS256", "kid": key.as_dict()["kid"]}
         return jwt.encode(headers, claims, key).decode("utf-8")
 
-    @pytest.mark.asyncio()
+    @pytest.mark.asyncio
     async def test_malformed_token_structure(self, validator: TokenValidator) -> None:
         """Test that a completely malformed token string raises CoreasonIdentityError."""
         # Not a JWT (no dots)
@@ -63,13 +64,13 @@ class TestTokenValidatorEdgeCases:
         with pytest.raises(CoreasonIdentityError, match="Token validation failed"):
             await validator.validate_token("header.payload")
 
-    @pytest.mark.asyncio()
+    @pytest.mark.asyncio
     async def test_invalid_base64(self, validator: TokenValidator) -> None:
         """Test token with invalid base64 characters."""
         with pytest.raises(CoreasonIdentityError, match="Token validation failed"):
             await validator.validate_token("header.payload.signature!")
 
-    @pytest.mark.asyncio()
+    @pytest.mark.asyncio
     async def test_issuer_mismatch(
         self,
         validator: TokenValidator,
@@ -91,7 +92,7 @@ class TestTokenValidatorEdgeCases:
         with pytest.raises(CoreasonIdentityError, match="Invalid claim"):
             await validator.validate_token(token)
 
-    @pytest.mark.asyncio()
+    @pytest.mark.asyncio
     async def test_issuer_missing_in_token(
         self,
         validator: TokenValidator,
