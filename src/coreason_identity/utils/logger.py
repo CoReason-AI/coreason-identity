@@ -8,11 +8,9 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
-import contextlib
 import logging
 import os
 import sys
-from pathlib import Path
 from typing import Any
 
 from loguru import logger
@@ -80,12 +78,6 @@ def configure_logging() -> None:
     # and sets the patcher in one go.
     logger.configure(handlers=[], patcher=trace_id_injector)
 
-    # Ensure logs directory exists and add file sink
-    with contextlib.suppress(PermissionError, OSError):
-        log_path = Path("logs")
-        if not log_path.exists():
-            log_path.mkdir(parents=True, exist_ok=True)  # pragma: no cover
-
     # Sink 1: Console (Stdout/Stderr)
     if log_json:
         # JSON logs to stdout are preferred for containerized environments
@@ -108,18 +100,6 @@ def configure_logging() -> None:
             sys.stderr,
             level=log_level,
             format=format_str,
-        )
-
-    # Sink 2: File (JSON, Rotation, Retention)
-    # Always JSON for file to allow structured analysis later
-    with contextlib.suppress(PermissionError, OSError):
-        logger.add(
-            "logs/app.log",
-            rotation="500 MB",
-            retention="10 days",
-            serialize=True,
-            enqueue=True,
-            level=log_level,
         )
 
     # Intercept standard logging
