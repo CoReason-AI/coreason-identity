@@ -8,21 +8,22 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
-import anyio
-import pytest
 from unittest.mock import AsyncMock, Mock
+
+import anyio
 import httpx
+import pytest
+
 from coreason_identity.oidc_provider import OIDCProvider
+
 
 @pytest.fixture
 def mock_client() -> AsyncMock:
     client = AsyncMock(spec=httpx.AsyncClient)
     # Setup default response for get_jwks to avoid actual network calls or crashes
-    client.get.return_value = Mock(
-        status_code=200,
-        json=lambda: {"jwks_uri": "https://idp/jwks", "keys": []}
-    )
+    client.get.return_value = Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks", "keys": []})
     return client
+
 
 def test_sync_init_async_run(mock_client: AsyncMock) -> None:
     # 1. Instantiate in Sync Context
