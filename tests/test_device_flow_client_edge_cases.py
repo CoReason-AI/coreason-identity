@@ -52,6 +52,8 @@ async def test_initiate_flow_returns_invalid_json(client: DeviceFlowClient, mock
         json={
             "device_authorization_endpoint": "https://idp/device",
             "token_endpoint": "https://idp/token",
+            "issuer": "https://idp",
+            "jwks_uri": "https://idp/jwks",
         },
         request=Request("GET", "url"),
     )

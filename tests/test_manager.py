@@ -78,10 +78,10 @@ def test_validate_token_success(manager: IdentityManager) -> None:
 
 
 def test_validate_token_invalid_header_format(manager: IdentityManager) -> None:
-    with pytest.raises(InvalidTokenError, match="Missing or invalid Authorization header"):
+    with pytest.raises(InvalidTokenError, match="Invalid Authorization header format. Must start with 'Bearer '"):
         manager.validate_token("InvalidHeader")
 
-    with pytest.raises(InvalidTokenError, match="Missing or invalid Authorization header"):
+    with pytest.raises(InvalidTokenError, match="Missing Authorization header"):
         manager.validate_token("")
 
 

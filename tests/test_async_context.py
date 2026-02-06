@@ -36,7 +36,7 @@ def test_sync_init_async_run(mock_client: AsyncMock) -> None:
     # 2. Define async function that uses the provider
     async def run_check() -> None:
         mock_client.get.side_effect = [
-            Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks"}),
+            Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks", "issuer": "https://idp"}),
             Mock(status_code=200, json=lambda: {"keys": []}),
         ]
         await provider.get_jwks()
@@ -54,7 +54,7 @@ def test_provider_reuse_across_loops(mock_client: AsyncMock) -> None:
 
     async def run_check() -> None:
         mock_client.get.side_effect = [
-            Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks"}),
+            Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks", "issuer": "https://idp"}),
             Mock(status_code=200, json=lambda: {"keys": []}),
         ]
         await provider.get_jwks(force_refresh=True)
@@ -80,7 +80,7 @@ def test_concurrent_access_in_loop(mock_client: AsyncMock) -> None:
         # We simulate that only one fetch happens (mock side effect has finite items)
         # If lock fails, we might get errors or extra calls.
         mock_client.get.side_effect = [
-            Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks"}),
+            Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks", "issuer": "https://idp"}),
             Mock(status_code=200, json=lambda: {"keys": ["key1"]}),
         ]
         # Any subsequent calls would fail StopIteration if called, or return default
@@ -127,7 +127,7 @@ def test_lock_recreation_on_loop_error(mock_client: AsyncMock) -> None:
         # We expect it to catch the error, create a NEW lock (real anyio.Lock), and succeed.
         # We need mock_client to respond
         mock_client.get.side_effect = [
-            Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks"}),
+            Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks", "issuer": "https://idp"}),
             Mock(status_code=200, json=lambda: {"keys": ["recovered"]}),
         ]
 

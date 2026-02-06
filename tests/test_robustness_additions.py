@@ -117,7 +117,12 @@ class TestDeviceFlowClientRobustness:
         """
         # Discovery succeeds
         mock_client.get.return_value = create_response(
-            200, {"device_authorization_endpoint": "https://idp.com/device", "token_endpoint": "https://idp.com/token"}
+            200, {
+                "device_authorization_endpoint": "https://idp.com/device",
+                "token_endpoint": "https://idp.com/token",
+                "issuer": "https://idp",
+                "jwks_uri": "https://idp/jwks",
+            }
         )
 
         # Post fails with ReadTimeout (must be httpx error)
@@ -133,7 +138,13 @@ class TestDeviceFlowClientRobustness:
         """
         Verify handling of 'expired_token' error response.
         """
-        mock_client.get.return_value = create_response(200, {"token_endpoint": "url"})
+        mock_client.get.return_value = create_response(
+            200, {
+                "token_endpoint": "url",
+                "issuer": "https://idp",
+                "jwks_uri": "https://idp/jwks",
+            }
+        )
 
         # Return expired_token error
         mock_client.post.return_value = create_response(400, {"error": "expired_token"})

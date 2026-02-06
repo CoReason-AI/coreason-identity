@@ -180,22 +180,16 @@ class TestSecurityEdgeCases:
         AuthN Edge Case: Verify rejection of invalid Authorization header formats.
         """
         # 1. Missing header (empty string passed to manager)
-        with pytest.raises(InvalidTokenError, match="Missing or invalid Authorization header"):
+        with pytest.raises(InvalidTokenError, match="Missing Authorization header"):
             identity_manager.validate_token("")
 
         # 2. "Bearer" only (no token)
-        with pytest.raises(InvalidTokenError):
+        with pytest.raises(InvalidTokenError, match="Invalid Authorization header format"):
             identity_manager.validate_token("Bearer")
 
-        # 3. "Bearer " only (empty token) -> Validator should fail or Manager should strip
-        # Manager strips "Bearer " -> results in empty string. Validator might fail on empty.
-        # Let's check IdentityManager.validate_token implementation:
-        # token = auth_header[7:] -> ""
-        # Mock validator behaviour for empty string:
-        mock_validator = cast("MagicMock", identity_manager._async.validator)
-        mock_validator.validate_token = AsyncMock(side_effect=InvalidTokenError("Empty token"))
-
-        with pytest.raises(InvalidTokenError):
+        # 3. "Bearer " only (empty token)
+        # Now rejected by Manager regex
+        with pytest.raises(InvalidTokenError, match="Invalid Authorization header format"):
             identity_manager.validate_token("Bearer ")
 
         # 4. Wrong scheme "Basic"
