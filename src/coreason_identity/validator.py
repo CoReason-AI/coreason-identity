@@ -124,7 +124,26 @@ class TokenValidator:
                         "iss": {"essential": True, "value": iss},
                     }
 
-                claims_options = get_claims_options(self.issuer)
+                # Ensure issuer is not None before passing to get_claims_options
+                # self.issuer should be populated if initialized correctly,
+                # otherwise we fetch it or raise.
+                # However, type hint says str | None.
+                # If dynamic discovery is disabled (implicit in current design), issuer MUST be present.
+                # We can fallback to fetching if None, or assume it's set if we are enforcing it.
+                # Given previous context, we might want to fetch it if missing.
+                # But Config validator sets default.
+                # So we can assert or handle it.
+                # Let's use the fetched/configured issuer.
+
+                # For MyPy, we need to ensure it's not None.
+                # If we are here, we might have skipped dynamic fetch if self.issuer was set.
+                # If self.issuer is None, we need to handle it.
+
+                final_issuer = self.issuer
+                if not final_issuer:
+                     final_issuer = await self.oidc_provider.get_issuer()
+
+                claims_options = get_claims_options(final_issuer)
 
                 def _decode(jwks_data: dict[str, Any], opts: dict[str, Any]) -> Any:
                     claims = self.jwt.decode(token, jwks_data, claims_options=opts)  # type: ignore[call-overload]
