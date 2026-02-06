@@ -9,6 +9,7 @@
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
 import hashlib
+import hmac
 from collections.abc import Generator
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -89,7 +90,7 @@ async def test_audience_mismatch_real_validator_behavior() -> None:
     mock_oidc = MagicMock()
     mock_oidc.get_jwks = AsyncMock(return_value={"keys": []})
     mock_oidc.get_issuer = AsyncMock(return_value="https://issuer.com")
-    validator = TokenValidator(mock_oidc, audience="expected-audience")
+    validator = TokenValidator(mock_oidc, audience="expected-audience", issuer="https://issuer.com")
 
     # Mock the internal jwt.decode to raise InvalidClaimError for 'aud'
     with patch.object(validator.jwt, "decode") as mock_decode:
@@ -116,7 +117,9 @@ async def test_pii_redaction_in_logs(log_capture: list[str]) -> None:
     token_string = "sensitive.jwt.token.string"
 
     # Compute expected hash
-    expected_hash = hashlib.sha256(sensitive_user_id.encode("utf-8")).hexdigest()
+    expected_hash = hmac.new(
+        b"coreason-unsafe-default-salt", sensitive_user_id.encode("utf-8"), hashlib.sha256
+    ).hexdigest()
 
     # Mock validation success on the identity manager itself won't trigger the logging code
     # inside Validator. We need to construct a real Validator or use the one we construct below.
@@ -128,7 +131,7 @@ async def test_pii_redaction_in_logs(log_capture: list[str]) -> None:
     mock_oidc.get_jwks = AsyncMock(return_value={"keys": []})
     mock_oidc.get_issuer = AsyncMock(return_value="https://issuer.com")
 
-    validator = TokenValidator(mock_oidc, audience="aud")
+    validator = TokenValidator(mock_oidc, audience="aud", issuer="https://issuer.com")
 
     # Mock jwt.decode to return our claims without error
     with patch.object(validator.jwt, "decode") as mock_decode:
@@ -177,22 +180,16 @@ class TestSecurityEdgeCases:
         AuthN Edge Case: Verify rejection of invalid Authorization header formats.
         """
         # 1. Missing header (empty string passed to manager)
-        with pytest.raises(InvalidTokenError, match="Missing or invalid Authorization header"):
+        with pytest.raises(InvalidTokenError, match="Missing Authorization header"):
             identity_manager.validate_token("")
 
         # 2. "Bearer" only (no token)
-        with pytest.raises(InvalidTokenError):
+        with pytest.raises(InvalidTokenError, match="Invalid Authorization header format"):
             identity_manager.validate_token("Bearer")
 
-        # 3. "Bearer " only (empty token) -> Validator should fail or Manager should strip
-        # Manager strips "Bearer " -> results in empty string. Validator might fail on empty.
-        # Let's check IdentityManager.validate_token implementation:
-        # token = auth_header[7:] -> ""
-        # Mock validator behaviour for empty string:
-        mock_validator = cast("MagicMock", identity_manager._async.validator)
-        mock_validator.validate_token = AsyncMock(side_effect=InvalidTokenError("Empty token"))
-
-        with pytest.raises(InvalidTokenError):
+        # 3. "Bearer " only (empty token)
+        # Now rejected by Manager regex
+        with pytest.raises(InvalidTokenError, match="Invalid Authorization header format"):
             identity_manager.validate_token("Bearer ")
 
         # 4. Wrong scheme "Basic"
@@ -219,7 +216,9 @@ class TestSecurityEdgeCases:
         Logging Edge Case: Verify that Unicode characters in PII are handled and hashed correctly.
         """
         unicode_user_id = "user_🚀_ñ_123"
-        expected_hash = hashlib.sha256(unicode_user_id.encode("utf-8")).hexdigest()
+        expected_hash = hmac.new(
+            b"coreason-unsafe-default-salt", unicode_user_id.encode("utf-8"), hashlib.sha256
+        ).hexdigest()
         token_string = "unicode.jwt.token"
 
         from coreason_identity.oidc_provider import OIDCProvider
@@ -229,7 +228,7 @@ class TestSecurityEdgeCases:
         mock_oidc.get_jwks = AsyncMock(return_value={"keys": []})
         mock_oidc.get_issuer = AsyncMock(return_value="https://issuer.com")
 
-        validator = TokenValidator(mock_oidc, audience="aud")
+        validator = TokenValidator(mock_oidc, audience="aud", issuer="https://issuer.com")
 
         with patch.object(validator.jwt, "decode") as mock_decode:
             mock_claims_dict = {"sub": unicode_user_id, "aud": "aud", "exp": 1234567890}

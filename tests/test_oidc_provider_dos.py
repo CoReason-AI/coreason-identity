@@ -40,7 +40,7 @@ async def test_lazy_lock_initialization(mock_client: AsyncMock) -> None:
 
     # Mock responses to avoid actual network calls
     mock_client.get.side_effect = [
-        Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks"}),
+        Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks", "issuer": "https://idp"}),
         Mock(status_code=200, json=lambda: {"keys": []}),
     ]
 
@@ -59,7 +59,7 @@ def test_provider_sync_init_async_run(mock_client: AsyncMock) -> None:
 
     # Mock responses
     mock_client.get.side_effect = [
-        Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks"}),
+        Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks", "issuer": "https://idp"}),
         Mock(status_code=200, json=lambda: {"keys": []}),
     ]
 
@@ -78,7 +78,7 @@ async def test_dos_protection_cooldown(provider: OIDCProvider, mock_client: Asyn
     """
     # 1. Initial Fetch (Startup)
     mock_client.get.side_effect = [
-        Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks"}),
+        Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks", "issuer": "https://idp"}),
         Mock(status_code=200, json=lambda: {"keys": ["v1"]}),
     ]
 
@@ -102,7 +102,7 @@ async def test_dos_protection_cooldown(provider: OIDCProvider, mock_client: Asyn
 
     # Setup mock for next fetch
     mock_client.get.side_effect = [
-        Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks"}),
+        Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks", "issuer": "https://idp"}),
         Mock(status_code=200, json=lambda: {"keys": ["v2"]}),
     ]
 
@@ -123,7 +123,7 @@ async def test_dos_protection_warning_log(provider: OIDCProvider, mock_client: A
     try:
         # 1. Initial Fetch
         mock_client.get.side_effect = [
-            Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks"}),
+            Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks", "issuer": "https://idp"}),
             Mock(status_code=200, json=lambda: {"keys": ["v1"]}),
         ]
         await provider.get_jwks(force_refresh=True)

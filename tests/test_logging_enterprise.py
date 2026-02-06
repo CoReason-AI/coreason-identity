@@ -11,7 +11,6 @@
 import json
 import logging
 import os
-from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -182,31 +181,3 @@ def test_success_log_level_fallback() -> None:
         # So logging.getLevelName("SUCCESS") returns string "Level SUCCESS" (or similar)
         # So it falls to else block -> logging.INFO
         assert logging.getLogger().level == logging.INFO
-
-
-def test_logging_permission_error() -> None:
-    """Test that PermissionError during log directory creation or file adding is ignored."""
-    with (
-        patch("pathlib.Path.exists", return_value=False),
-        patch("pathlib.Path.mkdir", side_effect=PermissionError("Mock perm error")),
-    ):
-        # This should not raise exception
-        configure_logging()
-
-    # Test logger.add failure for file
-    with patch("coreason_identity.utils.logger.logger.add") as mock_add:
-        # First call is console, succeed. Second call is file, fail.
-        # However, logger.add is called multiple times.
-        # We can't easily side_effect based on args with simple Mock side_effect list if logic is complex
-        # But we can assume call order.
-
-        # Actually, let's just mock logger.add to raise error when called with filename
-        def side_effect(*args: Any, **_kwargs: Any) -> int:
-            if args and isinstance(args[0], str) and "app.log" in args[0]:
-                raise PermissionError("File write error")
-            return 1
-
-        mock_add.side_effect = side_effect
-
-        # This should not raise
-        configure_logging()

@@ -76,11 +76,11 @@ def test_validate_token_header_edge_cases(manager: IdentityManager) -> None:
     """Test strict header parsing."""
 
     # Case sensitive "Bearer"
-    with pytest.raises(InvalidTokenError, match="Missing or invalid Authorization header"):
+    with pytest.raises(InvalidTokenError, match="Invalid Authorization header format"):
         manager.validate_token("bearer token")
 
     # Missing token part
-    manager._async.validator.validate_token = AsyncMock(side_effect=InvalidTokenError("Empty token"))  # type: ignore
+    manager._async.validator.validate_token = AsyncMock()  # type: ignore
     with pytest.raises(InvalidTokenError):
         manager.validate_token("Bearer ")
 
@@ -133,18 +133,18 @@ def test_manager_malformed_bearer_headers(manager: IdentityManager) -> None:
     manager._async.validator = Mock()
 
     # Case 1: No space
-    with pytest.raises(InvalidTokenError, match="Missing or invalid Authorization header"):
+    with pytest.raises(InvalidTokenError, match="Invalid Authorization header format"):
         manager.validate_token("BearerToken")
 
     # Case 2: Lowercase bearer (strict check says 'Bearer ')
-    # The code uses `startswith("Bearer ")`.
-    with pytest.raises(InvalidTokenError, match="Missing or invalid Authorization header"):
+    # The code uses `re.match(r"^Bearer\s+(.+)$", auth_header)`
+    with pytest.raises(InvalidTokenError, match="Invalid Authorization header format"):
         manager.validate_token("bearer token")
 
     # Case 3: Just "Bearer"
-    with pytest.raises(InvalidTokenError, match="Missing or invalid Authorization header"):
+    with pytest.raises(InvalidTokenError, match="Invalid Authorization header format"):
         manager.validate_token("Bearer")
 
     # Case 4: None/Empty (handled by type signature usually, but runtime check exists)
-    with pytest.raises(InvalidTokenError, match="Missing or invalid Authorization header"):
+    with pytest.raises(InvalidTokenError, match="Missing Authorization header"):
         manager.validate_token("")
