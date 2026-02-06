@@ -49,7 +49,7 @@ class TestTokenValidatorComplex:
 
     @pytest.fixture
     def validator(self, mock_oidc_provider: Mock) -> TokenValidator:
-        return TokenValidator(oidc_provider=mock_oidc_provider, audience="my-audience")
+        return TokenValidator(oidc_provider=mock_oidc_provider, audience="my-audience", issuer="https://valid-issuer.com")
 
     def create_token(self, key: Any, claims: dict[str, Any], headers: dict[str, Any] | None = None) -> bytes:
         if headers is None:

@@ -64,7 +64,7 @@ async def test_validate_token_success_telemetry(
 
     # Patch the module-level tracer
     with patch("coreason_identity.validator.tracer", tracer):
-        validator = TokenValidator(mock_oidc_provider, audience)
+        validator = TokenValidator(mock_oidc_provider, audience, issuer="https://test-issuer.com")
 
         # Mock JWT decode to succeed
         claims = MockClaims({"sub": "user123", "aud": audience, "exp": time.time() + 3600})
@@ -93,7 +93,7 @@ async def test_validate_token_failure_telemetry(
     audience = "test-audience"
 
     with patch("coreason_identity.validator.tracer", tracer):
-        validator = TokenValidator(mock_oidc_provider, audience)
+        validator = TokenValidator(mock_oidc_provider, audience, issuer="https://test-issuer.com")
 
         # Mock JWT decode to raise ExpiredTokenError
         with patch("authlib.jose.JsonWebToken.decode") as mock_decode:
@@ -125,7 +125,7 @@ async def test_logging_strictness(mock_oidc_provider: MagicMock) -> None:
     logger.add(logs.append, level="INFO", format="{message}")
 
     audience = "test-audience"
-    validator = TokenValidator(mock_oidc_provider, audience)
+    validator = TokenValidator(mock_oidc_provider, audience, issuer="https://test-issuer.com")
     user_id = "sensitive-user-id"
 
     # Mock JWT decode to succeed
