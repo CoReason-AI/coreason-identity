@@ -1,6 +1,7 @@
-import pytest
 from pydantic import SecretStr
+
 from coreason_identity.models import UserContext
+
 
 def test_user_context_repr_redaction() -> None:
     """
@@ -13,11 +14,7 @@ def test_user_context_repr_redaction() -> None:
         groups=["admin"],
         scopes=["read"],
         downstream_token=SecretStr("secret"),
-        claims={
-            "phone_number": "+1-555-0199",
-            "address": sensitive_value,
-            "other": "data"
-        },
+        claims={"phone_number": "+1-555-0199", "address": sensitive_value, "other": "data"},
     )
 
     repr_str = repr(user)
@@ -41,6 +38,7 @@ def test_user_context_repr_redaction() -> None:
     # Check structure resembles class signature
     assert repr_str.startswith("UserContext(")
     assert repr_str.endswith(")")
+
 
 def test_user_context_data_integrity() -> None:
     """
