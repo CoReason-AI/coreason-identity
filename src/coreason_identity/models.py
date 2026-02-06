@@ -60,6 +60,19 @@ class UserContext(BaseModel):
     )
     claims: dict[str, Any] = Field(default_factory=dict, description="Extended attributes and legacy field mappings.")
 
+    def __repr__(self) -> str:
+        return (
+            f"UserContext(user_id={self.user_id!r}, "
+            f"email={self.email!r}, "
+            f"groups={self.groups!r}, "
+            f"scopes={self.scopes!r}, "
+            f"downstream_token={self.downstream_token!r}, "
+            f"claims='<REDACTED>')"
+        )
+
+    def __str__(self) -> str:
+        return self.__repr__()
+
 
 class DeviceFlowResponse(BaseModel):
     """
