@@ -71,9 +71,7 @@ class OIDCProvider:
             response.raise_for_status()
             return response.json()  # type: ignore[no-any-return]
         except httpx.HTTPError as e:
-            raise CoreasonIdentityError(
-                f"Failed to fetch OIDC configuration from {self.discovery_url}: {e}"
-            ) from e
+            raise CoreasonIdentityError(f"Failed to fetch OIDC configuration from {self.discovery_url}: {e}") from e
 
     async def _fetch_jwks(self, jwks_uri: str) -> dict[str, Any]:
         """
@@ -114,26 +112,17 @@ class OIDCProvider:
         # Double-checked locking pattern optimization
         if not force_refresh:
             current_time = time.time()
-            if (
-                self._jwks_cache is not None
-                and (current_time - self._last_update) < self.cache_ttl
-            ):
+            if self._jwks_cache is not None and (current_time - self._last_update) < self.cache_ttl:
                 return self._jwks_cache
 
         async with self._lock:
             current_time = time.time()
 
             # Check existing cache validity
-            is_cache_valid = (
-                self._jwks_cache is not None
-                and (current_time - self._last_update) < self.cache_ttl
-            )
+            is_cache_valid = self._jwks_cache is not None and (current_time - self._last_update) < self.cache_ttl
 
             # Check DoS protection cooldown
-            is_in_cooldown = (
-                self._jwks_cache is not None
-                and (current_time - self._last_update) < self.refresh_cooldown
-            )
+            is_in_cooldown = self._jwks_cache is not None and (current_time - self._last_update) < self.refresh_cooldown
 
             # 1. Normal cache hit (no force refresh)
             if not force_refresh and is_cache_valid:
@@ -141,9 +130,7 @@ class OIDCProvider:
 
             # 2. DoS Protection: If force_refresh is requested but we are in cooldown, return cached data
             if force_refresh and is_in_cooldown:
-                logger.warning(
-                    "JWKS refresh cooldown active. Returning cached keys despite force_refresh request."
-                )
+                logger.warning("JWKS refresh cooldown active. Returning cached keys despite force_refresh request.")
                 return self._jwks_cache  # type: ignore[return-value]
 
             # Fetch fresh keys

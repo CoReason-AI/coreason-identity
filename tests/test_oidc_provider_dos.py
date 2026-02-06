@@ -9,10 +9,11 @@
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
 import time
-import anyio
-import pytest
-import httpx
 from unittest.mock import AsyncMock, Mock
+
+import anyio
+import httpx
+import pytest
 
 from coreason_identity.oidc_provider import OIDCProvider
 from coreason_identity.utils.logger import logger
