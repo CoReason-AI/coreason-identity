@@ -1,4 +1,5 @@
 from typing import Any
+
 from pydantic import SecretStr
 
 from coreason_identity.models import UserContext
@@ -71,13 +72,7 @@ def test_user_context_repr_redaction_edge_cases() -> None:
     user = UserContext(
         user_id="edge_case_user",
         email="edge@example.com",
-        claims={
-            "empty": "",
-            "none": None,
-            "long": long_string,
-            "unicode": unicode_val,
-            "nested": {"key": "value"}
-        }
+        claims={"empty": "", "none": None, "long": long_string, "unicode": unicode_val, "nested": {"key": "value"}},
     )
 
     repr_str = repr(user)
@@ -97,24 +92,18 @@ def test_user_context_repr_redaction_complex_cases() -> None:
     - Lists of dictionaries
     - Custom objects
     """
+
     class CustomObj:
         def __repr__(self) -> str:
             return "SensitiveCustomObj"
 
     complex_claims: dict[str, Any] = {
-        "user_metadata": {
-            "address": {"street": "123 Main", "zip": "90210"},
-            "preferences": ["email", "sms"]
-        },
+        "user_metadata": {"address": {"street": "123 Main", "zip": "90210"}, "preferences": ["email", "sms"]},
         "history": [{"login_ip": "1.2.3.4"}, {"login_ip": "5.6.7.8"}],
-        "custom": CustomObj()
+        "custom": CustomObj(),
     }
 
-    user = UserContext(
-        user_id="complex_user",
-        email="complex@example.com",
-        claims=complex_claims
-    )
+    user = UserContext(user_id="complex_user", email="complex@example.com", claims=complex_claims)
 
     repr_str = repr(user)
 
