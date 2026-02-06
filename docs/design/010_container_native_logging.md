@@ -43,3 +43,13 @@ The `src/coreason_identity/utils/logger.py` module has been refactored to:
 1.  Remove `logger.add("logs/app.log", ...)`
 2.  Remove `os.makedirs("logs")`
 3.  Retain `logger.add(sys.stderr, ...)` and `logger.add(sys.stdout, ...)` based on `COREASON_LOG_JSON`.
+
+## Testing Strategy
+To ensure the stability and security of the logging configuration, the following test coverage is mandatory:
+
+1.  **Security Verification:** `tests/test_logger_security.py` verifies that no file sinks are created and no `logs/` directory exists.
+2.  **Edge Cases:** `tests/test_logger_complex.py` verifies:
+    -   **JSON Toggling:** Switching `COREASON_LOG_JSON` correctly routes to `stdout` with JSON serialization.
+    -   **Invalid Configuration:** Invalid log levels gracefully default to `INFO`.
+    -   **Reconfiguration:** Repeated calls to `configure_logging()` do not duplicate handlers.
+    -   **Concurrency:** Logging during high-concurrency scenarios does not cause race conditions or crashes.
