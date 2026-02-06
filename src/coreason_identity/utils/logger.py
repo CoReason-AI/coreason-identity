@@ -8,6 +8,7 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
+import contextlib
 import logging
 import os
 import sys
@@ -17,7 +18,7 @@ from typing import Any
 from loguru import logger
 from opentelemetry import trace
 
-__all__ = ["logger", "configure_logging"]
+__all__ = ["configure_logging", "logger"]
 
 
 class InterceptHandler(logging.Handler):
@@ -31,21 +32,17 @@ class InterceptHandler(logging.Handler):
         try:
             level = logger.level(record.levelname).name
         except ValueError:
-            level = record.levelno  # type: ignore[assignment]
+            # If the level name isn't registered in loguru, use the integer value
+            level = record.levelno
 
         # Find caller from where originated the logged message
         frame = logging.currentframe()
         depth = 2
-        while frame and (
-            frame.f_code.co_filename == logging.__file__
-            or frame.f_code.co_filename == __file__
-        ):
-            frame = frame.f_back
+        while frame and (frame.f_code.co_filename == logging.__file__ or frame.f_code.co_filename == __file__):
+            frame = frame.f_back  # type: ignore[assignment]
             depth += 1
 
-        logger.opt(depth=depth, exception=record.exc_info).log(
-            level, record.getMessage()
-        )
+        logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
 
 
 def trace_id_injector(record: dict[str, Any]) -> None:
@@ -84,14 +81,10 @@ def configure_logging() -> None:
     logger.configure(handlers=[], patcher=trace_id_injector)
 
     # Ensure logs directory exists and add file sink
-    try:
+    with contextlib.suppress(PermissionError, OSError):
         log_path = Path("logs")
         if not log_path.exists():
             log_path.mkdir(parents=True, exist_ok=True)  # pragma: no cover
-    except (PermissionError, OSError):
-        # In read-only environments (e.g. some containers), we might fail to create dir.
-        # We'll skip file logging in that case.
-        pass
 
     # Sink 1: Console (Stdout/Stderr)
     if log_json:
@@ -111,12 +104,6 @@ def configure_logging() -> None:
             "<level>{message}</level>"
         )
 
-        # If we wanted to include trace_id in text:
-        # format_str += " | {extra[trace_id]}"
-        # But we need to handle if it's missing. Loguru handles missing keys in extra gracefully?
-        # No, it raises KeyError usually unless we use {extra.get(...)}.
-        # For now, keep it simple. Enterprise usage usually assumes JSON for tracing.
-
         logger.add(
             sys.stderr,
             level=log_level,
@@ -125,7 +112,7 @@ def configure_logging() -> None:
 
     # Sink 2: File (JSON, Rotation, Retention)
     # Always JSON for file to allow structured analysis later
-    try:
+    with contextlib.suppress(PermissionError, OSError):
         logger.add(
             "logs/app.log",
             rotation="500 MB",
@@ -134,9 +121,6 @@ def configure_logging() -> None:
             enqueue=True,
             level=log_level,
         )
-    except (PermissionError, OSError):
-        # Fail silently if we can't write to file (e.g. read-only filesystem)
-        pass
 
     # Intercept standard logging
     # Force=True ensures we override existing config

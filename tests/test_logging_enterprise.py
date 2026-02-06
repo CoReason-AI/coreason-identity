@@ -11,6 +11,7 @@
 import json
 import logging
 import os
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -23,7 +24,7 @@ from coreason_identity.utils.logger import configure_logging
 @pytest.fixture
 def capture_logs(capfd: pytest.CaptureFixture[str]) -> pytest.CaptureFixture[str]:
     """Fixture to capture stdout/stderr."""
-    yield capfd
+    return capfd
 
 
 def test_json_configuration(capture_logs: pytest.CaptureFixture[str]) -> None:
@@ -40,7 +41,7 @@ def test_json_configuration(capture_logs: pytest.CaptureFixture[str]) -> None:
         assert not err, f"Stderr should be empty when JSON enabled, but got: {err}"
 
         assert out
-        lines = out.strip().split('\n')
+        lines = out.strip().split("\n")
         # We might have other logs, get the last one or search
         found = False
         for line in lines:
@@ -74,9 +75,9 @@ def test_trace_id_injection(capture_logs: pytest.CaptureFixture[str]) -> None:
             trace_id = format(ctx.trace_id, "032x")
             span_id = format(ctx.span_id, "016x")
 
-            out, err = capture_logs.readouterr()
+            out, _ = capture_logs.readouterr()
             assert out
-            lines = out.strip().split('\n')
+            lines = out.strip().split("\n")
             found = False
             for line in lines:
                 if "Trace message" in line:
@@ -101,11 +102,11 @@ def test_standard_logging_interception(capture_logs: pytest.CaptureFixture[str])
         # Use standard logging
         logging.info("Standard logging message")
 
-        out, err = capture_logs.readouterr()
+        out, _ = capture_logs.readouterr()
         assert out
 
         found = False
-        for line in out.strip().split('\n'):
+        for line in out.strip().split("\n"):
             if "Standard logging message" in line:
                 try:
                     log_entry = json.loads(line)
@@ -125,7 +126,7 @@ def test_default_text_logging(capture_logs: pytest.CaptureFixture[str]) -> None:
 
         logger.info("Text message")
 
-        out, err = capture_logs.readouterr()
+        _, err = capture_logs.readouterr()
         # Stderr is used for text logging in our config
         assert err
         assert "Text message" in err
@@ -154,11 +155,11 @@ def test_custom_log_level_interception(capture_logs: pytest.CaptureFixture[str])
         # Log with custom level
         logging.log(CUSTOM_LEVEL, "Custom level message")
 
-        out, err = capture_logs.readouterr()
+        out, _ = capture_logs.readouterr()
         assert out
 
         found = False
-        for line in out.strip().split('\n'):
+        for line in out.strip().split("\n"):
             if "Custom level message" in line:
                 try:
                     log_entry = json.loads(line)
@@ -185,10 +186,12 @@ def test_success_log_level_fallback() -> None:
 
 def test_logging_permission_error() -> None:
     """Test that PermissionError during log directory creation or file adding is ignored."""
-    with patch("pathlib.Path.exists", return_value=False):
-        with patch("pathlib.Path.mkdir", side_effect=PermissionError("Mock perm error")):
-             # This should not raise exception
-             configure_logging()
+    with (
+        patch("pathlib.Path.exists", return_value=False),
+        patch("pathlib.Path.mkdir", side_effect=PermissionError("Mock perm error")),
+    ):
+        # This should not raise exception
+        configure_logging()
 
     # Test logger.add failure for file
     with patch("coreason_identity.utils.logger.logger.add") as mock_add:
@@ -198,7 +201,7 @@ def test_logging_permission_error() -> None:
         # But we can assume call order.
 
         # Actually, let's just mock logger.add to raise error when called with filename
-        def side_effect(*args, **kwargs):
+        def side_effect(*args: Any, **_kwargs: Any) -> int:
             if args and isinstance(args[0], str) and "app.log" in args[0]:
                 raise PermissionError("File write error")
             return 1
