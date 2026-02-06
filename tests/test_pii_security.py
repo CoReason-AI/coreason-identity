@@ -52,21 +52,13 @@ class TestPiiSecurity:
         - Assert that the result is NOT the plain SHA-256 hash.
         """
         salt = "test-salt"
-        validator = TokenValidator(
-            oidc_provider=mock_oidc_provider,
-            audience="aud",
-            pii_salt=SecretStr(salt)
-        )
+        validator = TokenValidator(oidc_provider=mock_oidc_provider, audience="aud", pii_salt=SecretStr(salt))
 
         user_id = "user123"
         anonymized = validator._anonymize(user_id)
 
         # Expected HMAC-SHA256
-        expected = hmac.new(
-            salt.encode("utf-8"),
-            user_id.encode("utf-8"),
-            hashlib.sha256
-        ).hexdigest()
+        expected = hmac.new(salt.encode("utf-8"), user_id.encode("utf-8"), hashlib.sha256).hexdigest()
 
         # Plain SHA-256 (unsafe)
         unsafe_hash = hashlib.sha256(user_id.encode("utf-8")).hexdigest()
@@ -75,9 +67,7 @@ class TestPiiSecurity:
         assert anonymized != unsafe_hash
 
     @pytest.mark.asyncio
-    async def test_telemetry_protection(
-        self, mock_oidc_provider: Mock, key_pair: Any, jwks: dict[str, Any]
-    ) -> None:
+    async def test_telemetry_protection(self, mock_oidc_provider: Mock, key_pair: Any, jwks: dict[str, Any]) -> None:
         """
         Test Case 2 (Telemetry Protection):
         - Mock the trace.get_tracer or check the span attributes.
@@ -85,11 +75,7 @@ class TestPiiSecurity:
         - Assert that the span attribute "user.id" contains the hashed value, not the raw ID.
         """
         salt = "test-salt"
-        validator = TokenValidator(
-            oidc_provider=mock_oidc_provider,
-            audience="aud",
-            pii_salt=SecretStr(salt)
-        )
+        validator = TokenValidator(oidc_provider=mock_oidc_provider, audience="aud", pii_salt=SecretStr(salt))
         mock_oidc_provider.get_jwks.return_value = jwks
 
         now = int(time.time())
@@ -112,11 +98,7 @@ class TestPiiSecurity:
             await validator.validate_token(token_str)
 
             # Calculate expected anonymized ID
-            expected_anonymized = hmac.new(
-                salt.encode("utf-8"),
-                user_id.encode("utf-8"),
-                hashlib.sha256
-            ).hexdigest()
+            expected_anonymized = hmac.new(salt.encode("utf-8"), user_id.encode("utf-8"), hashlib.sha256).hexdigest()
 
             # Verify set_attribute was called with the anonymized ID
             mock_span.set_attribute.assert_any_call("user.id", expected_anonymized)

@@ -26,6 +26,7 @@ from authlib.jose.errors import (
 )
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
+from pydantic import SecretStr
 
 from coreason_identity.exceptions import (
     CoreasonIdentityError,
@@ -34,8 +35,6 @@ from coreason_identity.exceptions import (
     SignatureVerificationError,
     TokenExpiredError,
 )
-from pydantic import SecretStr
-
 from coreason_identity.oidc_provider import OIDCProvider
 from coreason_identity.utils.logger import logger
 
