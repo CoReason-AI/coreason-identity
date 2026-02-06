@@ -19,6 +19,7 @@ import anyio
 import httpx
 
 from coreason_identity.exceptions import CoreasonIdentityError
+from coreason_identity.utils.logger import logger
 
 
 class OIDCProvider:
@@ -30,7 +31,13 @@ class OIDCProvider:
         cache_ttl (int): The cache time-to-live in seconds.
     """
 
-    def __init__(self, discovery_url: str, client: httpx.AsyncClient, cache_ttl: int = 3600) -> None:
+    def __init__(
+        self,
+        discovery_url: str,
+        client: httpx.AsyncClient,
+        cache_ttl: int = 3600,
+        refresh_cooldown: float = 30.0,
+    ) -> None:
         """
         Initialize the OIDCProvider.
 
@@ -38,14 +45,16 @@ class OIDCProvider:
             discovery_url: The OIDC discovery URL (e.g., https://my-tenant.auth0.com/.well-known/openid-configuration).
             client: The async HTTP client to use for requests.
             cache_ttl: Time-to-live for the JWKS cache in seconds. Defaults to 3600 (1 hour).
+            refresh_cooldown: Minimum time in seconds between forced refreshes. Defaults to 30.0.
         """
         self.discovery_url = discovery_url
         self.client = client
         self.cache_ttl = cache_ttl
+        self.refresh_cooldown = refresh_cooldown
         self._jwks_cache: dict[str, Any] | None = None
         self._oidc_config_cache: dict[str, Any] | None = None
         self._last_update: float = 0.0
-        self._lock = anyio.Lock()
+        self._lock: anyio.Lock | None = None
 
     async def _fetch_oidc_config(self) -> dict[str, Any]:
         """
@@ -62,7 +71,9 @@ class OIDCProvider:
             response.raise_for_status()
             return response.json()  # type: ignore[no-any-return]
         except httpx.HTTPError as e:
-            raise CoreasonIdentityError(f"Failed to fetch OIDC configuration from {self.discovery_url}: {e}") from e
+            raise CoreasonIdentityError(
+                f"Failed to fetch OIDC configuration from {self.discovery_url}: {e}"
+            ) from e
 
     async def _fetch_jwks(self, jwks_uri: str) -> dict[str, Any]:
         """
@@ -97,21 +108,43 @@ class OIDCProvider:
         Raises:
             CoreasonIdentityError: If fetching fails.
         """
+        if self._lock is None:
+            self._lock = anyio.Lock()
+
         # Double-checked locking pattern optimization
         if not force_refresh:
             current_time = time.time()
-            if self._jwks_cache is not None and (current_time - self._last_update) < self.cache_ttl:
-                return self._jwks_cache
-
-        async with self._lock:
-            # Check again inside lock
-            current_time = time.time()
             if (
-                not force_refresh
-                and self._jwks_cache is not None
+                self._jwks_cache is not None
                 and (current_time - self._last_update) < self.cache_ttl
             ):
                 return self._jwks_cache
+
+        async with self._lock:
+            current_time = time.time()
+
+            # Check existing cache validity
+            is_cache_valid = (
+                self._jwks_cache is not None
+                and (current_time - self._last_update) < self.cache_ttl
+            )
+
+            # Check DoS protection cooldown
+            is_in_cooldown = (
+                self._jwks_cache is not None
+                and (current_time - self._last_update) < self.refresh_cooldown
+            )
+
+            # 1. Normal cache hit (no force refresh)
+            if not force_refresh and is_cache_valid:
+                return self._jwks_cache  # type: ignore[return-value]
+
+            # 2. DoS Protection: If force_refresh is requested but we are in cooldown, return cached data
+            if force_refresh and is_in_cooldown:
+                logger.warning(
+                    "JWKS refresh cooldown active. Returning cached keys despite force_refresh request."
+                )
+                return self._jwks_cache  # type: ignore[return-value]
 
             # Fetch fresh keys
             oidc_config = await self._fetch_oidc_config()

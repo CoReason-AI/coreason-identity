@@ -56,7 +56,8 @@ async def test_get_jwks_cache_hit(provider: OIDCProvider, mock_client: AsyncMock
 @pytest.mark.asyncio
 async def test_get_jwks_force_refresh(provider: OIDCProvider, mock_client: AsyncMock) -> None:
     provider._jwks_cache = {"keys": ["cached"]}
-    provider._last_update = time.time()
+    # Ensure update is old enough to bypass cooldown
+    provider._last_update = time.time() - 31.0
 
     mock_client.get.side_effect = [
         Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks"}),
@@ -192,6 +193,12 @@ async def test_get_jwks_double_check_locking(provider: OIDCProvider, mock_client
     Test the double-checked locking inside the lock.
     We simulate a race where the cache is updated by another task while the current task is waiting for the lock.
     """
+    # Initialize lock first since it's lazy-loaded
+    if provider._lock is None:
+        import anyio
+
+        provider._lock = anyio.Lock()
+
     # 1. Start with invalid cache so we enter the waiting phase
     provider._jwks_cache = {"keys": ["old"]}
     provider._last_update = 0  # Expired
