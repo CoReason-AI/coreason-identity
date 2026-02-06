@@ -89,7 +89,7 @@ async def test_audience_mismatch_real_validator_behavior() -> None:
     mock_oidc = MagicMock()
     mock_oidc.get_jwks = AsyncMock(return_value={"keys": []})
     mock_oidc.get_issuer = AsyncMock(return_value="https://issuer.com")
-    validator = TokenValidator(mock_oidc, audience="expected-audience")
+    validator = TokenValidator(mock_oidc, audience="expected-audience", issuer="https://issuer.com")
 
     # Mock the internal jwt.decode to raise InvalidClaimError for 'aud'
     with patch.object(validator.jwt, "decode") as mock_decode:
@@ -128,7 +128,7 @@ async def test_pii_redaction_in_logs(log_capture: list[str]) -> None:
     mock_oidc.get_jwks = AsyncMock(return_value={"keys": []})
     mock_oidc.get_issuer = AsyncMock(return_value="https://issuer.com")
 
-    validator = TokenValidator(mock_oidc, audience="aud")
+    validator = TokenValidator(mock_oidc, audience="aud", issuer="https://issuer.com")
 
     # Mock jwt.decode to return our claims without error
     with patch.object(validator.jwt, "decode") as mock_decode:
@@ -229,7 +229,7 @@ class TestSecurityEdgeCases:
         mock_oidc.get_jwks = AsyncMock(return_value={"keys": []})
         mock_oidc.get_issuer = AsyncMock(return_value="https://issuer.com")
 
-        validator = TokenValidator(mock_oidc, audience="aud")
+        validator = TokenValidator(mock_oidc, audience="aud", issuer="https://issuer.com")
 
         with patch.object(validator.jwt, "decode") as mock_decode:
             mock_claims_dict = {"sub": unicode_user_id, "aud": "aud", "exp": 1234567890}
