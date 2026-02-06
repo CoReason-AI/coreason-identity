@@ -62,6 +62,7 @@ class IdentityManagerAsync:
         self.validator = TokenValidator(
             oidc_provider=self.oidc_provider,
             audience=self.config.audience,
+            pii_salt=self.config.pii_salt,
             issuer=self.config.issuer,
         )
         self.identity_mapper = IdentityMapper()

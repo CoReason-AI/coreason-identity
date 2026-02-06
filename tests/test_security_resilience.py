@@ -9,6 +9,7 @@
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
 import hashlib
+import hmac
 from collections.abc import Generator
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -116,7 +117,9 @@ async def test_pii_redaction_in_logs(log_capture: list[str]) -> None:
     token_string = "sensitive.jwt.token.string"
 
     # Compute expected hash
-    expected_hash = hashlib.sha256(sensitive_user_id.encode("utf-8")).hexdigest()
+    expected_hash = hmac.new(
+        b"coreason-unsafe-default-salt", sensitive_user_id.encode("utf-8"), hashlib.sha256
+    ).hexdigest()
 
     # Mock validation success on the identity manager itself won't trigger the logging code
     # inside Validator. We need to construct a real Validator or use the one we construct below.
@@ -219,7 +222,9 @@ class TestSecurityEdgeCases:
         Logging Edge Case: Verify that Unicode characters in PII are handled and hashed correctly.
         """
         unicode_user_id = "user_🚀_ñ_123"
-        expected_hash = hashlib.sha256(unicode_user_id.encode("utf-8")).hexdigest()
+        expected_hash = hmac.new(
+            b"coreason-unsafe-default-salt", unicode_user_id.encode("utf-8"), hashlib.sha256
+        ).hexdigest()
         token_string = "unicode.jwt.token"
 
         from coreason_identity.oidc_provider import OIDCProvider

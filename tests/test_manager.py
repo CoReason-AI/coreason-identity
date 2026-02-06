@@ -241,6 +241,7 @@ def test_init_strict_issuer() -> None:
             oidc_provider=MockOIDC.return_value,
             audience=MOCK_AUDIENCE,
             issuer=expected_issuer,
+            pii_salt=config.pii_salt,
         )
 
 
