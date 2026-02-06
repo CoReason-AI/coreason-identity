@@ -79,6 +79,8 @@ def configure_logging() -> None:
     logger.configure(handlers=[], patcher=trace_id_injector)
 
     # Sink 1: Console (Stdout/Stderr)
+    # Finding #7 Mitigation: File logging is disabled to prevent disk exhaustion.
+    # Logs are routed exclusively to stdout/stderr.
     if log_json:
         # JSON logs to stdout are preferred for containerized environments
         logger.add(

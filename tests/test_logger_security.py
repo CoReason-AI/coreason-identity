@@ -44,12 +44,12 @@ def test_stderr_output(capsys: pytest.CaptureFixture[str]) -> None:
     Test Case 2: Verify that logging outputs to stderr.
     Finding #7 Mitigation.
     """
-    # We need to make sure logger uses the captured stderr
-    logger.remove()
-    logger.add(sys.stderr, format="{message}")
+    # Ensure the logger is configured with default settings (which should be stderr)
+    configure_logging()
 
     msg = "This should go to stderr"
     logger.warning(msg)
 
+    # Loguru writes to stderr synchronously by default unless enqueue=True
     captured = capsys.readouterr()
     assert msg in captured.err
