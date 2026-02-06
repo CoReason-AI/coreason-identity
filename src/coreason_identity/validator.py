@@ -141,7 +141,7 @@ class TokenValidator:
 
                 final_issuer = self.issuer
                 if not final_issuer:
-                     final_issuer = await self.oidc_provider.get_issuer()
+                    final_issuer = await self.oidc_provider.get_issuer()
 
                 claims_options = get_claims_options(final_issuer)
 
