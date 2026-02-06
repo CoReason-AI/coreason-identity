@@ -34,12 +34,8 @@ class TestPiiAnonymizationComplexScenarios:
         salt_a = "salt-v1"
         salt_b = "salt-v2"
 
-        validator_a = TokenValidator(
-            oidc_provider=mock_oidc_provider, audience="aud", pii_salt=SecretStr(salt_a)
-        )
-        validator_b = TokenValidator(
-            oidc_provider=mock_oidc_provider, audience="aud", pii_salt=SecretStr(salt_b)
-        )
+        validator_a = TokenValidator(oidc_provider=mock_oidc_provider, audience="aud", pii_salt=SecretStr(salt_a))
+        validator_b = TokenValidator(oidc_provider=mock_oidc_provider, audience="aud", pii_salt=SecretStr(salt_b))
 
         user_id = "user123"
         hash_a = validator_a._anonymize(user_id)
@@ -48,9 +44,7 @@ class TestPiiAnonymizationComplexScenarios:
         assert hash_a != hash_b
 
         # Verify correctness individually
-        expected_a = hmac.new(
-            salt_a.encode("utf-8"), user_id.encode("utf-8"), hashlib.sha256
-        ).hexdigest()
+        expected_a = hmac.new(salt_a.encode("utf-8"), user_id.encode("utf-8"), hashlib.sha256).hexdigest()
         assert hash_a == expected_a
 
     def test_deterministic_output(self, mock_oidc_provider: Mock) -> None:
@@ -59,9 +53,7 @@ class TestPiiAnonymizationComplexScenarios:
         Verify that the same User ID + same Salt always produces the same hash across multiple calls.
         """
         salt = "stable-salt"
-        validator = TokenValidator(
-            oidc_provider=mock_oidc_provider, audience="aud", pii_salt=SecretStr(salt)
-        )
+        validator = TokenValidator(oidc_provider=mock_oidc_provider, audience="aud", pii_salt=SecretStr(salt))
 
         user_id = "user123"
 
@@ -78,10 +70,7 @@ class TestPiiAnonymizationComplexScenarios:
         """
         custom_salt = "super-secret-salt-value"
         config = CoreasonIdentityConfig(
-            domain="auth.example.com",
-            audience="aud",
-            client_id="client",
-            pii_salt=SecretStr(custom_salt)
+            domain="auth.example.com", audience="aud", client_id="client", pii_salt=SecretStr(custom_salt)
         )
 
         with (
@@ -91,6 +80,7 @@ class TestPiiAnonymizationComplexScenarios:
             IdentityManager(config)
 
             # Check that TokenValidator was initialized with the custom salt
+            MockOIDC.assert_called_once()
             MockValidator.assert_called_once()
             call_kwargs = MockValidator.call_args[1]
             assert call_kwargs["pii_salt"] == config.pii_salt

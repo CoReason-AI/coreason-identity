@@ -30,18 +30,12 @@ class TestPiiAnonymizationEdgeCases:
         Verify it hashes correctly (empty message HMAC) and doesn't crash.
         """
         salt = "test-salt"
-        validator = TokenValidator(
-            oidc_provider=mock_oidc_provider, audience="aud", pii_salt=SecretStr(salt)
-        )
+        validator = TokenValidator(oidc_provider=mock_oidc_provider, audience="aud", pii_salt=SecretStr(salt))
 
         user_id = ""
         anonymized = validator._anonymize(user_id)
 
-        expected = hmac.new(
-            salt.encode("utf-8"),
-            user_id.encode("utf-8"),
-            hashlib.sha256
-        ).hexdigest()
+        expected = hmac.new(salt.encode("utf-8"), user_id.encode("utf-8"), hashlib.sha256).hexdigest()
 
         assert anonymized == expected
 
@@ -51,18 +45,12 @@ class TestPiiAnonymizationEdgeCases:
         Ensure \\x00 is handled correctly (Python strings handle nulls fine, but HMAC ensures no truncation issues).
         """
         salt = "test-salt"
-        validator = TokenValidator(
-            oidc_provider=mock_oidc_provider, audience="aud", pii_salt=SecretStr(salt)
-        )
+        validator = TokenValidator(oidc_provider=mock_oidc_provider, audience="aud", pii_salt=SecretStr(salt))
 
         user_id = "user\x00with\x00nulls"
         anonymized = validator._anonymize(user_id)
 
-        expected = hmac.new(
-            salt.encode("utf-8"),
-            user_id.encode("utf-8"),
-            hashlib.sha256
-        ).hexdigest()
+        expected = hmac.new(salt.encode("utf-8"), user_id.encode("utf-8"), hashlib.sha256).hexdigest()
 
         assert anonymized == expected
 
@@ -72,19 +60,13 @@ class TestPiiAnonymizationEdgeCases:
         Verify correct hashing for large payloads.
         """
         salt = "test-salt"
-        validator = TokenValidator(
-            oidc_provider=mock_oidc_provider, audience="aud", pii_salt=SecretStr(salt)
-        )
+        validator = TokenValidator(oidc_provider=mock_oidc_provider, audience="aud", pii_salt=SecretStr(salt))
 
         # 100KB string
         user_id = "a" * 100_000
         anonymized = validator._anonymize(user_id)
 
-        expected = hmac.new(
-            salt.encode("utf-8"),
-            user_id.encode("utf-8"),
-            hashlib.sha256
-        ).hexdigest()
+        expected = hmac.new(salt.encode("utf-8"), user_id.encode("utf-8"), hashlib.sha256).hexdigest()
 
         assert anonymized == expected
 
@@ -94,17 +76,11 @@ class TestPiiAnonymizationEdgeCases:
         Ensure the configuration and HMAC handle non-ASCII characters in the salt.
         """
         salt = "s@lt_🚀_ñ"
-        validator = TokenValidator(
-            oidc_provider=mock_oidc_provider, audience="aud", pii_salt=SecretStr(salt)
-        )
+        validator = TokenValidator(oidc_provider=mock_oidc_provider, audience="aud", pii_salt=SecretStr(salt))
 
         user_id = "user123"
         anonymized = validator._anonymize(user_id)
 
-        expected = hmac.new(
-            salt.encode("utf-8"),
-            user_id.encode("utf-8"),
-            hashlib.sha256
-        ).hexdigest()
+        expected = hmac.new(salt.encode("utf-8"), user_id.encode("utf-8"), hashlib.sha256).hexdigest()
 
         assert anonymized == expected
