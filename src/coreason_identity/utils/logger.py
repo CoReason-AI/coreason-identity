@@ -27,6 +27,7 @@ class InterceptHandler(logging.Handler):
 
     def emit(self, record: logging.LogRecord) -> None:
         # Get corresponding Loguru level if it exists
+        level: str | int
         try:
             level = logger.level(record.levelname).name
         except ValueError:
@@ -43,7 +44,7 @@ class InterceptHandler(logging.Handler):
         logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
 
 
-def trace_id_injector(record: dict[str, Any]) -> None:
+def trace_id_injector(record: Any) -> None:
     """
     Injects OpenTelemetry trace_id and span_id into the log record.
     Used as a patcher for Loguru.
