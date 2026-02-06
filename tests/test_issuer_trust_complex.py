@@ -14,8 +14,8 @@ from authlib.jose import JsonWebKey, jwt
 from coreason_identity.exceptions import CoreasonIdentityError
 from coreason_identity.validator import TokenValidator
 
-class TestIssuerTrustComplex:
 
+class TestIssuerTrustComplex:
     @pytest.fixture
     def mock_oidc(self) -> AsyncMock:
         mock = AsyncMock()
@@ -45,7 +45,7 @@ class TestIssuerTrustComplex:
 
     @pytest.mark.asyncio
     async def test_key_rotation_with_issuer_mismatch(
-        self, mock_oidc: AsyncMock, key_pair: Any, second_key_pair: Any, jwks: dict[str, Any], jwks_rotated: dict[str, Any]
+        self, mock_oidc: AsyncMock, second_key_pair: Any, jwks: dict[str, Any], jwks_rotated: dict[str, Any]
     ) -> None:
         """
         Test Case 4 (Key Rotation + Mismatch):
@@ -74,12 +74,9 @@ class TestIssuerTrustComplex:
         mock_oidc.get_jwks.side_effect = get_jwks_side_effect
 
         # Create token with Key B AND Wrong Issuer
-        token = self.create_token(second_key_pair, {
-            "sub": "u",
-            "iss": malicious_issuer,
-            "aud": "aud",
-            "exp": 9999999999
-        })
+        token = self.create_token(
+            second_key_pair, {"sub": "u", "iss": malicious_issuer, "aud": "aud", "exp": 9999999999}
+        )
 
         with pytest.raises(CoreasonIdentityError, match="Invalid claim"):
             await validator.validate_token(token)
@@ -100,24 +97,24 @@ class TestIssuerTrustComplex:
         expected_issuer = "https://valid.com/"
         validator = TokenValidator(oidc_provider=mock_oidc, audience="aud", issuer=expected_issuer)
 
-        token_valid = self.create_token(key_pair, {
-            "sub": "valid_user", "iss": expected_issuer, "aud": "aud", "exp": 9999999999
-        })
+        token_valid = self.create_token(
+            key_pair, {"sub": "valid_user", "iss": expected_issuer, "aud": "aud", "exp": 9999999999}
+        )
 
-        token_invalid = self.create_token(key_pair, {
-            "sub": "invalid_user", "iss": "https://invalid.com/", "aud": "aud", "exp": 9999999999
-        })
+        token_invalid = self.create_token(
+            key_pair, {"sub": "invalid_user", "iss": "https://invalid.com/", "aud": "aud", "exp": 9999999999}
+        )
 
         async def validate_valid() -> str:
             res = await validator.validate_token(token_valid)
-            return res["sub"] # type: ignore[no-any-return]
+            return res["sub"]  # type: ignore[no-any-return]
 
         async def validate_invalid() -> None:
             with pytest.raises(CoreasonIdentityError, match="Invalid claim"):
                 await validator.validate_token(token_invalid)
 
         # Run 50 mixed tasks
-        tasks = []
+        tasks: list[Any] = []
         for i in range(50):
             if i % 2 == 0:
                 tasks.append(validate_valid())
@@ -131,4 +128,4 @@ class TestIssuerTrustComplex:
             if i % 2 == 0:
                 assert res == "valid_user"
             else:
-                assert res is None # validate_invalid returns None (it asserts internally)
+                assert res is None  # validate_invalid returns None (it asserts internally)

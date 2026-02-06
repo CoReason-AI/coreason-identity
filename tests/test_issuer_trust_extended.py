@@ -5,7 +5,7 @@ Using real JWT signing/decoding to verify Authlib integration.
 """
 
 from typing import Any
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock
 
 import pytest
 from authlib.jose import JsonWebKey, jwt
@@ -13,8 +13,8 @@ from authlib.jose import JsonWebKey, jwt
 from coreason_identity.exceptions import CoreasonIdentityError
 from coreason_identity.validator import TokenValidator
 
-class TestIssuerTrustExtended:
 
+class TestIssuerTrustExtended:
     @pytest.fixture
     def mock_oidc(self) -> AsyncMock:
         mock = AsyncMock()
@@ -49,12 +49,7 @@ class TestIssuerTrustExtended:
 
         validator = TokenValidator(oidc_provider=mock_oidc, audience="aud", issuer=issuer_config)
 
-        token = self.create_token(key_pair, {
-            "sub": "u",
-            "iss": issuer_token,
-            "aud": "aud",
-            "exp": 9999999999
-        })
+        token = self.create_token(key_pair, {"sub": "u", "iss": issuer_token, "aud": "aud", "exp": 9999999999})
 
         with pytest.raises(CoreasonIdentityError, match="Invalid claim"):
             await validator.validate_token(token)
@@ -73,20 +68,13 @@ class TestIssuerTrustExtended:
 
         validator = TokenValidator(oidc_provider=mock_oidc, audience="aud", issuer=issuer_config)
 
-        token = self.create_token(key_pair, {
-            "sub": "u",
-            "iss": issuer_token,
-            "aud": "aud",
-            "exp": 9999999999
-        })
+        token = self.create_token(key_pair, {"sub": "u", "iss": issuer_token, "aud": "aud", "exp": 9999999999})
 
         with pytest.raises(CoreasonIdentityError, match="Invalid claim"):
             await validator.validate_token(token)
 
     @pytest.mark.asyncio
-    async def test_subdomain_attack_prefix(
-        self, mock_oidc: AsyncMock, key_pair: Any, jwks: dict[str, Any]
-    ) -> None:
+    async def test_subdomain_attack_prefix(self, mock_oidc: AsyncMock, key_pair: Any, jwks: dict[str, Any]) -> None:
         """
         Test Case 2: Subdomain/Prefix attacks.
         Config: https://auth.company.com
@@ -99,20 +87,13 @@ class TestIssuerTrustExtended:
 
         validator = TokenValidator(oidc_provider=mock_oidc, audience="aud", issuer=issuer_config)
 
-        token = self.create_token(key_pair, {
-            "sub": "u",
-            "iss": issuer_token,
-            "aud": "aud",
-            "exp": 9999999999
-        })
+        token = self.create_token(key_pair, {"sub": "u", "iss": issuer_token, "aud": "aud", "exp": 9999999999})
 
         with pytest.raises(CoreasonIdentityError, match="Invalid claim"):
             await validator.validate_token(token)
 
     @pytest.mark.asyncio
-    async def test_subdomain_attack_suffix(
-        self, mock_oidc: AsyncMock, key_pair: Any, jwks: dict[str, Any]
-    ) -> None:
+    async def test_subdomain_attack_suffix(self, mock_oidc: AsyncMock, key_pair: Any, jwks: dict[str, Any]) -> None:
         """
         Test Case 2b: Suffix attack.
         Config: https://company.com
@@ -125,20 +106,13 @@ class TestIssuerTrustExtended:
 
         validator = TokenValidator(oidc_provider=mock_oidc, audience="aud", issuer=issuer_config)
 
-        token = self.create_token(key_pair, {
-            "sub": "u",
-            "iss": issuer_token,
-            "aud": "aud",
-            "exp": 9999999999
-        })
+        token = self.create_token(key_pair, {"sub": "u", "iss": issuer_token, "aud": "aud", "exp": 9999999999})
 
         with pytest.raises(CoreasonIdentityError, match="Invalid claim"):
             await validator.validate_token(token)
 
     @pytest.mark.asyncio
-    async def test_protocol_mismatch(
-        self, mock_oidc: AsyncMock, key_pair: Any, jwks: dict[str, Any]
-    ) -> None:
+    async def test_protocol_mismatch(self, mock_oidc: AsyncMock, key_pair: Any, jwks: dict[str, Any]) -> None:
         """
         Test Case 3: HTTP vs HTTPS mismatch explicit check.
         """
@@ -149,12 +123,7 @@ class TestIssuerTrustExtended:
 
         validator = TokenValidator(oidc_provider=mock_oidc, audience="aud", issuer=issuer_config)
 
-        token = self.create_token(key_pair, {
-            "sub": "u",
-            "iss": issuer_token,
-            "aud": "aud",
-            "exp": 9999999999
-        })
+        token = self.create_token(key_pair, {"sub": "u", "iss": issuer_token, "aud": "aud", "exp": 9999999999})
 
         with pytest.raises(CoreasonIdentityError, match="Invalid claim"):
             await validator.validate_token(token)
