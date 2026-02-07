@@ -16,7 +16,7 @@ import pytest
 from pydantic import SecretStr
 
 from coreason_identity.config import CoreasonIdentityConfig
-from coreason_identity.manager import IdentityManager
+from coreason_identity.manager import IdentityManagerSync
 from coreason_identity.oidc_provider import OIDCProvider
 from coreason_identity.validator import TokenValidator
 
@@ -66,7 +66,7 @@ class TestPiiAnonymizationComplexScenarios:
     def test_config_integration(self) -> None:
         """
         Complex Case 3: Config Integration.
-        Verify IdentityManager correctly propagates the salt from a complex config object to the validator.
+        Verify IdentityManagerSync correctly propagates the salt from a complex config object to the validator.
         """
         custom_salt = "super-secret-salt-value"
         config = CoreasonIdentityConfig(
@@ -77,7 +77,7 @@ class TestPiiAnonymizationComplexScenarios:
             patch("coreason_identity.manager.OIDCProvider") as MockOIDC,
             patch("coreason_identity.manager.TokenValidator") as MockValidator,
         ):
-            IdentityManager(config)
+            IdentityManagerSync(config)
 
             # Check that TokenValidator was initialized with the custom salt
             MockOIDC.assert_called_once()

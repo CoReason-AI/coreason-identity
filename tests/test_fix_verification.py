@@ -22,7 +22,7 @@ from authlib.jose import JsonWebKey, jwt
 
 from coreason_identity.config import CoreasonIdentityConfig
 from coreason_identity.exceptions import InvalidTokenError
-from coreason_identity.manager import IdentityManager
+from coreason_identity.manager import IdentityManagerSync
 
 
 @pytest.fixture
@@ -54,7 +54,7 @@ def test_missing_claim_raises_invalid_token_error(key_pair: Any, jwks: dict[str,
         mock_oidc_instance.get_jwks = AsyncMock(return_value=jwks)
         mock_oidc_instance.get_issuer = AsyncMock(return_value=f"https://{domain}/")
 
-        manager = IdentityManager(config)
+        manager = IdentityManagerSync(config)
 
         # Create token missing 'exp' (which is essential)
         claims = {
@@ -89,7 +89,7 @@ def test_mapper_validation_raises_invalid_token_error(key_pair: Any, jwks: dict[
         mock_oidc_instance.get_jwks = AsyncMock(return_value=jwks)
         mock_oidc_instance.get_issuer = AsyncMock(return_value=f"https://{domain}/")
 
-        manager = IdentityManager(config)
+        manager = IdentityManagerSync(config)
 
         # Valid crypto claims, but missing 'email' required by IdentityMapper
         import time
