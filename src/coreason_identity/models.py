@@ -45,15 +45,15 @@ class UserContext(BaseModel):
     email: EmailStr = Field(
         ..., description="The user's email address. Verified and strictly typed.", examples=["alice@coreason.ai"]
     )
-    groups: list[str] = Field(
-        default_factory=list,
+    groups: tuple[str, ...] = Field(
+        default_factory=tuple,
         description="Security group IDs. Used for Row-Level Security (RLS).",
-        examples=[["admin", "project:apollo"]],
+        examples=[("admin", "project:apollo")],
     )
-    scopes: list[str] = Field(
-        default_factory=list,
+    scopes: tuple[str, ...] = Field(
+        default_factory=tuple,
         description="OAuth 2.0 scopes for coarse-grained API permission checks.",
-        examples=[["openid", "profile"]],
+        examples=[("openid", "profile")],
     )
     downstream_token: SecretStr | None = Field(
         default=None, description="The On-Behalf-Of (OBO) token for downstream API calls. Protected from logging."
