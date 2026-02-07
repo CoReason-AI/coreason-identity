@@ -11,7 +11,6 @@
 import copy
 import pickle
 import threading
-from typing import Any
 
 import pytest
 from pydantic import ValidationError
@@ -38,13 +37,13 @@ class TestImmutabilityComplex:
     def test_assignment_blocked(self, user_context: UserContext) -> None:
         """Test that field assignment raises ValidationError."""
         with pytest.raises(ValidationError):
-            user_context.user_id = "hacker"
+            user_context.user_id = "hacker"  # type: ignore[misc]
 
         with pytest.raises(ValidationError):
-            user_context.email = "hacker@example.com"
+            user_context.email = "hacker@example.com"  # type: ignore[misc]
 
         with pytest.raises(ValidationError):
-            user_context.groups = ("hacker",)
+            user_context.groups = ("hacker",)  # type: ignore[misc]
 
     def test_deep_immutability_tuples(self, user_context: UserContext) -> None:
         """
@@ -63,7 +62,7 @@ class TestImmutabilityComplex:
     def test_copy_on_write(self, user_context: UserContext) -> None:
         """Test the copy-on-write pattern using model_copy."""
         # Create a new version
-        new_groups = user_context.groups + ("audit",)
+        new_groups = (*user_context.groups, "audit")
         updated_user = user_context.model_copy(update={"groups": new_groups})
 
         # Verify new instance
@@ -82,7 +81,7 @@ class TestImmutabilityComplex:
         assert isinstance(unpickled, UserContext)
         # Verify it's still frozen/immutable
         with pytest.raises(ValidationError):
-            unpickled.user_id = "changed"
+            unpickled.user_id = "changed"  # type: ignore[misc]
 
     def test_deepcopy_behavior(self, user_context: UserContext) -> None:
         """Test that deepcopy works correctly."""
@@ -92,7 +91,7 @@ class TestImmutabilityComplex:
 
         # Verify mutation attempt on copy fails
         with pytest.raises(ValidationError):
-            copied.user_id = "new"
+            copied.user_id = "new"  # type: ignore[misc]
 
     def test_threading_safety_read(self, user_context: UserContext) -> None:
         """
@@ -107,7 +106,7 @@ class TestImmutabilityComplex:
                 _ = user_context.groups
                 # Try to mutate (should fail)
                 try:
-                    user_context.user_id = "race_condition"
+                    user_context.user_id = "race_condition"  # type: ignore[misc]
                 except ValidationError:
                     pass
                 else:
@@ -128,12 +127,12 @@ class TestImmutabilityComplex:
         config = CoreasonIdentityConfig(domain="example.com", audience="aud")
 
         with pytest.raises(ValidationError):
-            config.domain = "malicious.com"
+            config.domain = "malicious.com"  # type: ignore[misc]
 
         # Check that internal mutation via _secret_ field access is also discouraged/blocked by pydantic logic
         # Pydantic doesn't block private attr set by default unless extra='forbid', but public attrs are frozen.
         with pytest.raises(ValidationError):
-            config.audience = "new_aud"
+            config.audience = "new_aud"  # type: ignore[misc]
 
     def test_claims_dict_immutability_limitation(self, user_context: UserContext) -> None:
         """
@@ -142,7 +141,7 @@ class TestImmutabilityComplex:
         """
         # Reassignment is blocked
         with pytest.raises(ValidationError):
-            user_context.claims = {}
+            user_context.claims = {}  # type: ignore[misc]
 
         # However, because it is a standard dict, in-place mutation is technically possible
         # We acknowledge this limitation. The primary protection is against 'scopes' and 'groups'.
