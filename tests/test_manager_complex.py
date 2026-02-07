@@ -13,6 +13,7 @@ from typing import Any
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
+from pydantic import SecretStr
 
 from coreason_identity.config import CoreasonIdentityConfig
 from coreason_identity.exceptions import (
@@ -32,7 +33,9 @@ MOCK_CLIENT_ID = "test-client-id"
 
 @pytest.fixture
 def config() -> CoreasonIdentityConfig:
-    return CoreasonIdentityConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id=MOCK_CLIENT_ID)
+    return CoreasonIdentityConfig(
+        pii_salt="test-salt", domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id=MOCK_CLIENT_ID
+    )
 
 
 @pytest.fixture

@@ -18,6 +18,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
 import pytest
+from pydantic import SecretStr
 from authlib.jose import JsonWebKey
 
 # Helper for httpx mocks
@@ -150,7 +151,7 @@ class TestTokenValidatorSuperEdgeCases:
     def validator(self, mock_oidc_provider: Mock, jwks: dict[str, Any]) -> TokenValidator:
         mock_oidc_provider.get_jwks = AsyncMock(return_value=jwks)
         return TokenValidator(
-            oidc_provider=mock_oidc_provider,
+            pii_salt=SecretStr("test-salt"), oidc_provider=mock_oidc_provider,
             audience="my-audience",
             issuer="https://valid-issuer.com/",
         )

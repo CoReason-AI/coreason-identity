@@ -17,6 +17,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
 import pytest
+from pydantic import SecretStr
 from authlib.jose import JsonWebKey, jwt
 
 from coreason_identity.device_flow_client import DeviceFlowClient
@@ -48,7 +49,7 @@ class TestTokenValidatorComplex:
     def validator(self, mock_oidc_provider: Mock, jwks: dict[str, Any]) -> TokenValidator:
         mock_oidc_provider.get_jwks.return_value = jwks
         return TokenValidator(
-            oidc_provider=mock_oidc_provider,
+            pii_salt=SecretStr("test-salt"), oidc_provider=mock_oidc_provider,
             audience="my-audience",
             issuer="https://valid-issuer.com/",
         )

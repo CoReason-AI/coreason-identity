@@ -124,7 +124,7 @@ class TestImmutabilityComplex:
 
     def test_config_immutability(self) -> None:
         """Test that CoreasonIdentityConfig is also immutable."""
-        config = CoreasonIdentityConfig(domain="example.com", audience="aud")
+        config = CoreasonIdentityConfig(pii_salt="test-salt", domain="example.com", audience="aud")
 
         with pytest.raises(ValidationError):
             config.domain = "malicious.com"  # type: ignore[misc]

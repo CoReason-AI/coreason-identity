@@ -37,7 +37,8 @@ from coreason_identity import IdentityManager, CoreasonIdentityConfig, InvalidTo
 # 1. Initialize with strict configuration (The Borrowing)
 config = CoreasonIdentityConfig(
     domain="auth.coreason.com",
-    audience="api://coreason-platform"
+    audience="api://coreason-platform",
+    pii_salt="mandatory-secret-salt"
 )
 identity = IdentityManager(config)
 

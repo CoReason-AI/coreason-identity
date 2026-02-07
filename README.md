@@ -40,7 +40,12 @@ pip install coreason-identity
 from coreason_identity import IdentityManager, CoreasonIdentityConfig, InvalidTokenError
 
 # 1. Initialize (The Borrowing)
-config = CoreasonIdentityConfig(domain="auth.coreason.com", audience="api://coreason")
+# Note: pii_salt is now mandatory for secure logging
+config = CoreasonIdentityConfig(
+    domain="auth.coreason.com",
+    audience="api://coreason",
+    pii_salt="mandatory-secret-salt"
+)
 identity = IdentityManager(config)
 
 # 2. Validate (The Bouncer)

@@ -8,6 +8,7 @@ from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
+from pydantic import SecretStr
 from authlib.jose import JsonWebKey, jwt
 
 from coreason_identity.exceptions import CoreasonIdentityError
@@ -47,7 +48,7 @@ class TestIssuerTrustExtended:
         issuer_config = "https://a.com"
         issuer_token = "https://a.com/"
 
-        validator = TokenValidator(oidc_provider=mock_oidc, audience="aud", issuer=issuer_config)
+        validator = TokenValidator(pii_salt=SecretStr("test-salt"), oidc_provider=mock_oidc, audience="aud", issuer=issuer_config)
 
         token = self.create_token(key_pair, {"sub": "u", "iss": issuer_token, "aud": "aud", "exp": 9999999999})
 
@@ -66,7 +67,7 @@ class TestIssuerTrustExtended:
         issuer_config = "https://a.com/"
         issuer_token = "https://a.com"
 
-        validator = TokenValidator(oidc_provider=mock_oidc, audience="aud", issuer=issuer_config)
+        validator = TokenValidator(pii_salt=SecretStr("test-salt"), oidc_provider=mock_oidc, audience="aud", issuer=issuer_config)
 
         token = self.create_token(key_pair, {"sub": "u", "iss": issuer_token, "aud": "aud", "exp": 9999999999})
 
@@ -85,7 +86,7 @@ class TestIssuerTrustExtended:
         issuer_config = "https://auth.company.com"
         issuer_token = "https://auth.company.com.attacker.com"
 
-        validator = TokenValidator(oidc_provider=mock_oidc, audience="aud", issuer=issuer_config)
+        validator = TokenValidator(pii_salt=SecretStr("test-salt"), oidc_provider=mock_oidc, audience="aud", issuer=issuer_config)
 
         token = self.create_token(key_pair, {"sub": "u", "iss": issuer_token, "aud": "aud", "exp": 9999999999})
 
@@ -104,7 +105,7 @@ class TestIssuerTrustExtended:
         issuer_config = "https://company.com"
         issuer_token = "https://auth.company.com"
 
-        validator = TokenValidator(oidc_provider=mock_oidc, audience="aud", issuer=issuer_config)
+        validator = TokenValidator(pii_salt=SecretStr("test-salt"), oidc_provider=mock_oidc, audience="aud", issuer=issuer_config)
 
         token = self.create_token(key_pair, {"sub": "u", "iss": issuer_token, "aud": "aud", "exp": 9999999999})
 
@@ -121,7 +122,7 @@ class TestIssuerTrustExtended:
         issuer_config = "https://auth.com/"
         issuer_token = "http://auth.com/"
 
-        validator = TokenValidator(oidc_provider=mock_oidc, audience="aud", issuer=issuer_config)
+        validator = TokenValidator(pii_salt=SecretStr("test-salt"), oidc_provider=mock_oidc, audience="aud", issuer=issuer_config)
 
         token = self.create_token(key_pair, {"sub": "u", "iss": issuer_token, "aud": "aud", "exp": 9999999999})
 

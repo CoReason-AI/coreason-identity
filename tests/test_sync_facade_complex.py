@@ -21,7 +21,9 @@ from coreason_identity.models import UserContext
 
 @pytest.fixture
 def mock_identity_manager_sync() -> IdentityManagerSync:
-    config = CoreasonIdentityConfig(domain="test.auth0.com", audience="test-audience", client_id="test-client-id")
+    config = CoreasonIdentityConfig(
+        pii_salt="test-salt", domain="test.auth0.com", audience="test-audience", client_id="test-client-id"
+    )
     with patch("coreason_identity.manager.IdentityManagerAsync") as MockAsync:
         mock_instance = MockAsync.return_value
 

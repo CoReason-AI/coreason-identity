@@ -13,6 +13,7 @@ from typing import Any, cast
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
+from pydantic import SecretStr
 
 from coreason_identity.config import CoreasonIdentityConfig
 from coreason_identity.exceptions import CoreasonIdentityError, InvalidTokenError
@@ -29,7 +30,9 @@ MOCK_AUTH_HEADER = f"Bearer {MOCK_TOKEN}"
 
 @pytest.fixture
 def config() -> CoreasonIdentityConfig:
-    return CoreasonIdentityConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id=MOCK_CLIENT_ID)
+    return CoreasonIdentityConfig(
+        pii_salt="test-salt", domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id=MOCK_CLIENT_ID
+    )
 
 
 @pytest.fixture
@@ -151,7 +154,7 @@ def test_start_device_login_recreation(manager: IdentityManagerSync) -> None:
 
 
 def test_start_device_login_missing_client_id() -> None:
-    config_no_client = CoreasonIdentityConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE)
+    config_no_client = CoreasonIdentityConfig(pii_salt="test-salt", domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE)
 
     with (
         patch("coreason_identity.manager.OIDCProvider"),
@@ -208,7 +211,7 @@ def test_await_device_token_stateless(manager: IdentityManagerSync) -> None:
 
 
 def test_await_device_token_missing_client_id() -> None:
-    config_no_client = CoreasonIdentityConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE)
+    config_no_client = CoreasonIdentityConfig(pii_salt="test-salt", domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE)
 
     with (
         patch("coreason_identity.manager.OIDCProvider"),
@@ -226,7 +229,9 @@ def test_await_device_token_missing_client_id() -> None:
 
 def test_init_strict_issuer() -> None:
     """Test that IdentityManagerSync initializes TokenValidator with strict issuer from config."""
-    config = CoreasonIdentityConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id=MOCK_CLIENT_ID)
+    config = CoreasonIdentityConfig(
+        pii_salt="test-salt", domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id=MOCK_CLIENT_ID
+    )
 
     with (
         patch("coreason_identity.manager.OIDCProvider") as MockOIDC,

@@ -55,8 +55,8 @@ class TokenValidator:
         self,
         oidc_provider: OIDCProvider,
         audience: str,
+        pii_salt: SecretStr,
         issuer: str | None = None,
-        pii_salt: SecretStr | None = None,
     ) -> None:
         """
         Initialize the TokenValidator.
@@ -64,13 +64,13 @@ class TokenValidator:
         Args:
             oidc_provider: The OIDCProvider instance to fetch JWKS.
             audience: The expected audience (aud) claim.
+            pii_salt: Salt for anonymizing PII. REQUIRED.
             issuer: The expected issuer (iss) claim. If None, it will be fetched dynamically from OIDCProvider.
-            pii_salt: Salt for anonymizing PII. Defaults to unsafe static salt if not provided.
         """
         self.oidc_provider = oidc_provider
         self.audience = audience
         self.issuer = issuer
-        self.pii_salt = pii_salt or SecretStr("coreason-unsafe-default-salt")
+        self.pii_salt = pii_salt
         # Use a specific JsonWebToken instance to enforce RS256 and reject 'none'
         self.jwt = JsonWebToken(["RS256"])
 

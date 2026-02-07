@@ -18,6 +18,7 @@ from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from pydantic import SecretStr
 from authlib.jose import JsonWebKey, jwt
 
 from coreason_identity.config import CoreasonIdentityConfig
@@ -53,7 +54,7 @@ def test_manager_enforces_strict_issuer(key_pair: Any, jwks: dict[str, Any]) -> 
     correct_issuer = f"https://{domain}/"
     wrong_issuer = "https://wrong-issuer.com/"
 
-    config = CoreasonIdentityConfig(domain=domain, audience=audience, client_id="client")
+    config = CoreasonIdentityConfig(pii_salt="test-salt", domain=domain, audience=audience, client_id="client")
 
     # We mock OIDCProvider to return our test keys, but we let TokenValidator run real logic
     with patch("coreason_identity.manager.OIDCProvider") as MockOIDC:

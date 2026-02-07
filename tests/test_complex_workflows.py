@@ -17,6 +17,7 @@ from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from pydantic import SecretStr
 
 from coreason_identity.config import CoreasonIdentityConfig
 from coreason_identity.manager import IdentityManagerSync
@@ -29,7 +30,7 @@ MOCK_AUDIENCE = "api://test"
 
 @pytest.fixture
 def identity_manager() -> Generator[IdentityManagerSync, Any, None]:
-    config = CoreasonIdentityConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id="cid")
+    config = CoreasonIdentityConfig(pii_salt="test-salt", domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id="cid")
 
     # We need to mock the internal async manager components to avoid real network calls
     with (
@@ -117,7 +118,7 @@ def test_legacy_migration_flow(identity_manager: IdentityManagerSync) -> None:
 # Redefine fixture to use REAL IdentityMapper for better integration tests
 @pytest.fixture
 def integration_manager() -> Generator[IdentityManagerSync, Any, None]:
-    config = CoreasonIdentityConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id="cid")
+    config = CoreasonIdentityConfig(pii_salt="test-salt", domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id="cid")
 
     # Only mock networking parts (Provider, Validator's internal checks)
     with patch("coreason_identity.manager.OIDCProvider"), patch("coreason_identity.manager.TokenValidator"):

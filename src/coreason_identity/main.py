@@ -35,6 +35,7 @@ def main() -> None:  # pragma: no cover
             domain="auth.example.com",  # Replace with real domain for live test
             audience="api://coreason",
             client_id="demo-client-id",
+            pii_salt="demo-salt",
         )
     except Exception as e:
         print(f"Configuration Error: {e}")

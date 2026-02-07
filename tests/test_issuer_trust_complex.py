@@ -9,6 +9,7 @@ from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
+from pydantic import SecretStr
 from authlib.jose import JsonWebKey, jwt
 
 from coreason_identity.exceptions import CoreasonIdentityError
@@ -63,7 +64,7 @@ class TestIssuerTrustComplex:
         expected_issuer = "https://valid.com/"
         malicious_issuer = "https://evil.com/"
 
-        validator = TokenValidator(oidc_provider=mock_oidc, audience="aud", issuer=expected_issuer)
+        validator = TokenValidator(pii_salt=SecretStr("test-salt"), oidc_provider=mock_oidc, audience="aud", issuer=expected_issuer)
 
         # Setup mock behavior
         async def get_jwks_side_effect(force_refresh: bool = False) -> dict[str, Any]:
@@ -95,7 +96,7 @@ class TestIssuerTrustComplex:
         """
         mock_oidc.get_jwks.return_value = jwks
         expected_issuer = "https://valid.com/"
-        validator = TokenValidator(oidc_provider=mock_oidc, audience="aud", issuer=expected_issuer)
+        validator = TokenValidator(pii_salt=SecretStr("test-salt"), oidc_provider=mock_oidc, audience="aud", issuer=expected_issuer)
 
         token_valid = self.create_token(
             key_pair, {"sub": "valid_user", "iss": expected_issuer, "aud": "aud", "exp": 9999999999}

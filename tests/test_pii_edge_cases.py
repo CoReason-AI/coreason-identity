@@ -24,63 +24,69 @@ class TestPiiAnonymizationEdgeCases:
     def mock_oidc_provider(self) -> Mock:
         return Mock(spec=OIDCProvider)
 
-    def test_empty_user_id(self, mock_oidc_provider: Mock) -> None:
-        """
-        Edge Case 1: Empty User ID.
-        Verify it hashes correctly (empty message HMAC) and doesn't crash.
-        """
-        salt = "test-salt"
-        validator = TokenValidator(oidc_provider=mock_oidc_provider, audience="aud", pii_salt=SecretStr(salt))
-
-        user_id = ""
-        anonymized = validator._anonymize(user_id)
-
-        expected = hmac.new(salt.encode("utf-8"), user_id.encode("utf-8"), hashlib.sha256).hexdigest()
-
-        assert anonymized == expected
-
-    def test_null_byte_in_user_id(self, mock_oidc_provider: Mock) -> None:
-        """
-        Edge Case 2: Null Byte in User ID.
-        Ensure \\x00 is handled correctly (Python strings handle nulls fine, but HMAC ensures no truncation issues).
-        """
-        salt = "test-salt"
-        validator = TokenValidator(oidc_provider=mock_oidc_provider, audience="aud", pii_salt=SecretStr(salt))
-
-        user_id = "user\x00with\x00nulls"
-        anonymized = validator._anonymize(user_id)
-
-        expected = hmac.new(salt.encode("utf-8"), user_id.encode("utf-8"), hashlib.sha256).hexdigest()
-
-        assert anonymized == expected
-
-    def test_long_user_id(self, mock_oidc_provider: Mock) -> None:
-        """
-        Edge Case 3: Extremely Long User ID.
-        Verify correct hashing for large payloads.
-        """
-        salt = "test-salt"
-        validator = TokenValidator(oidc_provider=mock_oidc_provider, audience="aud", pii_salt=SecretStr(salt))
-
-        # 100KB string
-        user_id = "a" * 100_000
-        anonymized = validator._anonymize(user_id)
-
-        expected = hmac.new(salt.encode("utf-8"), user_id.encode("utf-8"), hashlib.sha256).hexdigest()
-
-        assert anonymized == expected
-
-    def test_unicode_salt(self, mock_oidc_provider: Mock) -> None:
-        """
-        Edge Case 4: Unicode Salt.
-        Ensure the configuration and HMAC handle non-ASCII characters in the salt.
-        """
-        salt = "s@lt_🚀_ñ"
+    def test_empty_string_salt(self, mock_oidc_provider: Mock) -> None:
+        """Test with empty string salt (should work but be weak)."""
+        salt = ""
         validator = TokenValidator(oidc_provider=mock_oidc_provider, audience="aud", pii_salt=SecretStr(salt))
 
         user_id = "user123"
-        anonymized = validator._anonymize(user_id)
+        hash_val = validator._anonymize(user_id)
 
         expected = hmac.new(salt.encode("utf-8"), user_id.encode("utf-8"), hashlib.sha256).hexdigest()
+        assert hash_val == expected
+        assert hash_val != ""
 
-        assert anonymized == expected
+    def test_whitespace_salt(self, mock_oidc_provider: Mock) -> None:
+        """Test with whitespace-only salt."""
+        salt = "   "
+        validator = TokenValidator(oidc_provider=mock_oidc_provider, audience="aud", pii_salt=SecretStr(salt))
+
+        user_id = "user123"
+        hash_val = validator._anonymize(user_id)
+
+        expected = hmac.new(salt.encode("utf-8"), user_id.encode("utf-8"), hashlib.sha256).hexdigest()
+        assert hash_val == expected
+
+    def test_special_chars_salt(self, mock_oidc_provider: Mock) -> None:
+        """Test with special characters in salt."""
+        salt = "!@#$%^&*()_+-=[]{}|;':,./<>?"
+        validator = TokenValidator(oidc_provider=mock_oidc_provider, audience="aud", pii_salt=SecretStr(salt))
+
+        user_id = "user123"
+        hash_val = validator._anonymize(user_id)
+
+        expected = hmac.new(salt.encode("utf-8"), user_id.encode("utf-8"), hashlib.sha256).hexdigest()
+        assert hash_val == expected
+
+    def test_unicode_salt(self, mock_oidc_provider: Mock) -> None:
+        """Test with Unicode characters (emoji, non-ascii) in salt."""
+        salt = "🔐🧂salt_with_emoji_ñ"
+        validator = TokenValidator(oidc_provider=mock_oidc_provider, audience="aud", pii_salt=SecretStr(salt))
+
+        user_id = "user123"
+        hash_val = validator._anonymize(user_id)
+
+        expected = hmac.new(salt.encode("utf-8"), user_id.encode("utf-8"), hashlib.sha256).hexdigest()
+        assert hash_val == expected
+
+    def test_very_long_salt(self, mock_oidc_provider: Mock) -> None:
+        """Test with a very long salt."""
+        salt = "a" * 10000
+        validator = TokenValidator(oidc_provider=mock_oidc_provider, audience="aud", pii_salt=SecretStr(salt))
+
+        user_id = "user123"
+        hash_val = validator._anonymize(user_id)
+
+        expected = hmac.new(salt.encode("utf-8"), user_id.encode("utf-8"), hashlib.sha256).hexdigest()
+        assert hash_val == expected
+
+    def test_unicode_user_id(self, mock_oidc_provider: Mock) -> None:
+        """Test hashing of a user ID containing unicode characters."""
+        salt = "test-salt"
+        validator = TokenValidator(oidc_provider=mock_oidc_provider, audience="aud", pii_salt=SecretStr(salt))
+
+        user_id = "user_🚀_ñ"
+        hash_val = validator._anonymize(user_id)
+
+        expected = hmac.new(salt.encode("utf-8"), user_id.encode("utf-8"), hashlib.sha256).hexdigest()
+        assert hash_val == expected

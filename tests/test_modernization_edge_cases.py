@@ -17,6 +17,7 @@ from typing import Any
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from pydantic import SecretStr
 from authlib.jose import JsonWebKey, jwt
 
 from coreason_identity.exceptions import CoreasonIdentityError, InvalidTokenError
@@ -117,7 +118,7 @@ class TestTokenValidatorTypeStress:
     def validator(self, mock_oidc_provider: Mock, jwks: dict[str, Any]) -> TokenValidator:
         mock_oidc_provider.get_jwks.return_value = jwks
         return TokenValidator(
-            oidc_provider=mock_oidc_provider,
+            pii_salt=SecretStr("test-salt"), oidc_provider=mock_oidc_provider,
             audience="aud",
             issuer="https://iss/",
         )

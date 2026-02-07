@@ -15,6 +15,7 @@ from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from pydantic import SecretStr
 from authlib.jose.errors import InvalidClaimError
 
 from coreason_identity.config import CoreasonIdentityConfig
@@ -30,6 +31,7 @@ from coreason_identity.utils.logger import logger
 @pytest.fixture
 def mock_config() -> CoreasonIdentityConfig:
     return CoreasonIdentityConfig(
+        pii_salt="test-salt",
         domain="auth.coreason.com",
         audience="expected-audience",
         client_id="test-client",
@@ -90,7 +92,7 @@ async def test_audience_mismatch_real_validator_behavior() -> None:
     mock_oidc = MagicMock()
     mock_oidc.get_jwks = AsyncMock(return_value={"keys": []})
     mock_oidc.get_issuer = AsyncMock(return_value="https://issuer.com")
-    validator = TokenValidator(mock_oidc, audience="expected-audience", issuer="https://issuer.com")
+    validator = TokenValidator(mock_oidc, audience="expected-audience", pii_salt=SecretStr("test-salt"), issuer="https://issuer.com")
 
     # Mock the internal jwt.decode to raise InvalidClaimError for 'aud'
     with patch.object(validator.jwt, "decode") as mock_decode:
@@ -118,7 +120,7 @@ async def test_pii_redaction_in_logs(log_capture: list[str]) -> None:
 
     # Compute expected hash
     expected_hash = hmac.new(
-        b"coreason-unsafe-default-salt", sensitive_user_id.encode("utf-8"), hashlib.sha256
+        b"test-salt", sensitive_user_id.encode("utf-8"), hashlib.sha256
     ).hexdigest()
 
     # Mock validation success on the identity manager itself won't trigger the logging code
@@ -131,7 +133,7 @@ async def test_pii_redaction_in_logs(log_capture: list[str]) -> None:
     mock_oidc.get_jwks = AsyncMock(return_value={"keys": []})
     mock_oidc.get_issuer = AsyncMock(return_value="https://issuer.com")
 
-    validator = TokenValidator(mock_oidc, audience="aud", issuer="https://issuer.com")
+    validator = TokenValidator(mock_oidc, audience="aud", pii_salt=SecretStr("test-salt"), issuer="https://issuer.com")
 
     # Mock jwt.decode to return our claims without error
     with patch.object(validator.jwt, "decode") as mock_decode:
@@ -217,7 +219,7 @@ class TestSecurityEdgeCases:
         """
         unicode_user_id = "user_🚀_ñ_123"
         expected_hash = hmac.new(
-            b"coreason-unsafe-default-salt", unicode_user_id.encode("utf-8"), hashlib.sha256
+            b"test-salt", unicode_user_id.encode("utf-8"), hashlib.sha256
         ).hexdigest()
         token_string = "unicode.jwt.token"
 
@@ -228,7 +230,7 @@ class TestSecurityEdgeCases:
         mock_oidc.get_jwks = AsyncMock(return_value={"keys": []})
         mock_oidc.get_issuer = AsyncMock(return_value="https://issuer.com")
 
-        validator = TokenValidator(mock_oidc, audience="aud", issuer="https://issuer.com")
+        validator = TokenValidator(mock_oidc, audience="aud", pii_salt=SecretStr("test-salt"), issuer="https://issuer.com")
 
         with patch.object(validator.jwt, "decode") as mock_decode:
             mock_claims_dict = {"sub": unicode_user_id, "aud": "aud", "exp": 1234567890}

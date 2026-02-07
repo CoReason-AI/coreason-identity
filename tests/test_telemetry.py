@@ -15,6 +15,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from pydantic import SecretStr
 from authlib.jose.errors import ExpiredTokenError
 from opentelemetry.sdk.trace import Tracer, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
@@ -65,7 +66,7 @@ async def test_validate_token_success_telemetry(
 
     # Patch the module-level tracer
     with patch("coreason_identity.validator.tracer", tracer):
-        validator = TokenValidator(mock_oidc_provider, audience, issuer="https://test-issuer.com")
+        validator = TokenValidator(mock_oidc_provider, audience, pii_salt=SecretStr("test-salt"), issuer="https://test-issuer.com")
 
         # Mock JWT decode to succeed
         claims = MockClaims({"sub": "user123", "aud": audience, "exp": time.time() + 3600})
@@ -81,7 +82,7 @@ async def test_validate_token_success_telemetry(
     assert span.status.status_code == StatusCode.OK
     # The attributes might be None if empty, but we set it, so it should be a BoundedAttributes
     assert span.attributes is not None
-    expected_hash = hmac.new(b"coreason-unsafe-default-salt", b"user123", hashlib.sha256).hexdigest()
+    expected_hash = hmac.new(b"test-salt", b"user123", hashlib.sha256).hexdigest()
     assert span.attributes["user.id"] == expected_hash
 
 
@@ -95,7 +96,7 @@ async def test_validate_token_failure_telemetry(
     audience = "test-audience"
 
     with patch("coreason_identity.validator.tracer", tracer):
-        validator = TokenValidator(mock_oidc_provider, audience, issuer="https://test-issuer.com")
+        validator = TokenValidator(mock_oidc_provider, audience, pii_salt=SecretStr("test-salt"), issuer="https://test-issuer.com")
 
         # Mock JWT decode to raise ExpiredTokenError
         with patch("authlib.jose.JsonWebToken.decode") as mock_decode:
@@ -127,7 +128,7 @@ async def test_logging_strictness(mock_oidc_provider: MagicMock) -> None:
     logger.add(logs.append, level="INFO", format="{message}")
 
     audience = "test-audience"
-    validator = TokenValidator(mock_oidc_provider, audience, issuer="https://test-issuer.com")
+    validator = TokenValidator(mock_oidc_provider, audience, pii_salt=SecretStr("test-salt"), issuer="https://test-issuer.com")
     user_id = "sensitive-user-id"
 
     # Mock JWT decode to succeed
@@ -137,7 +138,7 @@ async def test_logging_strictness(mock_oidc_provider: MagicMock) -> None:
         await validator.validate_token("dummy_token")
 
     # Calculate expected hash
-    expected_hash = hmac.new(b"coreason-unsafe-default-salt", user_id.encode("utf-8"), hashlib.sha256).hexdigest()
+    expected_hash = hmac.new(b"test-salt", user_id.encode("utf-8"), hashlib.sha256).hexdigest()
 
     # Check if the message is in the captured logs
     assert any(f"Token validated for user {expected_hash}" in record.record["message"] for record in logs)

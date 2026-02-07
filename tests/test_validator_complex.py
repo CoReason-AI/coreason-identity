@@ -13,6 +13,7 @@ from typing import Any
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from pydantic import SecretStr
 from authlib.jose import JsonWebKey, jwt
 
 from coreason_identity.exceptions import (
@@ -50,7 +51,7 @@ class TestTokenValidatorComplex:
     @pytest.fixture
     def validator(self, mock_oidc_provider: Mock) -> TokenValidator:
         return TokenValidator(
-            oidc_provider=mock_oidc_provider, audience="my-audience", issuer="https://valid-issuer.com"
+            pii_salt=SecretStr("test-salt"), oidc_provider=mock_oidc_provider, audience="my-audience", issuer="https://valid-issuer.com"
         )
 
     def create_token(self, key: Any, claims: dict[str, Any], headers: dict[str, Any] | None = None) -> bytes:
