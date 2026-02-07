@@ -14,7 +14,7 @@ import httpx
 import pytest
 
 from coreason_identity.config import CoreasonIdentityConfig
-from coreason_identity.manager import IdentityManagerSync, IdentityManagerAsync
+from coreason_identity.manager import IdentityManagerAsync, IdentityManagerSync
 from coreason_identity.models import DeviceFlowResponse, TokenResponse, UserContext
 
 

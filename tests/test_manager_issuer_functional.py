@@ -84,7 +84,8 @@ def test_manager_enforces_strict_issuer(key_pair: Any, jwks: dict[str, Any]) -> 
 
         # Expect failure (InvalidTokenError -> CoreasonIdentityError or specifically InvalidClaimError wrapped)
         # TokenValidator raises InvalidAudienceError or CoreasonIdentityError for invalid claims.
-        # IdentityManagerSync wraps validation in its own logic? No, validate_token calls validator.validate_token directly.
+        # IdentityManagerSync wraps validation in its own logic? No,
+        # validate_token calls validator.validate_token directly.
 
         with pytest.raises(CoreasonIdentityError, match="Invalid claim"):
             manager.validate_token(f"Bearer {token_wrong}")
