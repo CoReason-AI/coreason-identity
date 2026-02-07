@@ -181,22 +181,25 @@ class TestIdentityMapperComplex:
             "sub": "u1",
             "email": "u@e.com",
             "https://coreason.com/project_id": "EXPLICIT_ID",
-            "groups": ["project:GROUP_ID"],
+            "groups": ["project:apollo"],
         }
         context = mapper.map_claims(claims)
         # Explicit claim wins
         assert context.claims["project_context"] == "EXPLICIT_ID"
 
     def test_mapper_admin_group_case_insensitive(self) -> None:
-        """Test 'AdMiN' does NOT map to permissions=['*'] anymore."""
+        """
+        Test 'AdMiN' is rejected due to strict enum validation.
+        Previously it just didn't map to permissions.
+        """
         mapper = IdentityMapper()
         claims = {
             "sub": "u1",
             "email": "u@e.com",
             "groups": ["AdMiN"],
         }
-        context = mapper.map_claims(claims)
-        assert context.claims["permissions"] == []
+        with pytest.raises(CoreasonIdentityError):
+            mapper.map_claims(claims)
 
 
 class TestDeviceFlowClientComplex:

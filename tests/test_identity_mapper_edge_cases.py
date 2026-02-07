@@ -14,7 +14,7 @@ Edge case tests specifically for the new Identity Mapper logic and UserContext.
 
 import pytest
 
-from coreason_identity.exceptions import InvalidTokenError
+from coreason_identity.exceptions import CoreasonIdentityError, InvalidTokenError
 from coreason_identity.identity_mapper import IdentityMapper
 
 
@@ -33,20 +33,20 @@ def test_mapper_missing_downstream_token(mapper: IdentityMapper) -> None:
 def test_mapper_scopes_parsing_variations(mapper: IdentityMapper) -> None:
     """Test various formats of scope/scp claims."""
     # 1. 'scope' as space-delimited string
-    c1 = {"sub": "u1", "email": "u@e.com", "scope": "read write"}
-    assert mapper.map_claims(c1).scopes == ["read", "write"]
+    c1 = {"sub": "u1", "email": "u@e.com", "scope": "openid profile"}
+    assert mapper.map_claims(c1).scopes == ["openid", "profile"]
 
     # 2. 'scp' as list
-    c2 = {"sub": "u1", "email": "u@e.com", "scp": ["read", "write"]}
-    assert mapper.map_claims(c2).scopes == ["read", "write"]
+    c2 = {"sub": "u1", "email": "u@e.com", "scp": ["openid", "profile"]}
+    assert mapper.map_claims(c2).scopes == ["openid", "profile"]
 
     # 3. 'scopes' as list (explicit field)
-    c3 = {"sub": "u1", "email": "u@e.com", "scopes": ["read", "write"]}
-    assert mapper.map_claims(c3).scopes == ["read", "write"]
+    c3 = {"sub": "u1", "email": "u@e.com", "scopes": ["openid", "profile"]}
+    assert mapper.map_claims(c3).scopes == ["openid", "profile"]
 
     # 4. 'scope' as single string (no spaces)
-    c4 = {"sub": "u1", "email": "u@e.com", "scope": "admin"}
-    assert mapper.map_claims(c4).scopes == ["admin"]
+    c4 = {"sub": "u1", "email": "u@e.com", "scope": "openid"}
+    assert mapper.map_claims(c4).scopes == ["openid"]
 
     # 5. Missing scope
     c5 = {"sub": "u1", "email": "u@e.com"}
@@ -86,16 +86,17 @@ def test_mapper_claims_conflicts(mapper: IdentityMapper) -> None:
 def test_mapper_groups_mixed_types_robustness(mapper: IdentityMapper) -> None:
     """Test groups containing non-string types."""
     # Integers in groups -> parsed as strings by ensure_list_of_strings
-    c1 = {"sub": "u1", "email": "u@e.com", "groups": [123, "valid"]}
-    ctx1 = mapper.map_claims(c1)
-    assert ctx1.groups == ["123", "valid"]
+    # But UserContext validation should fail because '123' is not a valid CoreasonGroup
+    c1 = {"sub": "u1", "email": "u@e.com", "groups": [123, "admin"]}
+    with pytest.raises(CoreasonIdentityError):
+        mapper.map_claims(c1)
 
-    # None in groups -> filtered out
-    c2 = {"sub": "u1", "email": "u@e.com", "groups": [None, "valid"]}
+    # None in groups -> filtered out, leaving only "admin"
+    c2 = {"sub": "u1", "email": "u@e.com", "groups": [None, "admin"]}
     # ensure_list_of_strings: "if item is not None"
     # But wait, [str(item) for item in v if item is not None]
     ctx2 = mapper.map_claims(c2)
-    assert ctx2.groups == ["valid"]
+    assert ctx2.groups == ["admin"]
 
 
 def test_mapper_malformed_email(mapper: IdentityMapper) -> None:

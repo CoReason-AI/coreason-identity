@@ -40,22 +40,24 @@ class TestIdentityMapperRobustness:
         claims = {
             "sub": "u1",
             "email": "u@e.com",
-            "groups": ["group1", "group2"],
+            "groups": ["admin", "project:apollo"],
         }
         context = mapper.map_claims(claims)
         permissions = context.claims.get("permissions", [])
-        assert "group1" in permissions or "*" in permissions or not permissions
+        # Permissions mapping is removed, so permissions should be empty
+        assert not permissions
 
         claims_mixed = {
             "sub": "u1",
             "email": "u@e.com",
-            "groups": ["group1", 123, True],
+            "groups": ["admin", 123, True],
         }
 
-        try:
-            context = mapper.map_claims(claims_mixed)
-        except InvalidTokenError:
-            return
+        # 123 and True are converted to strings "123", "True" by RawIdPClaims,
+        # but UserContext rejects them as invalid enums.
+        # IdentityMapper wraps exceptions in CoreasonIdentityError.
+        with pytest.raises(CoreasonIdentityError):
+            mapper.map_claims(claims_mixed)
 
     def test_permissions_vs_groups_conflict(self) -> None:
         """
@@ -81,7 +83,7 @@ class TestIdentityMapperRobustness:
             "sub": "u1",
             "email": "u@e.com",
             "https://coreason.com/project_id": "EXPLICIT",
-            "groups": ["project:IMPLICIT"],
+            "groups": ["project:apollo"],
         }
         context = mapper.map_claims(claims)
         assert context.claims["project_context"] == "EXPLICIT"

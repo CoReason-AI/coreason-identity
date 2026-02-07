@@ -35,45 +35,45 @@ class TestIdentityMapperTypeBoundaries:
         Verify that `ensure_list_of_strings` handles mixed lists (int, None, bool) correctly
         and converts them to strings, maintaining robustness.
         """
-        mapper = IdentityMapper()
+        # Testing RawIdPClaims directly since UserContext enforces enums and would fail
         claims = {
             "sub": "user1",
             "email": "u@e.com",
             "groups": ["valid", 123, None, True],
         }
         # 123 -> "123", True -> "True", None -> filtered out
-        context = mapper.map_claims(claims)
-        assert "valid" in context.groups
-        assert "123" in context.groups
-        assert "True" in context.groups
-        assert None not in context.groups
+        raw = RawIdPClaims(**claims)
+        assert "valid" in raw.groups
+        assert "123" in raw.groups
+        assert "True" in raw.groups
+        assert None not in raw.groups
 
     def test_ensure_list_of_strings_tuple_input(self) -> None:
         """
         Verify that a tuple input is correctly converted to a list of strings.
         This tests the `isinstance(v, (list, tuple))` logic.
         """
-        mapper = IdentityMapper()
+        # Testing RawIdPClaims directly
         claims = {
             "sub": "user1",
             "email": "u@e.com",
             "groups": ("group1", "group2"),
         }
-        context = mapper.map_claims(claims)
-        assert context.groups == ["group1", "group2"]
+        raw = RawIdPClaims(**claims)
+        assert raw.groups == ["group1", "group2"]
 
     def test_ensure_list_of_strings_single_string_in_list(self) -> None:
         """
         Verify that a single string inside a list remains a list of one string.
         """
-        mapper = IdentityMapper()
+        # Testing RawIdPClaims directly
         claims = {
             "sub": "user1",
             "email": "u@e.com",
             "groups": ["group1"],
         }
-        context = mapper.map_claims(claims)
-        assert context.groups == ["group1"]
+        raw = RawIdPClaims(**claims)
+        assert raw.groups == ["group1"]
 
     def test_raw_claims_model_direct_instantiation(self) -> None:
         """

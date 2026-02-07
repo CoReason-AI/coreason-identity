@@ -12,9 +12,23 @@
 Data models for the coreason-identity package.
 """
 
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr
+
+
+class CoreasonScope(StrEnum):
+    OPENID = "openid"
+    PROFILE = "profile"
+    EMAIL = "email"
+    READ_REPORTS = "read:reports"
+
+
+class CoreasonGroup(StrEnum):
+    ADMIN = "admin"
+    DEVELOPER = "developer"
+    PROJECT_APOLLO = "project:apollo"
 
 
 class UserContext(BaseModel):
@@ -45,15 +59,15 @@ class UserContext(BaseModel):
     email: EmailStr = Field(
         ..., description="The user's email address. Verified and strictly typed.", examples=["alice@coreason.ai"]
     )
-    groups: list[str] = Field(
+    groups: list[CoreasonGroup] = Field(
         default_factory=list,
         description="Security group IDs. Used for Row-Level Security (RLS).",
-        examples=[["admin", "project:apollo"]],
+        examples=[[CoreasonGroup.ADMIN, CoreasonGroup.PROJECT_APOLLO]],
     )
-    scopes: list[str] = Field(
+    scopes: list[CoreasonScope] = Field(
         default_factory=list,
         description="OAuth 2.0 scopes for coarse-grained API permission checks.",
-        examples=[["openid", "profile"]],
+        examples=[[CoreasonScope.OPENID, CoreasonScope.PROFILE]],
     )
     downstream_token: SecretStr | None = Field(
         default=None, description="The On-Behalf-Of (OBO) token for downstream API calls. Protected from logging."
