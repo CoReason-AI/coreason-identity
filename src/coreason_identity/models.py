@@ -87,6 +87,8 @@ class DeviceFlowResponse(BaseModel):
         interval (int): The minimum amount of time in seconds that the client SHOULD wait between polling requests.
     """
 
+    model_config = ConfigDict(frozen=True)
+
     device_code: str
     user_code: str
     verification_uri: str
@@ -106,6 +108,8 @@ class TokenResponse(BaseModel):
         token_type (str): The type of the token (e.g. "Bearer").
         expires_in (int): The lifetime in seconds of the access token.
     """
+
+    model_config = ConfigDict(frozen=True)
 
     access_token: str
     refresh_token: str | None = None

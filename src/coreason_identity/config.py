@@ -36,6 +36,7 @@ class CoreasonIdentityConfig(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="COREASON_AUTH_",
         case_sensitive=False,
+        frozen=True,
     )
 
     domain: str
@@ -51,7 +52,8 @@ class CoreasonIdentityConfig(BaseSettings):
         """
         if self.issuer is None:
             # self.domain is already normalized by its field validator
-            self.issuer = f"https://{self.domain}/"
+            # Since the model is frozen, we must use object.__setattr__ to bypass validation
+            object.__setattr__(self, "issuer", f"https://{self.domain}/")
         return self
 
     @field_validator("domain")
