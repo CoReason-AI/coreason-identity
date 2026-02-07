@@ -25,6 +25,7 @@ from coreason_identity.exceptions import CoreasonIdentityError, InvalidTokenErro
 from coreason_identity.identity_mapper import IdentityMapper
 from coreason_identity.models import DeviceFlowResponse, TokenResponse, UserContext
 from coreason_identity.oidc_provider import OIDCProvider
+from coreason_identity.transport import SafeHTTPTransport
 from coreason_identity.validator import TokenValidator
 
 
@@ -44,7 +45,13 @@ class IdentityManagerAsync:
         """
         self.config = config
         self._internal_client = client is None
-        self._client = client or httpx.AsyncClient(timeout=self.config.http_timeout)
+
+        if client:
+            self._client = client
+        else:
+            # Use SafeHTTPTransport to prevent SSRF and DNS Rebinding
+            transport = SafeHTTPTransport(unsafe_local_dev=self.config.unsafe_local_dev)
+            self._client = httpx.AsyncClient(transport=transport, timeout=self.config.http_timeout)
 
         # Domain is already normalized by Config validator to be just the hostname (e.g. auth.coreason.com)
         self.domain = self.config.domain
