@@ -32,7 +32,7 @@ The raw User ID is **never** written to logs or traces.
 ## 3. Implementation Details
 
 *   **`TokenValidator`**: Now accepts `pii_salt` in its constructor. The `_anonymize(value: str)` method encapsulates the HMAC logic.
-*   **`IdentityManager`**: Propagates the salt from the global configuration to the validator.
+*   **`IdentityManagerSync`**: Propagates the salt from the global configuration to the validator.
 *   **OpenTelemetry**: The span attribute `user.id` is explicitly set to the anonymized value.
 
 ## 4. Security Considerations

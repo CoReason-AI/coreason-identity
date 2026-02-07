@@ -121,11 +121,11 @@ The agent must generate a Python package structure that allows the consuming mid
 ```python
 # Intended Usage Example (Do NOT implement this, just enable it)
 
-from coreason_identity import IdentityManager, CoreasonIdentityConfig
+from coreason_identity import IdentityManagerSync, CoreasonIdentityConfig
 
 # 1. Initialize (The Borrowing)
 config = CoreasonIdentityConfig(domain="auth.coreason.com", audience="api://coreason")
-identity = IdentityManager(config)
+identity = IdentityManagerSync(config)
 
 # 2. Validate (The Bouncer)
 try:
