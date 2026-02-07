@@ -14,7 +14,6 @@ Tests for explicit scope enforcement edge cases and complex scenarios.
 
 from unittest.mock import AsyncMock, patch
 
-import anyio
 import httpx
 import pytest
 
@@ -92,7 +91,6 @@ class TestComplexScopeScenarios:
             patch("coreason_identity.manager.IdentityMapper"),
             patch("coreason_identity.manager.DeviceFlowClient") as MockClient,
         ):
-            mock_instance = MockClient.return_value
             # We need separate mock instances for separate calls ideally, but MockClient() returns same mock
             # unless side_effect is used.
             # Let's use side_effect to return distinct mocks
