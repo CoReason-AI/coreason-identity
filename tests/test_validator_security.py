@@ -45,11 +45,7 @@ class TestValidatorSecurity:
         return {"keys": [rsa_key_pair.as_dict(private=False)]}
 
     def create_token(
-        self,
-        key: Any,
-        claims: dict[str, Any],
-        headers: dict[str, Any] | None = None,
-        alg: str = "RS256"
+        self, key: Any, claims: dict[str, Any], headers: dict[str, Any] | None = None, alg: str = "RS256"
     ) -> str:
         if headers is None:
             headers = {"alg": alg, "kid": key.as_dict().get("kid")}
@@ -72,7 +68,7 @@ class TestValidatorSecurity:
             audience="my-audience",
             issuer="https://valid-issuer.com",
             allowed_algorithms=["RS256"],
-            leeway=0
+            leeway=0,
         )
 
         now = int(time.time())
@@ -105,7 +101,7 @@ class TestValidatorSecurity:
             audience="my-audience",
             issuer="https://valid-issuer.com",
             allowed_algorithms=["RS256"],
-            leeway=0  # Zero tolerance
+            leeway=0,  # Zero tolerance
         )
 
         now = int(time.time())
@@ -135,7 +131,7 @@ class TestValidatorSecurity:
             audience="my-audience",
             issuer="https://valid-issuer.com",
             allowed_algorithms=["RS256"],
-            leeway=10  # 10 seconds leeway
+            leeway=10,  # 10 seconds leeway
         )
 
         now = int(time.time())
