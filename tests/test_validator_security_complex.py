@@ -177,7 +177,7 @@ class TestValidatorSecurityComplex:
         # 2. Import as Key object (Authlib needs this step to export PEM)
         pub_key_obj = JsonWebKey.import_key(pub_jwk, {"kty": "RSA"})
         # 3. Export as PEM (this is what attackers use as the HMAC secret)
-        pub_key_pem = pub_key_obj.as_pem()
+        pub_key_pem = pub_key_obj.as_pem()  # type: ignore[attr-defined]
 
         # Create a new OctKey using the PEM content as the secret
         # Note: In real attacks, they use the PEM string bytes as the secret
@@ -189,17 +189,18 @@ class TestValidatorSecurityComplex:
         k_bytes = pub_key_pem
         k_b64 = base64.urlsafe_b64encode(k_bytes).replace(b"=", b"").decode("utf-8")
 
-        attacker_key_dict = {
-            "kty": "oct",
-            "k": k_b64,
-            "kid": rsa_key_pair.as_dict()["kid"]
-        }
+        attacker_key_dict = {"kty": "oct", "k": k_b64, "kid": rsa_key_pair.as_dict()["kid"]}
 
         # Sign it using the attacker key
         # We need to pass the dict directly or import it as OctKey (which is allowed if it's a dict)
         attacker_key = JsonWebKey.import_key(attacker_key_dict)
 
-        token_confused = self.create_token(attacker_key, claims, headers={"alg": "HS256", "kid": attacker_key_dict["kid"]}, alg="HS256")
+        token_confused = self.create_token(
+            attacker_key,
+            claims,
+            headers={"alg": "HS256", "kid": attacker_key_dict["kid"]},
+            alg="HS256",
+        )
 
         # Validation should fail immediately due to algorithm mismatch
         with pytest.raises(InvalidTokenError):
