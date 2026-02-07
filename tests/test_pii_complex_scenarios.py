@@ -69,9 +69,7 @@ class TestPiiAnonymizationComplexScenarios:
         Verify IdentityManager correctly propagates the salt from a complex config object to the validator.
         """
         custom_salt = "super-secret-salt-value"
-        config = CoreasonVerifierConfig(
-            domain="auth.example.com", audience="aud", pii_salt=SecretStr(custom_salt)
-        )
+        config = CoreasonVerifierConfig(domain="auth.example.com", audience="aud", pii_salt=SecretStr(custom_salt))
 
         with (
             patch("coreason_identity.manager.OIDCProvider") as MockOIDC,
