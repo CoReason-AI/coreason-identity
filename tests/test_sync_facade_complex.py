@@ -8,9 +8,9 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
-import time
 import concurrent.futures
-from unittest.mock import patch, Mock, AsyncMock
+import time
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -18,20 +18,15 @@ from coreason_identity.config import CoreasonIdentityConfig
 from coreason_identity.manager import IdentityManagerSync
 from coreason_identity.models import UserContext
 
+
 @pytest.fixture
 def mock_identity_manager_sync() -> IdentityManagerSync:
-    config = CoreasonIdentityConfig(
-        domain="test.auth0.com",
-        audience="test-audience",
-        client_id="test-client-id"
-    )
+    config = CoreasonIdentityConfig(domain="test.auth0.com", audience="test-audience", client_id="test-client-id")
     with patch("coreason_identity.manager.IdentityManagerAsync") as MockAsync:
         mock_instance = MockAsync.return_value
 
         # Setup mocks for methods
-        mock_instance.validate_token = AsyncMock(return_value=UserContext(
-            user_id="user123", email="test@example.com"
-        ))
+        mock_instance.validate_token = AsyncMock(return_value=UserContext(user_id="user123", email="test@example.com"))
         mock_instance.start_device_login = AsyncMock()
         mock_instance.await_device_token = AsyncMock()
         mock_instance.__aexit__ = AsyncMock()
@@ -46,6 +41,7 @@ def test_concurrent_usage_in_threads(mock_identity_manager_sync: IdentityManager
 
     Each thread calls validate_token, which calls anyio.run(), creating a new loop each time.
     """
+
     def worker(token_suffix: str) -> str:
         # Simulate some work
         time.sleep(0.01)
@@ -60,7 +56,7 @@ def test_concurrent_usage_in_threads(mock_identity_manager_sync: IdentityManager
     assert all(uid == "user123" for uid in results)
 
     # Check calls
-    assert mock_identity_manager_sync._async.validate_token.call_count == 10
+    assert mock_identity_manager_sync._async.validate_token.call_count == 10  # type: ignore[attr-defined]
 
 
 def test_reentrant_context_manager_usage(mock_identity_manager_sync: IdentityManagerSync) -> None:
@@ -76,7 +72,7 @@ def test_reentrant_context_manager_usage(mock_identity_manager_sync: IdentityMan
     with mock_identity_manager_sync:
         mock_identity_manager_sync.validate_token("Bearer token2")
 
-    assert mock_identity_manager_sync._async.__aexit__.call_count == 2
+    assert mock_identity_manager_sync._async.__aexit__.call_count == 2  # type: ignore[attr-defined]
 
 
 def test_exception_propagation_from_async(mock_identity_manager_sync: IdentityManagerSync) -> None:
@@ -84,7 +80,7 @@ def test_exception_propagation_from_async(mock_identity_manager_sync: IdentityMa
     Verify that exceptions raised in the async layer are correctly propagated
     up through the sync facade.
     """
-    mock_identity_manager_sync._async.validate_token.side_effect = ValueError("Async error")
+    mock_identity_manager_sync._async.validate_token.side_effect = ValueError("Async error")  # type: ignore[attr-defined]
 
     with pytest.raises(ValueError, match="Async error"):
         mock_identity_manager_sync.validate_token("Bearer fail")
@@ -96,6 +92,7 @@ def test_nested_sync_calls_via_callbacks_simulated(mock_identity_manager_sync: I
     Just to ensure stack depth or simple re-entrancy isn't an issue for anyio.run
     (which creates new loops, so it shouldn't be unless nested within an async loop).
     """
+
     def inner_function() -> str:
         user = mock_identity_manager_sync.validate_token("Bearer inner")
         return user.user_id
@@ -104,4 +101,4 @@ def test_nested_sync_calls_via_callbacks_simulated(mock_identity_manager_sync: I
         return inner_function()
 
     assert outer_function() == "user123"
-    assert mock_identity_manager_sync._async.validate_token.call_count == 1
+    assert mock_identity_manager_sync._async.validate_token.call_count == 1  # type: ignore[attr-defined]

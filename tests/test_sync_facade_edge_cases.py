@@ -8,12 +8,12 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
+from unittest.mock import Mock, patch
+
 import pytest
-from unittest.mock import patch, Mock
 
 from coreason_identity.config import CoreasonIdentityConfig
-from coreason_identity.exceptions import CoreasonIdentityError
-from coreason_identity.manager import IdentityManagerSync, IdentityManagerAsync
+from coreason_identity.manager import IdentityManagerSync
 
 
 def test_import_old_class_fails() -> None:
@@ -53,7 +53,7 @@ def test_context_manager_cleanup_idempotency() -> None:
         # But wait, anyio.run(func, ...) calls func(). If func is async, it returns a coroutine.
         # So we need a coroutine function or something that returns a coroutine.
 
-        async def mock_aexit(*args, **kwargs):
+        async def mock_aexit(*args: object, **kwargs: object) -> None:
             pass
 
         mock_instance.__aexit__ = mock_aexit
