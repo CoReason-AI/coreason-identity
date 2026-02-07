@@ -144,6 +144,6 @@ def test_integration_legacy_access(integration_manager: IdentityManagerSync) -> 
     assert user.claims.get("permissions") == []
 
     # Verify New Access
-    assert user.groups == ["project:gemini", "admin"]
+    assert user.groups == ("project:gemini", "admin")
     assert user.downstream_token is not None
     assert user.downstream_token.get_secret_value() == "token123"

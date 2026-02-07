@@ -40,8 +40,8 @@ def test_map_claims_happy_path_explicit(mapper: IdentityMapper) -> None:
     assert context.email == "user@example.com"
     assert context.claims["project_context"] == "proj_123"
     assert context.claims["permissions"] == ["read", "write"]
-    assert context.scopes == ["read", "write"]
-    assert context.groups == ["group1"]
+    assert context.scopes == ("read", "write")
+    assert context.groups == ("group1",)
 
 
 def test_map_claims_with_token(mapper: IdentityMapper) -> None:
@@ -100,15 +100,15 @@ def test_map_claims_scopes(mapper: IdentityMapper) -> None:
     """Test scope parsing."""
     # 1. 'scope' string
     claims1: dict[str, Any] = {"sub": "u1", "email": "u@e.com", "scope": "a b c"}
-    assert mapper.map_claims(claims1).scopes == ["a", "b", "c"]
+    assert mapper.map_claims(claims1).scopes == ("a", "b", "c")
 
     # 2. 'scp' list
     claims2: dict[str, Any] = {"sub": "u1", "email": "u@e.com", "scp": ["d", "e"]}
-    assert mapper.map_claims(claims2).scopes == ["d", "e"]
+    assert mapper.map_claims(claims2).scopes == ("d", "e")
 
     # 3. 'scopes' explicit
     claims3: dict[str, Any] = {"sub": "u1", "email": "u@e.com", "scopes": ["f", "g"]}
-    assert mapper.map_claims(claims3).scopes == ["f", "g"]
+    assert mapper.map_claims(claims3).scopes == ("f", "g")
 
 
 def test_map_claims_missing_required_fields(mapper: IdentityMapper) -> None:
