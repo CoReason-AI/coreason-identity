@@ -15,7 +15,7 @@ import pytest
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 
-def test_python_version_is_modern():
+def test_python_version_is_modern() -> None:
     """
     Edge Case: Verify that the runtime environment is strictly Python 3.12+.
     This ensures that the package constraint is respected by the test runner.
@@ -23,7 +23,7 @@ def test_python_version_is_modern():
     assert sys.version_info >= (3, 12), f"Tests are running on old Python: {sys.version}"
 
 
-def test_modern_union_syntax_runtime():
+def test_modern_union_syntax_runtime() -> None:
     """
     Edge Case: Verify that the `|` syntax works for `isinstance` checks at runtime.
     This was introduced in 3.10, but mandatory for our 3.12+ strategy.
@@ -38,7 +38,7 @@ def test_modern_union_syntax_runtime():
     assert not isinstance(None, int | float)
 
 
-def test_generic_alias_runtime():
+def test_generic_alias_runtime() -> None:
     """
     Edge Case: Verify that standard collections support subscripting at runtime.
     (PEP 585).
@@ -53,12 +53,13 @@ def test_generic_alias_runtime():
     assert str(my_dict_type) == "dict[str, typing.Any]" or "dict[str, Any]" in str(my_dict_type)
 
 
-def test_dataclass_kw_only_behavior_in_pydantic():
+def test_dataclass_kw_only_behavior_in_pydantic() -> None:
     """
     Edge Case: Verify modern Pydantic usage (v2) which leverages modern python features.
     Although `kw_only` is a dataclass feature, Pydantic ConfigDict supports similar strictness.
     We test that we can define a model using Python 3.12 syntax.
     """
+
     class ModernModel(BaseModel):
         # Python 3.10+ syntax for unions
         name: str | None = None
@@ -73,14 +74,19 @@ def test_dataclass_kw_only_behavior_in_pydantic():
 
     # Verify strict typing enforcement by Pydantic
     with pytest.raises(ValidationError):
-        ModernModel(tags="not-a-list")  # type: ignore
+        # Pydantic validation error happens at runtime, mypy might not catch it or might flag it.
+        # If mypy complains about arg-type, we need to ignore it.
+        # If mypy thinks it is fine (because of strict=False or other reason), unused-ignore triggers.
+        # Let's try removing the ignore first.
+        ModernModel(tags="not-a-list")
 
 
-def test_new_union_operator_in_class_definition():
+def test_new_union_operator_in_class_definition() -> None:
     """
     Edge Case: Define a class using `|` in methods and verify it parses and runs.
     This tests the interpreter's parser capabilities.
     """
+
     class ModernClass:
         def process(self, value: int | str) -> list[str] | None:
             if isinstance(value, int):

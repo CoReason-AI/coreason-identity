@@ -1,5 +1,3 @@
-from typing import Any
-
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -7,6 +5,7 @@ class ComplexModernModel(BaseModel):
     """
     Complex Case: A deeply nested model using modern Python syntax exclusively.
     """
+
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     # PEP 604
@@ -22,20 +21,15 @@ class ComplexModernModel(BaseModel):
         return f"History length: {len(self.history)}"
 
 
-def test_complex_model_valid():
+def test_complex_model_valid() -> None:
     """
     Complex Case: Validate correct instantiation and field typing using new syntax.
     """
     data = {
         "id": "user-123",
-        "metadata": {
-            "score": 98.5,
-            "category": "A",
-            "retry_count": 3,
-            "archived": None
-        },
+        "metadata": {"score": 98.5, "category": "A", "retry_count": 3, "archived": None},
         "tags": {"active", "verified"},
-        "history": [("login", 1620000000), ("logout", 1620003600)]
+        "history": [("login", 1620000000), ("logout", 1620003600)],
     }
 
     model = ComplexModernModel(**data)
@@ -46,7 +40,7 @@ def test_complex_model_valid():
     assert isinstance(model.history, list)
 
 
-def test_complex_model_redundant_check():
+def test_complex_model_redundant_check() -> None:
     """
     Complex Case (Redundant): Similar to above but with different data permutation
     to stress test Pydantic's handling of the new union types.
@@ -55,7 +49,7 @@ def test_complex_model_redundant_check():
         "id": 999,  # Union allows int
         "metadata": {"empty": None},
         "tags": set(),
-        "history": []
+        "history": [],
     }
     model = ComplexModernModel(**data_alt)
     assert model.id == 999
@@ -69,9 +63,9 @@ class RecursiveModernModel(BaseModel):
     Complex Case: Recursive model definition using string forward refs but modern syntax.
     Note: self-referencing types usually require `from __future__ import annotations` or string refs.
     But in 3.10+ `|` works for strings too if quoted or if future imported.
-    Let's test if Pydantic handles `RecursiveModernModel | None` without quotes in 3.12 (it should via deferred evaluation).
-    Wait, recursive types in Pydantic usually need string forward refs if the class isn't fully defined.
+    Let's test if Pydantic handles `RecursiveModernModel | None` without quotes in 3.12.
     """
+
     name: str
     # Using string forward ref with pipe syntax inside the string is tricky.
     # Pydantic supports `child: "RecursiveModernModel | None"`.
@@ -80,7 +74,7 @@ class RecursiveModernModel(BaseModel):
     child: "RecursiveModernModel | None" = None
 
 
-def test_recursive_modern_syntax():
+def test_recursive_modern_syntax() -> None:
     """
     Complex Case: Recursive Pydantic model with modern syntax forward refs.
     """
