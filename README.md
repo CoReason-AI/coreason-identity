@@ -37,11 +37,11 @@ pip install coreason-identity
 ## Usage
 
 ```python
-from coreason_identity import IdentityManager, CoreasonIdentityConfig, InvalidTokenError
+from coreason_identity import IdentityManagerSync, CoreasonIdentityConfig, InvalidTokenError
 
 # 1. Initialize (The Borrowing)
 config = CoreasonIdentityConfig(domain="auth.coreason.com", audience="api://coreason")
-identity = IdentityManager(config)
+identity = IdentityManagerSync(config)
 
 # 2. Validate (The Bouncer)
 try:

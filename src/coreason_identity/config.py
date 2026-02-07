@@ -28,9 +28,9 @@ class CoreasonIdentityConfig(BaseSettings):
     Attributes:
         domain (str): The domain of the Identity Provider (e.g. auth.coreason.com).
         audience (str): The expected audience for the token.
-        client_id (Optional[str]): The OIDC Client ID (required for device flow).
+        client_id (str | None): The OIDC Client ID (required for device flow).
         pii_salt (SecretStr): Salt for anonymizing PII in logs/traces.
-        issuer (Optional[str]): The expected issuer URL. Defaults to https://{domain}/.
+        issuer (str | None): The expected issuer URL. Defaults to https://{domain}/.
     """
 
     model_config = SettingsConfigDict(
