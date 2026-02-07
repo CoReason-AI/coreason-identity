@@ -43,6 +43,7 @@ from coreason_identity import IdentityManagerSync, CoreasonIdentityConfig, Inval
 config = CoreasonIdentityConfig(
     domain="auth.coreason.com",
     audience="api://coreason",
+    pii_salt=SecretStr("super-secret-salt-123"),  # Mandatory: for PII hashing
     http_timeout=5.0  # Mandatory: fail fast if IdP is slow
 )
 identity = IdentityManager(config)
