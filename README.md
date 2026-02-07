@@ -49,7 +49,9 @@ config = CoreasonVerifierConfig(
     domain="auth.coreason.com",
     audience="api://coreason",
     pii_salt=SecretStr("super-secret-salt-123"),  # Mandatory: for PII hashing
-    http_timeout=5.0  # Mandatory: fail fast if IdP is slow
+    http_timeout=5.0,  # Mandatory: fail fast if IdP is slow
+    allowed_algorithms=["RS256"],  # Mandatory: algorithm allowlist
+    clock_skew_leeway=0            # Optional: defaults to 0 (strict security)
 )
 identity = IdentityManager(config)
 
@@ -83,7 +85,8 @@ config = CoreasonClientConfig(
     audience="api://coreason",
     client_id="my-cli-client-id",  # Mandatory for client operations
     pii_salt=SecretStr("super-secret-salt-123"),
-    http_timeout=10.0
+    http_timeout=10.0,
+    allowed_algorithms=["RS256"]
 )
 identity = IdentityManager(config)
 

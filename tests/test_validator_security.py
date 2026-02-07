@@ -147,3 +147,102 @@ class TestValidatorSecurity:
         # Should pass
         payload = await validator.validate_token(token)
         assert payload["sub"] == "user123"
+
+    @pytest.mark.asyncio
+    async def test_nbf_claim_enforcement_strict(
+        self, mock_oidc_provider: Mock, rsa_key_pair: Any, jwks: dict[str, Any]
+    ) -> None:
+        """
+        Verify that 'nbf' (Not Before) claim is strictly enforced with 0 leeway.
+        """
+        mock_oidc_provider.get_jwks.return_value = jwks
+
+        validator = TokenValidator(
+            oidc_provider=mock_oidc_provider,
+            audience="my-audience",
+            issuer="https://valid-issuer.com",
+            allowed_algorithms=["RS256"],
+            leeway=0,
+        )
+
+        now = int(time.time())
+        claims = {
+            "sub": "user123",
+            "aud": "my-audience",
+            "iss": "https://valid-issuer.com",
+            "exp": now + 3600,
+            "nbf": now + 5,  # Valid in 5 seconds (future)
+        }
+
+        token = self.create_token(rsa_key_pair, claims)
+
+        # Should fail as token is not yet valid
+        with pytest.raises(InvalidTokenError, match=r"Token validation failed:.*not valid yet"):
+            await validator.validate_token(token)
+
+    @pytest.mark.asyncio
+    async def test_nbf_claim_with_leeway(
+        self, mock_oidc_provider: Mock, rsa_key_pair: Any, jwks: dict[str, Any]
+    ) -> None:
+        """
+        Verify that 'nbf' claim allows slight clock skew with leeway.
+        """
+        mock_oidc_provider.get_jwks.return_value = jwks
+
+        validator = TokenValidator(
+            oidc_provider=mock_oidc_provider,
+            audience="my-audience",
+            issuer="https://valid-issuer.com",
+            allowed_algorithms=["RS256"],
+            leeway=10,
+        )
+
+        now = int(time.time())
+        claims = {
+            "sub": "user123",
+            "aud": "my-audience",
+            "iss": "https://valid-issuer.com",
+            "exp": now + 3600,
+            "nbf": now + 5,  # Valid in 5 seconds (future)
+        }
+
+        token = self.create_token(rsa_key_pair, claims)
+
+        # Should pass because 5s future is within 10s leeway
+        payload = await validator.validate_token(token)
+        assert payload["sub"] == "user123"
+
+    @pytest.mark.asyncio
+    async def test_exp_boundary_condition(
+        self, mock_oidc_provider: Mock, rsa_key_pair: Any, jwks: dict[str, Any]
+    ) -> None:
+        """
+        Verify behavior when token expires exactly at current time.
+        Authlib usually considers exp as exclusive upper bound (exp <= now is expired),
+        or inclusive? RFC 7519 says: processing of the "exp" claim requires that the current
+        date/time MUST be before the expiration date/time. So exp=now is expired.
+        """
+        mock_oidc_provider.get_jwks.return_value = jwks
+
+        validator = TokenValidator(
+            oidc_provider=mock_oidc_provider,
+            audience="my-audience",
+            issuer="https://valid-issuer.com",
+            allowed_algorithms=["RS256"],
+            leeway=0,
+        )
+
+        now = int(time.time())
+        # To strictly guarantee expiration failure, we check 1 second in the past
+        claims = {
+            "sub": "user123",
+            "aud": "my-audience",
+            "iss": "https://valid-issuer.com",
+            "exp": now - 1,  # Expired
+        }
+
+        token = self.create_token(rsa_key_pair, claims)
+
+        # Should fail immediately
+        with pytest.raises(TokenExpiredError):
+            await validator.validate_token(token)
