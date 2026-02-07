@@ -52,7 +52,7 @@ class TestConfigSegregationEdgeCases:
             manager = IdentityManager(config)
 
             with pytest.raises(CoreasonIdentityError, match="Device login requires CoreasonClientConfig"):
-                manager.start_device_login()
+                manager.start_device_login(scope="openid profile email")
 
             # Mock flow object for await_device_token call
             mock_flow = type("DeviceFlowResponse", (), {})()
@@ -77,7 +77,7 @@ class TestConfigSegregationEdgeCases:
             # It might raise network errors if we don't mock perfectly, but we just check it passes the type check
             MockDeviceClient.return_value.initiate_flow = AsyncMock(return_value="mock_flow")
 
-            manager.start_device_login()
+            manager.start_device_login(scope="openid profile email")
             assert MockDeviceClient.called
 
     def test_inheritance_semantics(self) -> None:

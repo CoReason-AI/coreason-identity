@@ -105,7 +105,7 @@ class TestDeviceFlowSuperEdgeCases:
         Verify behavior when IdP returns 200 OK but the JSON is missing 'access_token'.
         This should fail Pydantic validation of TokenResponse.
         """
-        client = DeviceFlowClient("cid", "https://idp.com", client=mock_client)
+        client = DeviceFlowClient("cid", "https://idp.com", client=mock_client, scope="openid profile email")
 
         # Discovery
         mock_client.get.return_value = create_response(

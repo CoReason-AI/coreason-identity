@@ -27,7 +27,9 @@ def mock_client() -> AsyncMock:
 
 @pytest.fixture
 def client(mock_client: AsyncMock) -> DeviceFlowClient:
-    return DeviceFlowClient(client_id="test-client", idp_url="https://test.auth0.com", client=mock_client)
+    return DeviceFlowClient(
+        client_id="test-client", idp_url="https://test.auth0.com", client=mock_client, scope="openid profile email"
+    )
 
 
 def create_response(status_code: int, json_data: Any | None = None, content: bytes | None = None) -> Response:

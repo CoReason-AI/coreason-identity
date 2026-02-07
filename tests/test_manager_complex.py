@@ -92,7 +92,7 @@ def test_device_login_network_failure(manager: IdentityManager) -> None:
         mock_instance.initiate_flow = AsyncMock(side_effect=CoreasonIdentityError("Network Error"))
 
         with pytest.raises(CoreasonIdentityError, match="Network Error"):
-            manager.start_device_login()
+            manager.start_device_login(scope="openid profile email")
 
 
 def test_await_device_token_polling_failure(manager: IdentityManager) -> None:

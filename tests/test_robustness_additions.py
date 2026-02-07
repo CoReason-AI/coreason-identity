@@ -110,7 +110,7 @@ class TestDeviceFlowClientRobustness:
 
     @pytest.fixture
     def client(self, mock_client: AsyncMock) -> DeviceFlowClient:
-        return DeviceFlowClient("client-id", "https://idp.com", client=mock_client)
+        return DeviceFlowClient("client-id", "https://idp.com", client=mock_client, scope="openid profile email")
 
     @pytest.mark.asyncio
     async def test_initiate_flow_timeout(self, client: DeviceFlowClient, mock_client: AsyncMock) -> None:

@@ -39,7 +39,11 @@ async def test_poll_token_enforces_minimum_interval() -> None:
 
     # Initialize client with default min_poll_interval=5.0
     df_client = DeviceFlowClient(
-        client_id="test-client", idp_url="https://idp.example.com", client=client_mock, min_poll_interval=5.0
+        client_id="test-client",
+        idp_url="https://idp.example.com",
+        client=client_mock,
+        min_poll_interval=5.0,
+        scope="openid profile email",
     )
 
     # Mock initiate_flow result with UNSAFE interval 0
@@ -91,6 +95,7 @@ async def test_poll_token_enforces_max_duration() -> None:
         idp_url="https://idp.example.com",
         client=client_mock,
         max_poll_duration=10.0,  # Short duration
+        scope="openid profile email",
     )
 
     device_resp = DeviceFlowResponse(
