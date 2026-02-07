@@ -17,7 +17,7 @@ import os
 import socket
 from urllib.parse import urlparse
 
-from pydantic import SecretStr, field_validator, model_validator
+from pydantic import Field, SecretStr, ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -42,7 +42,24 @@ class CoreasonIdentityConfig(BaseSettings):
     audience: str
     client_id: str | None = None
     pii_salt: SecretStr = SecretStr("coreason-unsafe-default-salt")
+    http_timeout: float = Field(
+        ..., description="Timeout in seconds for all IdP network operations."
+    )
+    unsafe_local_dev: bool = False
     issuer: str | None = None
+
+    @field_validator("issuer", mode="after")
+    @classmethod
+    def validate_https(cls, v: str | None, info: ValidationInfo) -> str | None:
+        """
+        Ensures that issuer uses HTTPS, unless strictly opted out for local dev.
+        """
+        if v and v.startswith("http://"):
+            if not info.data.get("unsafe_local_dev", False):
+                raise ValueError(
+                    "HTTPS is required for production. Set 'unsafe_local_dev=True' only for local testing."
+                )
+        return v
 
     @model_validator(mode="after")
     def set_default_issuer(self) -> "CoreasonIdentityConfig":

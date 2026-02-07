@@ -44,7 +44,7 @@ class IdentityManagerAsync:
         """
         self.config = config
         self._internal_client = client is None
-        self._client = client or httpx.AsyncClient()
+        self._client = client or httpx.AsyncClient(timeout=self.config.http_timeout)
 
         # Domain is already normalized by Config validator to be just the hostname (e.g. auth.coreason.com)
         self.domain = self.config.domain

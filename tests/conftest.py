@@ -8,11 +8,22 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
+import os
 import socket
 from collections.abc import Generator
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+
+@pytest.fixture(autouse=True)
+def set_default_env_vars() -> Generator[None, None, None]:
+    """
+    Sets default environment variables to ensure CoreasonIdentityConfig
+    can be instantiated in tests without mandatory fields causing errors.
+    """
+    with patch.dict(os.environ, {"COREASON_AUTH_HTTP_TIMEOUT": "5.0"}):
+        yield
 
 
 @pytest.fixture(autouse=True)

@@ -11,6 +11,9 @@
 import os
 from unittest.mock import patch
 
+import pytest
+from pydantic import ValidationError
+
 from coreason_identity.config import CoreasonIdentityConfig
 
 
@@ -59,3 +62,44 @@ def test_config_domain_normalization() -> None:
     # With path (should strip path)
     c4 = CoreasonIdentityConfig(domain="https://test.com/auth", audience="aud")
     assert c4.domain == "test.com"
+
+
+def test_timeout_required() -> None:
+    """Test that http_timeout is mandatory."""
+    # We must unset the env var set by the autouse fixture
+    with patch.dict(os.environ):
+        if "COREASON_AUTH_HTTP_TIMEOUT" in os.environ:
+            del os.environ["COREASON_AUTH_HTTP_TIMEOUT"]
+
+        with pytest.raises(ValidationError) as exc:
+            CoreasonIdentityConfig(domain="test.com", audience="aud")
+        assert "http_timeout" in str(exc.value)
+
+
+def test_https_enforcement() -> None:
+    """Test that HTTP issuer is rejected by default."""
+    with pytest.raises(ValidationError) as exc:
+        CoreasonIdentityConfig(
+            domain="test.com", audience="aud", issuer="http://auth.local"
+        )
+    assert "HTTPS is required for production" in str(exc.value)
+
+
+def test_https_override() -> None:
+    """Test that HTTP issuer is accepted with unsafe_local_dev=True."""
+    config = CoreasonIdentityConfig(
+        domain="test.com",
+        audience="aud",
+        issuer="http://auth.local",
+        unsafe_local_dev=True,
+    )
+    assert config.issuer == "http://auth.local"
+    assert config.unsafe_local_dev is True
+
+
+def test_https_success() -> None:
+    """Test that HTTPS issuer is accepted."""
+    config = CoreasonIdentityConfig(
+        domain="test.com", audience="aud", issuer="https://auth.prod"
+    )
+    assert config.issuer == "https://auth.prod"
