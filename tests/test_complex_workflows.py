@@ -18,7 +18,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from coreason_identity.config import CoreasonIdentityConfig
+from coreason_identity.config import CoreasonVerifierConfig
 from coreason_identity.manager import IdentityManager
 from coreason_identity.models import UserContext
 
@@ -29,7 +29,7 @@ MOCK_AUDIENCE = "api://test"
 
 @pytest.fixture
 def identity_manager() -> Generator[IdentityManager, Any, None]:
-    config = CoreasonIdentityConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id="cid")
+    config = CoreasonVerifierConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE)
 
     # We need to mock the internal async manager components to avoid real network calls
     with (
@@ -69,7 +69,7 @@ def test_full_auth_flow_simulation(identity_manager: IdentityManager) -> None:
         user_id="user_001",
         email="alice@example.com",
         groups=["admin", "project:apollo"],
-        scopes=["read", "write"],
+        scopes=["openid", "profile"],
         downstream_token="raw_jwt_token_string",
         claims={"project_context": "apollo", "permissions": []},
     )
@@ -83,7 +83,7 @@ def test_full_auth_flow_simulation(identity_manager: IdentityManager) -> None:
     # Assert - The Service View
     assert user.user_id == "user_001"
     assert "admin" in user.groups
-    assert "read" in user.scopes
+    assert "openid" in user.scopes
 
     # RLS Check Simulation
     allowed_groups = ["project:apollo"]
@@ -117,7 +117,7 @@ def test_legacy_migration_flow(identity_manager: IdentityManager) -> None:
 # Redefine fixture to use REAL IdentityMapper for better integration tests
 @pytest.fixture
 def integration_manager() -> Generator[IdentityManager, Any, None]:
-    config = CoreasonIdentityConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id="cid")
+    config = CoreasonVerifierConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE)
 
     # Only mock networking parts (Provider, Validator's internal checks)
     with patch("coreason_identity.manager.OIDCProvider"), patch("coreason_identity.manager.TokenValidator"):
@@ -132,7 +132,7 @@ def test_integration_legacy_access(integration_manager: IdentityManager) -> None
     mock_claims = {
         "sub": "u2",
         "email": "bob@example.com",
-        "groups": ["project:gemini", "admin"],
+        "groups": ["project:apollo", "admin"],
     }
 
     integration_manager._async.validator.validate_token = AsyncMock(return_value=mock_claims)  # type: ignore[method-assign]
@@ -140,10 +140,10 @@ def test_integration_legacy_access(integration_manager: IdentityManager) -> None
     user = integration_manager.validate_token("Bearer token123")
 
     # Verify Legacy Access
-    assert user.claims.get("project_context") == "gemini"
+    assert user.claims.get("project_context") == "apollo"
     assert user.claims.get("permissions") == []
 
     # Verify New Access
-    assert user.groups == ["project:gemini", "admin"]
+    assert user.groups == ["project:apollo", "admin"]
     assert user.downstream_token is not None
     assert user.downstream_token.get_secret_value() == "token123"

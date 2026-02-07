@@ -26,7 +26,7 @@ from coreason_identity.validator import TokenValidator
 
 
 class MockClaims(dict[str, Any]):
-    def validate(self) -> None:
+    def validate(self, *args: Any, **kwargs: Any) -> None:
         pass
 
 

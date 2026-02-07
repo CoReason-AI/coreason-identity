@@ -135,7 +135,7 @@ except InvalidTokenError:
     deny_access()
 
 # 3. CLI Login (The Device Flow)
-flow = identity.start_device_login()
+flow = identity.start_device_login(scope="openid profile email")
 print(f"Go to {flow.verification_uri} and enter {flow.user_code}")
 tokens = identity.await_device_token(flow)
 ```

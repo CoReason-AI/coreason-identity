@@ -16,7 +16,7 @@ A new configuration field `pii_salt` has been added to `CoreasonIdentityConfig`.
 
 *   **Env Variable:** `COREASON_AUTH_PII_SALT`
 *   **Type:** `SecretStr`
-*   **Default:** `SecretStr("coreason-unsafe-default-salt")` (Backward compatible, but **strongly recommended** to override in production).
+*   **Default:** None. **REQUIRED**. (The unsafe default has been removed to enforce security).
 
 ### Mechanism
 

@@ -8,107 +8,166 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
-import os
 import socket
-from typing import Any
-from unittest.mock import patch
+from collections.abc import Generator
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
-from pydantic import ValidationError
 
-from coreason_identity.config import CoreasonIdentityConfig
+from coreason_identity.transport import SafeHTTPTransport
 
-
-# Helper to format getaddrinfo response
-def mock_addr_info(ip: str) -> list[tuple[Any, Any, int, str, tuple[str, int]]]:
-    family = socket.AF_INET6 if ":" in ip else socket.AF_INET
-    return [(family, socket.SOCK_STREAM, 6, "", (ip, 443))]
+# Mock response for successful requests
+MOCK_RESPONSE = httpx.Response(200, json={"status": "ok"})
 
 
-class TestSSRFProtection:
-    """Test suite for SSRF protection in CoreasonIdentityConfig."""
+@pytest.fixture
+def mock_getaddrinfo() -> Generator[MagicMock, None, None]:
+    # We patch socket.getaddrinfo specifically for these tests
+    # Note: conftest.py might already patch it, but we override it here with a new patch
+    # to control the return value per test.
+    with patch("socket.getaddrinfo") as mock:
+        yield mock
 
-    def test_ssrf_localhost_ipv4(self) -> None:
-        """Test that localhost (127.0.0.1) is rejected."""
-        with patch("socket.getaddrinfo", return_value=mock_addr_info("127.0.0.1")):
-            with pytest.raises(ValidationError) as exc:
-                CoreasonIdentityConfig(domain="localhost", audience="aud")
-            # We check for a generic message part, exact text depends on implementation
-            assert "resolves to a prohibited IP" in str(exc.value) or "Security violation" in str(exc.value)
 
-    def test_ssrf_aws_metadata(self) -> None:
-        """Test that AWS metadata service (169.254.169.254) is rejected."""
-        with patch("socket.getaddrinfo", return_value=mock_addr_info("169.254.169.254")):
-            with pytest.raises(ValidationError) as exc:
-                CoreasonIdentityConfig(domain="metadata.aws", audience="aud")
-            assert "resolves to a prohibited IP" in str(exc.value)
+@pytest.mark.asyncio
+async def test_safe_transport_blocks_private_ip(mock_getaddrinfo: MagicMock) -> None:
+    """Test that resolving to a private IP raises a ConnectError."""
+    # Mock resolving to 127.0.0.1
+    mock_getaddrinfo.return_value = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 443))]
 
-    def test_ssrf_private_network_192(self) -> None:
-        """Test that private network (192.168.x.x) is rejected."""
-        with patch("socket.getaddrinfo", return_value=mock_addr_info("192.168.1.50")):
-            with pytest.raises(ValidationError) as exc:
-                CoreasonIdentityConfig(domain="internal.corp", audience="aud")
-            assert "resolves to a prohibited IP" in str(exc.value)
+    transport = SafeHTTPTransport()
+    client = httpx.AsyncClient(transport=transport)
 
-    def test_ssrf_private_network_10(self) -> None:
-        """Test that private network (10.x.x.x) is rejected."""
-        with patch("socket.getaddrinfo", return_value=mock_addr_info("10.0.0.5")):
-            with pytest.raises(ValidationError) as exc:
-                CoreasonIdentityConfig(domain="database.internal", audience="aud")
-            assert "resolves to a prohibited IP" in str(exc.value)
+    with pytest.raises(httpx.ConnectError, match="blocked by security policy"):
+        await client.get("https://evil.local")
 
-    def test_ssrf_ipv6_localhost(self) -> None:
-        """Test that IPv6 localhost (::1) is rejected."""
-        with patch("socket.getaddrinfo", return_value=mock_addr_info("::1")):
-            with pytest.raises(ValidationError) as exc:
-                CoreasonIdentityConfig(domain="ipv6.local", audience="aud")
-            assert "resolves to a prohibited IP" in str(exc.value)
 
-    def test_ssrf_valid_public_domain(self) -> None:
-        """Test that a valid public domain (8.8.8.8) is accepted."""
-        # 8.8.8.8 is Google DNS, safe
-        with patch("socket.getaddrinfo", return_value=mock_addr_info("8.8.8.8")):
-            config = CoreasonIdentityConfig(domain="google.com", audience="aud")
-            assert config.domain == "google.com"
+@pytest.mark.asyncio
+async def test_safe_transport_blocks_private_ipv6(mock_getaddrinfo: MagicMock) -> None:
+    """Test that resolving to a private IPv6 address raises a ConnectError."""
+    # Mock resolving to ::1
+    mock_getaddrinfo.return_value = [(socket.AF_INET6, socket.SOCK_STREAM, 6, "", ("::1", 443, 0, 0))]
 
-    def test_ssrf_dns_failure(self) -> None:
-        """Test that DNS resolution failure raises an error (Fail Closed)."""
-        with patch("socket.getaddrinfo", side_effect=socket.gaierror("Name or service not known")):
-            with pytest.raises(ValidationError) as exc:
-                CoreasonIdentityConfig(domain="nonexistent.domain", audience="aud")
-            assert "Unable to resolve domain" in str(exc.value)
+    transport = SafeHTTPTransport()
+    client = httpx.AsyncClient(transport=transport)
 
-    def test_ssrf_bypass_mode(self) -> None:
-        """Test that validation is bypassed when COREASON_DEV_UNSAFE_MODE is true."""
-        with (
-            patch.dict(os.environ, {"COREASON_DEV_UNSAFE_MODE": "true"}),
-            patch("socket.getaddrinfo", return_value=mock_addr_info("127.0.0.1")),
-        ):
-            config = CoreasonIdentityConfig(domain="localhost", audience="aud")
-            assert config.domain == "localhost"
+    with pytest.raises(httpx.ConnectError, match="blocked by security policy"):
+        await client.get("https://evil.local")
 
-    def test_ssrf_bypass_mode_false_default(self) -> None:
-        """Test that validation is NOT bypassed if env var is missing or false."""
-        # Case 1: missing (already covered by other tests, but explicit check here)
-        with (
-            patch("socket.getaddrinfo", return_value=mock_addr_info("127.0.0.1")),
-            pytest.raises(ValidationError),
-        ):
-            CoreasonIdentityConfig(domain="localhost", audience="aud")
 
-        # Case 2: false
-        with (
-            patch.dict(os.environ, {"COREASON_DEV_UNSAFE_MODE": "false"}),
-            patch("socket.getaddrinfo", return_value=mock_addr_info("127.0.0.1")),
-            pytest.raises(ValidationError),
-        ):
-            CoreasonIdentityConfig(domain="localhost", audience="aud")
+@pytest.mark.asyncio
+async def test_safe_transport_allows_public_ip(mock_getaddrinfo: MagicMock) -> None:
+    """Test that resolving to a public IP allows the request and pins the IP."""
+    # Mock resolving to 8.8.8.8
+    mock_getaddrinfo.return_value = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("8.8.8.8", 443))]
 
-    def test_ssrf_invalid_ip_format(self) -> None:
-        """Test that invalid IP formats returned by DNS are ignored (robustness)."""
-        # Return an invalid IP string to trigger ValueError in ipaddress.ip_address
-        bad_response = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("NOT_AN_IP", 443))]
-        with patch("socket.getaddrinfo", return_value=bad_response):
-            # Should pass because it ignores the invalid IP and finds no other unsafe IPs
-            config = CoreasonIdentityConfig(domain="example.com", audience="aud")
-            assert config.domain == "example.com"
+    transport = SafeHTTPTransport()
+
+    # We patch the parent handle_async_request to verify the modified request
+    with patch("httpx.AsyncHTTPTransport.handle_async_request", new_callable=AsyncMock) as mock_super:
+        mock_super.return_value = MOCK_RESPONSE
+
+        client = httpx.AsyncClient(transport=transport)
+        response = await client.get("https://google.com")
+
+        assert response.status_code == 200
+
+        # Verify the request passed to super() has the IP in the URL
+        args, _ = mock_super.call_args
+        request = args[0]
+        assert request.url.host == "8.8.8.8"
+        # Verify Host header is preserved
+        assert request.headers["Host"] == "google.com"
+        # Verify SNI extension is set (crucial for SSL verification)
+        assert request.extensions.get("sni_hostname") == "google.com"
+
+
+@pytest.mark.asyncio
+async def test_safe_transport_allows_private_ip_in_unsafe_mode(mock_getaddrinfo: MagicMock) -> None:
+    """Test that unsafe_local_dev allows private IPs."""
+    mock_getaddrinfo.return_value = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 443))]
+
+    transport = SafeHTTPTransport(unsafe_local_dev=True)
+
+    with patch("httpx.AsyncHTTPTransport.handle_async_request", new_callable=AsyncMock) as mock_super:
+        mock_super.return_value = MOCK_RESPONSE
+
+        client = httpx.AsyncClient(transport=transport)
+        await client.get("https://localhost")
+
+        args, _ = mock_super.call_args
+        request = args[0]
+        assert request.url.host == "127.0.0.1"
+        # SNI should still be set
+        assert request.extensions.get("sni_hostname") == "localhost"
+
+
+@pytest.mark.asyncio
+async def test_safe_transport_dns_failure(mock_getaddrinfo: MagicMock) -> None:
+    """Test that DNS resolution failure raises ConnectError."""
+    mock_getaddrinfo.side_effect = socket.gaierror("Name or service not known")
+
+    transport = SafeHTTPTransport()
+    client = httpx.AsyncClient(transport=transport)
+
+    with pytest.raises(httpx.ConnectError, match="Could not resolve hostname"):
+        await client.get("https://nonexistent.domain")
+
+
+@pytest.mark.asyncio
+async def test_safe_transport_ipv6_public(mock_getaddrinfo: MagicMock) -> None:
+    """Test that public IPv6 is allowed and formatted correctly in URL."""
+    # Mock resolving to valid public IPv6: 2001:4860:4860::8888
+    mock_getaddrinfo.return_value = [(socket.AF_INET6, socket.SOCK_STREAM, 6, "", ("2001:4860:4860::8888", 443, 0, 0))]
+
+    transport = SafeHTTPTransport()
+
+    with patch("httpx.AsyncHTTPTransport.handle_async_request", new_callable=AsyncMock) as mock_super:
+        mock_super.return_value = MOCK_RESPONSE
+
+        client = httpx.AsyncClient(transport=transport)
+        await client.get("https://ipv6.google.com")
+
+        args, _ = mock_super.call_args
+        request = args[0]
+        # Check IPv6 formatting
+        # httpx.URL.host returns the unbracketed IPv6 address
+        assert request.url.host == "2001:4860:4860::8888"
+        # Verify the full URL string contains brackets
+        assert "https://[2001:4860:4860::8888]" in str(request.url)
+        assert request.extensions.get("sni_hostname") == "ipv6.google.com"
+
+
+@pytest.mark.asyncio
+async def test_safe_transport_invalid_ip_string(mock_getaddrinfo: MagicMock) -> None:
+    """Test that invalid IP string from resolver fails validation."""
+    # Mock returning garbage as IP (which ipaddress lib rejects)
+    mock_getaddrinfo.return_value = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("garbage", 443))]
+
+    transport = SafeHTTPTransport()
+    client = httpx.AsyncClient(transport=transport)
+
+    # It should fail validation because ipaddress raises ValueError -> returns False
+    # So all IPs blocked
+    with pytest.raises(httpx.ConnectError, match="blocked by security policy"):
+        await client.get("https://garbage.com")
+
+
+@pytest.mark.asyncio
+async def test_safe_transport_invalid_ip_string_unsafe(mock_getaddrinfo: MagicMock) -> None:
+    """Test that invalid IP string bypasses validation in unsafe mode and is used as-is."""
+    mock_getaddrinfo.return_value = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("garbage", 443))]
+
+    transport = SafeHTTPTransport(unsafe_local_dev=True)
+
+    with patch("httpx.AsyncHTTPTransport.handle_async_request", new_callable=AsyncMock) as mock_super:
+        mock_super.return_value = MOCK_RESPONSE
+
+        client = httpx.AsyncClient(transport=transport)
+        await client.get("https://garbage.com")
+
+        args, _ = mock_super.call_args
+        request = args[0]
+        # Should use garbage as host because ipaddress parsing failed but we proceeded
+        assert request.url.host == "garbage"

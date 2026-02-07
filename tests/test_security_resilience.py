@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from authlib.jose.errors import InvalidClaimError
 
-from coreason_identity.config import CoreasonIdentityConfig
+from coreason_identity.config import CoreasonVerifierConfig
 from coreason_identity.exceptions import (
     CoreasonIdentityError,
     InvalidAudienceError,
@@ -28,16 +28,15 @@ from coreason_identity.utils.logger import logger
 
 
 @pytest.fixture
-def mock_config() -> CoreasonIdentityConfig:
-    return CoreasonIdentityConfig(
+def mock_config() -> CoreasonVerifierConfig:
+    return CoreasonVerifierConfig(
         domain="auth.coreason.com",
         audience="expected-audience",
-        client_id="test-client",
     )
 
 
 @pytest.fixture
-def identity_manager(mock_config: CoreasonIdentityConfig) -> Generator[IdentityManager, Any, None]:
+def identity_manager(mock_config: CoreasonVerifierConfig) -> Generator[IdentityManager, Any, None]:
     # We patch OIDCProvider to avoid network calls during init
     with (
         patch("coreason_identity.manager.OIDCProvider"),
@@ -144,7 +143,7 @@ async def test_pii_redaction_in_logs(log_capture: list[str]) -> None:
         # 3. dict(claims) must work
 
         class MockClaims(dict[str, Any]):
-            def validate(self) -> None:
+            def validate(self, *args: Any, **kwargs: Any) -> None:
                 pass
 
         claims_obj = MockClaims(mock_claims_dict)
@@ -234,7 +233,7 @@ class TestSecurityEdgeCases:
             mock_claims_dict = {"sub": unicode_user_id, "aud": "aud", "exp": 1234567890}
 
             class MockClaims(dict[str, Any]):
-                def validate(self) -> None:
+                def validate(self, *args: Any, **kwargs: Any) -> None:
                     pass
 
             mock_decode.return_value = MockClaims(mock_claims_dict)

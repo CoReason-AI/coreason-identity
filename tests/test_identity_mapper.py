@@ -30,8 +30,8 @@ def test_map_claims_happy_path_explicit(mapper: IdentityMapper) -> None:
         "email": "user@example.com",
         "https://coreason.com/project_id": "proj_123",
         "permissions": ["read", "write"],
-        "scope": "read write",
-        "groups": ["group1"],
+        "scope": "openid profile",
+        "groups": ["admin"],
     }
     context = mapper.map_claims(claims)
 
@@ -40,8 +40,8 @@ def test_map_claims_happy_path_explicit(mapper: IdentityMapper) -> None:
     assert context.email == "user@example.com"
     assert context.claims["project_context"] == "proj_123"
     assert context.claims["permissions"] == ["read", "write"]
-    assert context.scopes == ["read", "write"]
-    assert context.groups == ["group1"]
+    assert context.scopes == ["openid", "profile"]
+    assert context.groups == ["admin"]
 
 
 def test_map_claims_with_token(mapper: IdentityMapper) -> None:
@@ -60,11 +60,11 @@ def test_map_claims_project_fallback_to_groups(mapper: IdentityMapper) -> None:
     claims: dict[str, Any] = {
         "sub": "user|456",
         "email": "dev@example.com",
-        "groups": ["developers", "project:proj_ABC", "other"],
+        "groups": ["developer", "project:apollo"],
     }
     context = mapper.map_claims(claims)
 
-    assert context.claims["project_context"] == "proj_ABC"
+    assert context.claims["project_context"] == "apollo"
 
 
 def test_map_claims_permissions_fallback_admin_removed(mapper: IdentityMapper) -> None:
@@ -72,7 +72,7 @@ def test_map_claims_permissions_fallback_admin_removed(mapper: IdentityMapper) -
     claims: dict[str, Any] = {
         "sub": "admin|789",
         "email": "admin@coreason.com",
-        "https://coreason.com/groups": ["admin", "staff"],
+        "https://coreason.com/groups": ["admin"],
     }
     context = mapper.map_claims(claims)
 
@@ -84,31 +84,31 @@ def test_map_claims_permissions_fallback_admin_removed(mapper: IdentityMapper) -
 def test_map_claims_group_sources(mapper: IdentityMapper) -> None:
     """Test that groups are resolved from various sources (custom, standard, roles)."""
     # 1. Standard 'groups'
-    claims1: dict[str, Any] = {"sub": "u1", "email": "u1@e.com", "groups": ["project:A"]}
-    assert mapper.map_claims(claims1).claims["project_context"] == "A"
+    claims1: dict[str, Any] = {"sub": "u1", "email": "u1@e.com", "groups": ["project:apollo"]}
+    assert mapper.map_claims(claims1).claims["project_context"] == "apollo"
 
     # 2. Custom 'https://coreason.com/groups'
-    claims2: dict[str, Any] = {"sub": "u2", "email": "u2@e.com", "https://coreason.com/groups": ["project:B"]}
-    assert mapper.map_claims(claims2).claims["project_context"] == "B"
+    claims2: dict[str, Any] = {"sub": "u2", "email": "u2@e.com", "https://coreason.com/groups": ["project:apollo"]}
+    assert mapper.map_claims(claims2).claims["project_context"] == "apollo"
 
     # 3. 'roles'
-    claims3: dict[str, Any] = {"sub": "u3", "email": "u3@e.com", "roles": ["project:C"]}
-    assert mapper.map_claims(claims3).claims["project_context"] == "C"
+    claims3: dict[str, Any] = {"sub": "u3", "email": "u3@e.com", "roles": ["project:apollo"]}
+    assert mapper.map_claims(claims3).claims["project_context"] == "apollo"
 
 
 def test_map_claims_scopes(mapper: IdentityMapper) -> None:
     """Test scope parsing."""
     # 1. 'scope' string
-    claims1: dict[str, Any] = {"sub": "u1", "email": "u@e.com", "scope": "a b c"}
-    assert mapper.map_claims(claims1).scopes == ["a", "b", "c"]
+    claims1: dict[str, Any] = {"sub": "u1", "email": "u@e.com", "scope": "openid profile"}
+    assert mapper.map_claims(claims1).scopes == ["openid", "profile"]
 
     # 2. 'scp' list
-    claims2: dict[str, Any] = {"sub": "u1", "email": "u@e.com", "scp": ["d", "e"]}
-    assert mapper.map_claims(claims2).scopes == ["d", "e"]
+    claims2: dict[str, Any] = {"sub": "u1", "email": "u@e.com", "scp": ["email", "read:reports"]}
+    assert mapper.map_claims(claims2).scopes == ["email", "read:reports"]
 
     # 3. 'scopes' explicit
-    claims3: dict[str, Any] = {"sub": "u1", "email": "u@e.com", "scopes": ["f", "g"]}
-    assert mapper.map_claims(claims3).scopes == ["f", "g"]
+    claims3: dict[str, Any] = {"sub": "u1", "email": "u@e.com", "scopes": ["openid", "email"]}
+    assert mapper.map_claims(claims3).scopes == ["openid", "email"]
 
 
 def test_map_claims_missing_required_fields(mapper: IdentityMapper) -> None:
@@ -147,17 +147,17 @@ def test_map_claims_generic_exception(mapper: IdentityMapper) -> None:
             mapper.map_claims(claims)
 
 
-def test_mapper_multiple_project_groups_precedence(mapper: IdentityMapper) -> None:
+def test_mapper_project_group_extraction(mapper: IdentityMapper) -> None:
     """
-    Test precedence when multiple groups match the 'project:' pattern.
+    Test that project context is extracted from the valid project group.
     """
     claims: dict[str, Any] = {
         "sub": "u1",
         "email": "u@e.com",
-        "groups": ["project:PRIMARY", "project:SECONDARY"],
+        "groups": ["admin", "project:apollo"],
     }
     context = mapper.map_claims(claims)
-    assert context.claims["project_context"] == "PRIMARY"
+    assert context.claims["project_context"] == "apollo"
 
 
 def test_complex_groups_as_string(mapper: IdentityMapper) -> None:
@@ -165,10 +165,10 @@ def test_complex_groups_as_string(mapper: IdentityMapper) -> None:
     claims: dict[str, Any] = {
         "sub": "u1",
         "email": "u@e.com",
-        "groups": "project:SINGLE",
+        "groups": "project:apollo",
     }
     context = mapper.map_claims(claims)
-    assert context.claims["project_context"] == "SINGLE"
+    assert context.claims["project_context"] == "apollo"
 
 
 def test_ensure_list_of_strings_direct() -> None:

@@ -30,10 +30,10 @@ class RawIdPClaims(BaseModel):
     Attributes:
         sub (str): The subject (user ID) from the IdP.
         email (EmailStr): The user's email address.
-        project_id_claim (Optional[str]): Custom claim for project ID.
-        groups (List[str]): List of groups the user belongs to.
-        permissions (List[str]): List of permissions granted to the user.
-        scopes (List[str]): List of OAuth scopes.
+        project_id_claim (str | None): Custom claim for project ID.
+        groups (list[str]): List of groups the user belongs to.
+        permissions (list[str]): List of permissions granted to the user.
+        scopes (list[str]): List of OAuth scopes.
     """
 
     sub: str

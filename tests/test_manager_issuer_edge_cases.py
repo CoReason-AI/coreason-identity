@@ -19,7 +19,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from authlib.jose import JsonWebKey, jwt
 
-from coreason_identity.config import CoreasonIdentityConfig
+from coreason_identity.config import CoreasonVerifierConfig
 from coreason_identity.exceptions import CoreasonIdentityError
 from coreason_identity.manager import IdentityManager
 
@@ -46,7 +46,7 @@ def test_init_with_trailing_slash_in_domain() -> None:
     and TokenValidator is initialized with derived issuer.
     """
     domain = "test.auth0.com/"
-    config = CoreasonIdentityConfig(domain=domain, audience="aud")
+    config = CoreasonVerifierConfig(domain=domain, audience="aud")
 
     with (
         patch("coreason_identity.manager.OIDCProvider"),
@@ -66,7 +66,7 @@ def test_init_with_protocol_in_domain() -> None:
     TokenValidator should receive derived issuer.
     """
     domain = "https://test.auth0.com"
-    config = CoreasonIdentityConfig(domain=domain, audience="aud")
+    config = CoreasonVerifierConfig(domain=domain, audience="aud")
 
     with (
         patch("coreason_identity.manager.OIDCProvider"),
@@ -83,7 +83,7 @@ def test_validate_token_missing_iss_claim(key_pair: Any, jwks: dict[str, Any]) -
     """Test validation when 'iss' claim is missing from token."""
     domain = "test.auth0.com"
     audience = "test-audience"
-    config = CoreasonIdentityConfig(domain=domain, audience=audience)
+    config = CoreasonVerifierConfig(domain=domain, audience=audience)
 
     with patch("coreason_identity.manager.OIDCProvider") as MockOIDC:
         mock_oidc_instance = MockOIDC.return_value
@@ -117,7 +117,7 @@ def test_validate_token_no_trailing_slash_match(key_pair: Any, jwks: dict[str, A
     audience = "test-audience"
     # Explicitly configure issuer without trailing slash
     oidc_issuer = f"https://{domain}"
-    config = CoreasonIdentityConfig(domain=domain, audience=audience, issuer=oidc_issuer)
+    config = CoreasonVerifierConfig(domain=domain, audience=audience, issuer=oidc_issuer)
 
     with patch("coreason_identity.manager.OIDCProvider") as MockOIDC:
         mock_oidc_instance = MockOIDC.return_value
@@ -144,7 +144,7 @@ def test_validate_token_http_protocol(key_pair: Any, jwks: dict[str, Any]) -> No
     """Test token with http:// protocol vs https:// config."""
     domain = "test.auth0.com"
     audience = "test-audience"
-    config = CoreasonIdentityConfig(domain=domain, audience=audience)
+    config = CoreasonVerifierConfig(domain=domain, audience=audience)
 
     # Issuer from OIDC Config (HTTPS)
     oidc_issuer = f"https://{domain}/"
@@ -176,7 +176,7 @@ def test_init_with_http_protocol_in_domain() -> None:
     TokenValidator should receive derived issuer (https).
     """
     domain = "http://test.auth0.com"
-    config = CoreasonIdentityConfig(domain=domain, audience="aud")
+    config = CoreasonVerifierConfig(domain=domain, audience="aud")
 
     with (
         patch("coreason_identity.manager.OIDCProvider"),

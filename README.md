@@ -36,14 +36,26 @@ pip install coreason-identity
 
 ## Usage
 
-```python
-from coreason_identity import IdentityManager, CoreasonIdentityConfig, InvalidTokenError
+### 1. Token Verification (Server-Side)
 
-# 1. Initialize (The Borrowing)
-config = CoreasonIdentityConfig(domain="auth.coreason.com", audience="api://coreason")
+Use `CoreasonVerifierConfig` for services that only need to validate tokens (no client credentials required).
+
+```python
+from coreason_identity import IdentityManager, CoreasonVerifierConfig, InvalidTokenError
+from pydantic import SecretStr
+
+# Initialize (The Bouncer)
+config = CoreasonVerifierConfig(
+    domain="auth.coreason.com",
+    audience="api://coreason",
+    pii_salt=SecretStr("super-secret-salt-123"),  # Mandatory: for PII hashing
+    http_timeout=5.0,  # Mandatory: fail fast if IdP is slow
+    allowed_algorithms=["RS256"],  # Mandatory: algorithm allowlist
+    clock_skew_leeway=0            # Optional: defaults to 0 (strict security)
+)
 identity = IdentityManager(config)
 
-# 2. Validate (The Bouncer)
+# Validate (The Check)
 try:
     # Validate a raw Bearer token
     user_context = identity.validate_token(auth_header="Bearer eyJ...")
@@ -55,24 +67,39 @@ try:
     if "admin" in user_context.groups:
         print("Admin access granted.")
 
-    # Access extended attributes
-    project = user_context.claims.get("project_context")
-    print(f"Authorized for project: {project}")
-
 except InvalidTokenError:
     # Handle invalid tokens (expired, bad signature, wrong audience, etc.)
     print("Access denied.")
+```
 
-# 3. CLI Login (The Device Flow)
+### 2. Device Flow Login (CLI / Client-Side)
+
+Use `CoreasonClientConfig` when the application acts as an OIDC Client (needs `client_id`).
+
+```python
+from coreason_identity import IdentityManager, CoreasonClientConfig
+
+# Initialize (The Borrower)
+config = CoreasonClientConfig(
+    domain="auth.coreason.com",
+    audience="api://coreason",
+    client_id="my-cli-client-id",  # Mandatory for client operations
+    pii_salt=SecretStr("super-secret-salt-123"),
+    http_timeout=10.0,
+    allowed_algorithms=["RS256"]
+)
+identity = IdentityManager(config)
+
+# CLI Login (The Device Flow)
 # Initiate the flow
-flow = identity.start_device_login()
+flow = identity.start_device_login(scope="openid profile email")
 print(f"Go to {flow.verification_uri} and enter {flow.user_code}")
 
 # Poll for tokens
 try:
     tokens = identity.await_device_token(flow)
     print("Login successful!")
-    print(f"Access Token: {tokens['access_token']}")
+    print(f"Access Token: {tokens.access_token}")
 except Exception as e:
     print(f"Login failed: {e}")
 ```

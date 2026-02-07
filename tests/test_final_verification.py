@@ -118,26 +118,21 @@ def test_mapper_nested_groups_safely_handled() -> None:
     """
     Verify that if 'groups' contains a nested list (e.g. [['nested']]),
     the mapper handles it without crashing (converting to string representation).
+    It will raise CoreasonIdentityError due to strict enum validation, but shouldn't crash.
     """
     mapper = IdentityMapper()
     # Input with nested list
     claims: dict[str, Any] = {
         "sub": "u1",
         "email": "u@e.com",
-        "groups": [["nested_group"], "project:valid"],
+        "groups": [["nested_group"], "project:apollo"],
     }
 
     # Validation step in RawIdPClaims converts list elements to strings.
-    # ["nested_group"] -> "['nested_group']"
-    # "project:valid" -> "project:valid"
+    # ["nested_group"] -> "['nested_group']" which is invalid enum.
 
-    context = mapper.map_claims(claims)
-
-    # "['nested_group']" does not match regex ^project:
-    # "project:valid" matches
-    assert context.claims["project_context"] == "valid"
-    # Permissions should be empty (unless groups mapped to permissions, but these don't)
-    assert context.claims["permissions"] == []
+    with pytest.raises(CoreasonIdentityError):
+        mapper.map_claims(claims)
 
 
 def test_mapper_huge_input_strings() -> None:
@@ -153,15 +148,13 @@ def test_mapper_huge_input_strings() -> None:
     }
 
     start = time.time()
-    context = mapper.map_claims(claims)
+    # Expect validation error due to invalid group string
+    with pytest.raises(CoreasonIdentityError):
+        mapper.map_claims(claims)
     end = time.time()
 
     # Ensure it didn't take an absurd amount of time (regex catastrophic backtracking check)
     assert (end - start) < 1.0
-
-    # Since regex is ^project:, it anchors to start.
-    # "aaaa...project:HIDDEN" does NOT start with project:
-    assert "project_context" not in context.claims
 
 
 # --- 3. DeviceFlowClient Verification ---
@@ -174,7 +167,7 @@ async def test_device_flow_mixed_errors() -> None:
     """
     # Need mock client for async
     mock_client = AsyncMock(spec=httpx.AsyncClient)
-    client = DeviceFlowClient("id", "http://idp", client=mock_client)
+    client = DeviceFlowClient("id", "http://idp", client=mock_client, scope="openid profile email")
 
     # Mock endpoints discovery
     with patch.object(client, "_get_endpoints", return_value={"token_endpoint": "url"}):

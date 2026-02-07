@@ -57,6 +57,8 @@ class TokenValidator:
         audience: str,
         issuer: str | None = None,
         pii_salt: SecretStr | None = None,
+        allowed_algorithms: list[str] | None = None,
+        leeway: int = 0,
     ) -> None:
         """
         Initialize the TokenValidator.
@@ -66,13 +68,17 @@ class TokenValidator:
             audience: The expected audience (aud) claim.
             issuer: The expected issuer (iss) claim. If None, it will be fetched dynamically from OIDCProvider.
             pii_salt: Salt for anonymizing PII. Defaults to unsafe static salt if not provided.
+            allowed_algorithms: List of allowed JWT signing algorithms. Defaults to ["RS256"].
+            leeway: Acceptable clock skew in seconds. Defaults to 0.
         """
         self.oidc_provider = oidc_provider
         self.audience = audience
         self.issuer = issuer
         self.pii_salt = pii_salt or SecretStr("coreason-unsafe-default-salt")
-        # Use a specific JsonWebToken instance to enforce RS256 and reject 'none'
-        self.jwt = JsonWebToken(["RS256"])
+        self.allowed_algorithms = allowed_algorithms or ["RS256"]
+        self.leeway = leeway
+        # Use a specific JsonWebToken instance to enforce allowed algorithms and reject others
+        self.jwt = JsonWebToken(self.allowed_algorithms)
 
     def _anonymize(self, value: str) -> str:
         """
@@ -119,7 +125,8 @@ class TokenValidator:
                 # Define claim options factory
                 def get_claims_options(iss: str) -> dict[str, Any]:
                     return {
-                        "exp": {"essential": True},
+                        "exp": {"essential": True, "leeway": self.leeway},
+                        "nbf": {"essential": False, "leeway": self.leeway},
                         "aud": {"essential": True, "value": self.audience},
                         "iss": {"essential": True, "value": iss},
                     }
@@ -147,7 +154,7 @@ class TokenValidator:
 
                 def _decode(jwks_data: dict[str, Any], opts: dict[str, Any]) -> Any:
                     claims = self.jwt.decode(token, jwks_data, claims_options=opts)  # type: ignore[call-overload]
-                    claims.validate()
+                    claims.validate(leeway=self.leeway)
                     return claims
 
                 try:

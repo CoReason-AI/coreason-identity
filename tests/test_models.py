@@ -20,17 +20,52 @@ def test_user_context_valid() -> None:
         user_id="user123",
         email="test@example.com",
         groups=["admin"],
-        scopes=["read"],
+        scopes=["openid"],
         downstream_token=SecretStr("secret"),
         claims={"custom": "value"},
     )
     assert user.user_id == "user123"
     assert user.email == "test@example.com"
     assert user.groups == ["admin"]
-    assert user.scopes == ["read"]
+    assert user.scopes == ["openid"]
     assert user.downstream_token is not None
     assert user.downstream_token.get_secret_value() == "secret"
     assert user.claims == {"custom": "value"}
+
+
+def test_user_context_rejects_invalid_enums() -> None:
+    """Test that UserContext rejects invalid groups and scopes."""
+    # Invalid group
+    with pytest.raises(ValidationError) as excinfo:
+        UserContext(
+            user_id="user123",
+            email="test@example.com",
+            groups=["hacker_group"],
+        )
+    assert "Input should be 'admin', 'developer' or 'project:apollo'" in str(excinfo.value)
+
+    # Invalid scope
+    with pytest.raises(ValidationError) as excinfo:
+        UserContext(
+            user_id="user123",
+            email="test@example.com",
+            scopes=["invalid_scope"],
+        )
+    assert "Input should be 'openid', 'profile', 'email' or 'read:reports'" in str(excinfo.value)
+
+
+def test_user_context_serialization() -> None:
+    """Test that UserContext serializes enums to strings."""
+    user = UserContext(
+        user_id="user123",
+        email="test@example.com",
+        groups=["admin"],
+        scopes=["openid"],
+    )
+    # Using mode='json' ensures Enums are converted to their values
+    dump = user.model_dump(mode="json")
+    assert dump["groups"] == ["admin"]
+    assert dump["scopes"] == ["openid"]
 
 
 def test_user_context_defaults() -> None:
