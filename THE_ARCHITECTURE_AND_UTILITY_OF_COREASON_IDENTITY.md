@@ -26,20 +26,20 @@ To prevent tampering and ensure thread safety, all core data structures (`UserCo
 *   **Tuple Collections:** Lists are replaced with tuples (e.g., `user.scopes` is `tuple[str, ...]`), preventing in-place mutation like `.append()`.
 
 ### 3. In Practice (The How)
-The package exposes a single, high-level entry point: `IdentityManager`.
+The package exposes a single, high-level entry point: `IdentityManagerSync` (or `IdentityManagerAsync`).
 
 #### The Bouncer (Server-Side Validation)
 This is the primary use case for APIs. The middleware initializes the manager once and uses it to convert raw HTTP headers into a usable user context.
 
 ```python
-from coreason_identity import IdentityManager, CoreasonIdentityConfig, InvalidTokenError
+from coreason_identity import IdentityManagerSync, CoreasonIdentityConfig, InvalidTokenError
 
 # 1. Initialize with strict configuration (The Borrowing)
 config = CoreasonIdentityConfig(
     domain="auth.coreason.com",
     audience="api://coreason-platform"
 )
-identity = IdentityManager(config)
+identity = IdentityManagerSync(config)
 
 # 2. Validate incoming requests (The Bouncer)
 try:
