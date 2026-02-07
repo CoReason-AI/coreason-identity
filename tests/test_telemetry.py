@@ -30,7 +30,7 @@ from coreason_identity.validator import TokenValidator
 class MockClaims(dict[str, Any]):
     """Helper to mock Authlib claims which behave like a dict but have a validate method."""
 
-    def validate(self) -> None:
+    def validate(self, *args: Any, **kwargs: Any) -> None:
         pass
 
 

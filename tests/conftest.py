@@ -27,6 +27,8 @@ def set_default_env_vars() -> Generator[None, None, None]:
         {
             "COREASON_AUTH_HTTP_TIMEOUT": "5.0",
             "COREASON_AUTH_PII_SALT": "test-suite-mandatory-salt-123",
+            "COREASON_AUTH_ALLOWED_ALGORITHMS": '["RS256"]',
+            "COREASON_AUTH_CLOCK_SKEW_LEEWAY": "0",
         },
     ):
         yield
