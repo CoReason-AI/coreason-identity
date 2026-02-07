@@ -28,7 +28,9 @@ class TestIssuerTrust:
         Initialize CoreasonIdentityConfig(pii_salt="test-salt", domain="auth.example.com", issuer="https://other.com").
         Assert config.issuer == "https://other.com".
         """
-        config = CoreasonIdentityConfig(pii_salt="test-salt", domain="auth.example.com", audience="aud", issuer="https://other.com")
+        config = CoreasonIdentityConfig(
+            pii_salt="test-salt", domain="auth.example.com", audience="aud", issuer="https://other.com"
+        )
         assert config.issuer == "https://other.com"
 
     @pytest.mark.asyncio
