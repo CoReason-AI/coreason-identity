@@ -40,7 +40,7 @@ class DeviceFlowClient:
         client_id: str,
         idp_url: str,
         client: httpx.AsyncClient,
-        scope: str = "openid profile email",
+        scope: str,
         min_poll_interval: float = 5.0,
         max_poll_duration: float = 900.0,
     ) -> None:
@@ -51,7 +51,7 @@ class DeviceFlowClient:
             client_id: The OIDC Client ID.
             idp_url: The base URL of the Identity Provider (e.g., https://my-tenant.auth0.com).
             client: The async HTTP client to use for requests.
-            scope: The scopes to request (default: "openid profile email").
+            scope: The scopes to request.
             min_poll_interval: Minimum seconds to wait between requests (default: 5.0).
             max_poll_duration: Maximum seconds to poll before giving up (default: 900.0).
         """

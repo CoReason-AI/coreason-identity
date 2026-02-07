@@ -112,12 +112,15 @@ class IdentityManagerAsync:
         if not isinstance(self.config, CoreasonClientConfig):
             raise CoreasonIdentityError("Device login requires CoreasonClientConfig with a valid client_id.")
 
+        if not scope or not scope.strip():
+            raise ValueError("Scope must be explicitly provided (e.g., 'openid profile').")
+
         if not self.device_client:
             self.device_client = DeviceFlowClient(
                 client_id=self.config.client_id,
                 idp_url=f"https://{self.domain}",
                 client=self._client,
-                scope=scope or "openid profile email",
+                scope=scope,
             )
         else:
             # Re-init if needed to ensure correct client is passed if we ever support changing it,
@@ -128,7 +131,7 @@ class IdentityManagerAsync:
                 client_id=self.config.client_id,
                 idp_url=f"https://{self.domain}",
                 client=self._client,
-                scope=scope or "openid profile email",
+                scope=scope,
             )
 
         return await self.device_client.initiate_flow(audience=self.config.audience)
@@ -145,6 +148,7 @@ class IdentityManagerAsync:
                 client_id=self.config.client_id,
                 idp_url=f"https://{self.domain}",
                 client=self._client,
+                scope="",  # Scope is not used during polling
             )
 
         return await self.device_client.poll_token(flow)

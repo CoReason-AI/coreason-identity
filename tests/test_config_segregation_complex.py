@@ -45,11 +45,11 @@ class TestConfigSegregationComplex:
 
             # Verifier Manager: Should fail device flow
             with pytest.raises(CoreasonIdentityError, match="Device login requires CoreasonClientConfig"):
-                verifier_manager.start_device_login()
+                verifier_manager.start_device_login(scope="openid profile email")
 
             # Client Manager: Should succeed (mocked)
             MockDeviceClient.return_value.initiate_flow = AsyncMock(return_value="mock_flow")
-            client_manager.start_device_login()
+            client_manager.start_device_login(scope="openid profile email")
             assert MockDeviceClient.called
 
     def test_env_var_loading_isolation(self) -> None:
@@ -105,7 +105,7 @@ class TestConfigSegregationComplex:
 
             # Action: Try to login -> Fail
             with pytest.raises(CoreasonIdentityError):
-                manager.start_device_login()
+                manager.start_device_login(scope="openid profile email")
 
             # Phase 2: "Upgrade" - Must create NEW config and NEW manager
             # We cannot just set manager._async.config because runtime checks might depend on other things initialized?
@@ -122,5 +122,5 @@ class TestConfigSegregationComplex:
             # Verify new capabilities
             with patch("coreason_identity.manager.DeviceFlowClient") as MockDC:
                 MockDC.return_value.initiate_flow = AsyncMock(return_value="flow")
-                new_manager.start_device_login()
+                new_manager.start_device_login(scope="openid profile email")
                 assert MockDC.called

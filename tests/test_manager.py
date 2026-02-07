@@ -102,7 +102,7 @@ def test_start_device_login_success(manager: IdentityManager) -> None:
         mock_client_instance = MockClient.return_value
         mock_client_instance.initiate_flow = AsyncMock(return_value=mock_response)
 
-        response = manager.start_device_login()
+        response = manager.start_device_login(scope="openid profile email")
 
         # Check call args
         MockClient.assert_called_with(
@@ -137,7 +137,7 @@ def test_start_device_login_recreation(manager: IdentityManager) -> None:
         mock_client_instance.initiate_flow = AsyncMock()
 
         # First call
-        manager.start_device_login()
+        manager.start_device_login(scope="openid profile email")
         assert MockClient.call_count == 1
 
         # Second call
@@ -165,7 +165,7 @@ def test_start_device_login_missing_client_id() -> None:
         mgr = IdentityManager(config_no_client)
 
         with pytest.raises(CoreasonIdentityError, match="Device login requires CoreasonClientConfig"):
-            mgr.start_device_login()
+            mgr.start_device_login(scope="openid profile email")
 
 
 def test_await_device_token_success(manager: IdentityManager) -> None:
@@ -205,7 +205,10 @@ def test_await_device_token_stateless(manager: IdentityManager) -> None:
 
         # Should have created a new client
         MockClient.assert_called_with(
-            client_id=MOCK_CLIENT_ID, idp_url=f"https://{MOCK_DOMAIN}", client=manager._async._client
+            client_id=MOCK_CLIENT_ID,
+            idp_url=f"https://{MOCK_DOMAIN}",
+            client=manager._async._client,
+            scope="",  # Scope is not used during polling
         )
         mock_client_instance.poll_token.assert_awaited_with(mock_flow)
         assert result == mock_token_response
@@ -262,3 +265,9 @@ def test_init_missing_issuer_raises_error() -> None:
 
     with pytest.raises(CoreasonIdentityError, match="Issuer configuration is missing"):
         IdentityManager(config)
+
+
+def test_start_device_login_no_scope_raises_error(manager: IdentityManager) -> None:
+    """Test that start_device_login raises ValueError if scope is not provided."""
+    with pytest.raises(ValueError, match="Scope must be explicitly provided"):
+        manager.start_device_login()
