@@ -1,16 +1,15 @@
 [project]
 name = "coreason_identity"
-version = "0.7.0"
+version = "0.8.0"
 description = "Decoupled authentication middleware, abstracting OIDC and OAuth2 protocols from the main application."
 readme = "README.md"
-requires-python = ">=3.11, <3.15"
+requires-python = ">=3.12, <3.15"
 authors = [
     { name = "Gowtham A Rao", email = "gowtham.rao@coreason.ai" },
 ]
 license = {text = "Prosperity-3.0"}
 classifiers = [
     "License :: Other/Proprietary License",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Operating System :: OS Independent",
 ]
@@ -54,14 +53,14 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
 line-length = 120
-target-version = "py311"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "B", "I", "UP", "SIM", "RUF", "ARG", "C4", "PT", "TCH", "PIE", "RET"]
 ignore = []
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
 strict = true
 warn_unused_ignores = true
 warn_redundant_casts = true
