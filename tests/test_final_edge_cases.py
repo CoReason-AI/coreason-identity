@@ -25,7 +25,7 @@ from coreason_identity.exceptions import (
     InvalidTokenError,
 )
 from coreason_identity.identity_mapper import IdentityMapper
-from coreason_identity.manager import IdentityManager
+from coreason_identity.manager import IdentityManagerSync
 from coreason_identity.oidc_provider import OIDCProvider
 from coreason_identity.validator import TokenValidator
 
@@ -34,6 +34,7 @@ class TestIdentityManagerEdgeCases:
     @pytest.fixture
     def config(self) -> CoreasonIdentityConfig:
         return CoreasonIdentityConfig(
+            pii_salt="test-salt",
             domain="test.auth0.com",
             audience="my-audience",
             client_id="cid",
@@ -46,12 +47,12 @@ class TestIdentityManagerEdgeCases:
             patch("coreason_identity.manager.TokenValidator"),
             patch("coreason_identity.manager.IdentityMapper"),
         ):
-            manager = IdentityManager(config)
+            manager = IdentityManagerSync(config)
 
             # Mock validator just in case, but it shouldn't be reached
             manager._async.validator.validate_token = AsyncMock()  # type: ignore[method-assign]
 
-            # Now IdentityManager rejects "Bearer " strictly via regex
+            # Now IdentityManagerSync rejects "Bearer " strictly via regex
             with pytest.raises(InvalidTokenError, match="Invalid Authorization header format"):
                 manager.validate_token("Bearer ")
 

@@ -20,6 +20,11 @@ Internally, the `IdentityManager` orchestrates a pipeline:
 2.  **Validation:** It cryptographically verifies the token signature and strictly checks the `aud` (audience) claim to prevent token misuse.
 3.  **Mapping:** It transforms abstract IdP groups into concrete application project contexts, while enforcing strict permission mapping without implicit privilege escalation.
 
+### 3. Immutable Data Integrity
+To prevent tampering and ensure thread safety, all core data structures (`UserContext`, `CoreasonIdentityConfig`) are deeply immutable.
+*   **Frozen Models:** Attempting to assign to a field (e.g., `user.user_id = "new"`) raises a `ValidationError`.
+*   **Tuple Collections:** Lists are replaced with tuples (e.g., `user.scopes` is `tuple[str, ...]`), preventing in-place mutation like `.append()`.
+
 ### 3. In Practice (The How)
 The package exposes a single, high-level entry point: `IdentityManager`.
 

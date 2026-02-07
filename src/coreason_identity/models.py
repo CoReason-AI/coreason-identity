@@ -45,15 +45,15 @@ class UserContext(BaseModel):
     email: EmailStr = Field(
         ..., description="The user's email address. Verified and strictly typed.", examples=["alice@coreason.ai"]
     )
-    groups: list[str] = Field(
-        default_factory=list,
+    groups: tuple[str, ...] = Field(
+        default_factory=tuple,
         description="Security group IDs. Used for Row-Level Security (RLS).",
-        examples=[["admin", "project:apollo"]],
+        examples=[("admin", "project:apollo")],
     )
-    scopes: list[str] = Field(
-        default_factory=list,
+    scopes: tuple[str, ...] = Field(
+        default_factory=tuple,
         description="OAuth 2.0 scopes for coarse-grained API permission checks.",
-        examples=[["openid", "profile"]],
+        examples=[("openid", "profile")],
     )
     downstream_token: SecretStr | None = Field(
         default=None, description="The On-Behalf-Of (OBO) token for downstream API calls. Protected from logging."
@@ -87,6 +87,8 @@ class DeviceFlowResponse(BaseModel):
         interval (int): The minimum amount of time in seconds that the client SHOULD wait between polling requests.
     """
 
+    model_config = ConfigDict(frozen=True)
+
     device_code: str
     user_code: str
     verification_uri: str
@@ -106,6 +108,8 @@ class TokenResponse(BaseModel):
         token_type (str): The type of the token (e.g. "Bearer").
         expires_in (int): The lifetime in seconds of the access token.
     """
+
+    model_config = ConfigDict(frozen=True)
 
     access_token: str
     refresh_token: str | None = None

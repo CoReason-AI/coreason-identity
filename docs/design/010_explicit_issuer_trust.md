@@ -28,7 +28,7 @@ We have enforced **Explicit Issuer Trust**. The application now requires a hardc
     *   Removed logic that fetched the issuer from `OIDCProvider.get_issuer()`.
     *   The `validate_token` method now strictly checks the `iss` claim against the locally configured `issuer` string.
 
-3.  **Manager (`IdentityManager`):**
+3.  **Manager (`IdentityManagerSync`):**
     *   Updated to pass the `issuer` from `CoreasonIdentityConfig` when initializing the `TokenValidator`.
 
 ## Consequences

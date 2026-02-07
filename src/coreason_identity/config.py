@@ -36,16 +36,17 @@ class CoreasonIdentityConfig(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="COREASON_AUTH_",
         case_sensitive=False,
+        frozen=True,
     )
 
     domain: str
     audience: str
     client_id: str | None = None
-    pii_salt: SecretStr = SecretStr("coreason-unsafe-default-salt")
     http_timeout: float = Field(
         ..., description="Timeout in seconds for all IdP network operations."
     )
     unsafe_local_dev: bool = False
+    pii_salt: SecretStr = Field(..., description="High-entropy salt for PII hashing. REQUIRED.")
     issuer: str | None = None
 
     @field_validator("issuer", mode="after")
@@ -68,7 +69,8 @@ class CoreasonIdentityConfig(BaseSettings):
         """
         if self.issuer is None:
             # self.domain is already normalized by its field validator
-            self.issuer = f"https://{self.domain}/"
+            # Since the model is frozen, we must use object.__setattr__ to bypass validation
+            object.__setattr__(self, "issuer", f"https://{self.domain}/")
         return self
 
     @field_validator("domain")
