@@ -146,7 +146,10 @@ def test_start_device_login_recreation(manager: IdentityManager) -> None:
 
         # Verify the second call used the new scope
         MockClient.assert_called_with(
-            client_id=MOCK_CLIENT_ID, idp_url=f"https://{MOCK_DOMAIN}", client=manager._async._client, scope="read:reports"
+            client_id=MOCK_CLIENT_ID,
+            idp_url=f"https://{MOCK_DOMAIN}",
+            client=manager._async._client,
+            scope="read:reports",
         )
 
 

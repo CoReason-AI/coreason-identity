@@ -20,7 +20,7 @@ import pytest
 from authlib.jose import JsonWebKey, jwt
 
 from coreason_identity.exceptions import CoreasonIdentityError, InvalidTokenError
-from coreason_identity.identity_mapper import IdentityMapper, RawIdPClaims
+from coreason_identity.identity_mapper import RawIdPClaims
 from coreason_identity.oidc_provider import OIDCProvider
 from coreason_identity.validator import TokenValidator
 
