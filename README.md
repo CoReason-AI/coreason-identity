@@ -92,7 +92,7 @@ identity = IdentityManager(config)
 
 # CLI Login (The Device Flow)
 # Initiate the flow
-flow = identity.start_device_login()
+flow = identity.start_device_login(scope="openid profile email")
 print(f"Go to {flow.verification_uri} and enter {flow.user_code}")
 
 # Poll for tokens

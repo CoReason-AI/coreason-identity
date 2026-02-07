@@ -112,7 +112,7 @@ class IdentityManagerAsync:
         if not isinstance(self.config, CoreasonClientConfig):
             raise CoreasonIdentityError("Device login requires CoreasonClientConfig with a valid client_id.")
 
-        if not scope:
+        if not scope or not scope.strip():
             raise ValueError("Scope must be explicitly provided (e.g., 'openid profile').")
 
         if not self.device_client:
