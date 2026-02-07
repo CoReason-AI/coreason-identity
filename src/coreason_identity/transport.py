@@ -45,9 +45,7 @@ class SafeHTTPTransport(httpx.AsyncHTTPTransport):
         # Run DNS resolution in a thread to avoid blocking the event loop
         try:
             # socket.getaddrinfo returns a list of (family, type, proto, canonname, sockaddr)
-            addr_infos = await anyio.to_thread.run_sync(
-                socket.getaddrinfo, hostname, None
-            )
+            addr_infos = await anyio.to_thread.run_sync(socket.getaddrinfo, hostname, None)
         except socket.gaierror as e:
             raise httpx.ConnectError(f"Could not resolve hostname: {hostname}") from e
 
@@ -55,24 +53,20 @@ class SafeHTTPTransport(httpx.AsyncHTTPTransport):
         ip_str: str | None = None
         for _, _, _, _, sockaddr in addr_infos:
             # sockaddr is (ip, port) for IPv4 or (ip, port, flowinfo, scopeid) for IPv6
-            current_ip = sockaddr[0]
+            # The first element is always the address string
+            current_ip = str(sockaddr[0])
             if self._validate_ip(current_ip):
                 ip_str = current_ip
                 break
 
         if not ip_str:
-            raise httpx.ConnectError(
-                f"All resolved IPs for {hostname} are blocked by security policy."
-            )
+            raise httpx.ConnectError(f"All resolved IPs for {hostname} are blocked by security policy.")
 
         # Modify the request URL to use the IP address
         # Handle IPv6 formatting for URL (needs brackets)
         try:
             ip_obj = ipaddress.ip_address(ip_str)
-            if isinstance(ip_obj, ipaddress.IPv6Address):
-                host_replacement = f"[{ip_str}]"
-            else:
-                host_replacement = ip_str
+            host_replacement = f"[{ip_str}]" if isinstance(ip_obj, ipaddress.IPv6Address) else ip_str
         except ValueError:
             # Should not happen if getaddrinfo returned it
             host_replacement = ip_str

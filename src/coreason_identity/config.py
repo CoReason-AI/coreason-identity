@@ -12,7 +12,6 @@
 Configuration for the coreason-identity package.
 """
 
-import os
 from urllib.parse import urlparse
 
 from pydantic import Field, SecretStr, ValidationInfo, field_validator, model_validator
@@ -83,4 +82,3 @@ class CoreasonIdentityConfig(BaseSettings):
 
         parsed = urlparse(v)
         return parsed.netloc or v
-

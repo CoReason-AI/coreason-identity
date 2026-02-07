@@ -9,20 +9,20 @@
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
 import socket
-from unittest.mock import AsyncMock, patch
+from collections.abc import Generator
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
 
 from coreason_identity.transport import SafeHTTPTransport
 
-
 # Mock response for successful requests
 MOCK_RESPONSE = httpx.Response(200, json={"status": "ok"})
 
 
 @pytest.fixture
-def mock_getaddrinfo():
+def mock_getaddrinfo() -> Generator[MagicMock, None, None]:
     # We patch socket.getaddrinfo specifically for these tests
     # Note: conftest.py might already patch it, but we override it here with a new patch
     # to control the return value per test.
@@ -31,7 +31,7 @@ def mock_getaddrinfo():
 
 
 @pytest.mark.asyncio
-async def test_safe_transport_blocks_private_ip(mock_getaddrinfo):
+async def test_safe_transport_blocks_private_ip(mock_getaddrinfo: MagicMock) -> None:
     """Test that resolving to a private IP raises a ConnectError."""
     # Mock resolving to 127.0.0.1
     mock_getaddrinfo.return_value = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 443))]
@@ -44,7 +44,7 @@ async def test_safe_transport_blocks_private_ip(mock_getaddrinfo):
 
 
 @pytest.mark.asyncio
-async def test_safe_transport_blocks_private_ipv6(mock_getaddrinfo):
+async def test_safe_transport_blocks_private_ipv6(mock_getaddrinfo: MagicMock) -> None:
     """Test that resolving to a private IPv6 address raises a ConnectError."""
     # Mock resolving to ::1
     mock_getaddrinfo.return_value = [(socket.AF_INET6, socket.SOCK_STREAM, 6, "", ("::1", 443, 0, 0))]
@@ -57,7 +57,7 @@ async def test_safe_transport_blocks_private_ipv6(mock_getaddrinfo):
 
 
 @pytest.mark.asyncio
-async def test_safe_transport_allows_public_ip(mock_getaddrinfo):
+async def test_safe_transport_allows_public_ip(mock_getaddrinfo: MagicMock) -> None:
     """Test that resolving to a public IP allows the request and pins the IP."""
     # Mock resolving to 8.8.8.8
     mock_getaddrinfo.return_value = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("8.8.8.8", 443))]
@@ -84,7 +84,7 @@ async def test_safe_transport_allows_public_ip(mock_getaddrinfo):
 
 
 @pytest.mark.asyncio
-async def test_safe_transport_allows_private_ip_in_unsafe_mode(mock_getaddrinfo):
+async def test_safe_transport_allows_private_ip_in_unsafe_mode(mock_getaddrinfo: MagicMock) -> None:
     """Test that unsafe_local_dev allows private IPs."""
     mock_getaddrinfo.return_value = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 443))]
 
@@ -102,8 +102,9 @@ async def test_safe_transport_allows_private_ip_in_unsafe_mode(mock_getaddrinfo)
         # SNI should still be set
         assert request.extensions.get("sni_hostname") == "localhost"
 
+
 @pytest.mark.asyncio
-async def test_safe_transport_dns_failure(mock_getaddrinfo):
+async def test_safe_transport_dns_failure(mock_getaddrinfo: MagicMock) -> None:
     """Test that DNS resolution failure raises ConnectError."""
     mock_getaddrinfo.side_effect = socket.gaierror("Name or service not known")
 
@@ -115,7 +116,7 @@ async def test_safe_transport_dns_failure(mock_getaddrinfo):
 
 
 @pytest.mark.asyncio
-async def test_safe_transport_ipv6_public(mock_getaddrinfo):
+async def test_safe_transport_ipv6_public(mock_getaddrinfo: MagicMock) -> None:
     """Test that public IPv6 is allowed and formatted correctly in URL."""
     # Mock resolving to valid public IPv6: 2001:4860:4860::8888
     mock_getaddrinfo.return_value = [(socket.AF_INET6, socket.SOCK_STREAM, 6, "", ("2001:4860:4860::8888", 443, 0, 0))]
@@ -139,7 +140,7 @@ async def test_safe_transport_ipv6_public(mock_getaddrinfo):
 
 
 @pytest.mark.asyncio
-async def test_safe_transport_invalid_ip_string(mock_getaddrinfo):
+async def test_safe_transport_invalid_ip_string(mock_getaddrinfo: MagicMock) -> None:
     """Test that invalid IP string from resolver fails validation."""
     # Mock returning garbage as IP (which ipaddress lib rejects)
     mock_getaddrinfo.return_value = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("garbage", 443))]
@@ -152,8 +153,9 @@ async def test_safe_transport_invalid_ip_string(mock_getaddrinfo):
     with pytest.raises(httpx.ConnectError, match="blocked by security policy"):
         await client.get("https://garbage.com")
 
+
 @pytest.mark.asyncio
-async def test_safe_transport_invalid_ip_string_unsafe(mock_getaddrinfo):
+async def test_safe_transport_invalid_ip_string_unsafe(mock_getaddrinfo: MagicMock) -> None:
     """Test that invalid IP string bypasses validation in unsafe mode and is used as-is."""
     mock_getaddrinfo.return_value = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("garbage", 443))]
 
