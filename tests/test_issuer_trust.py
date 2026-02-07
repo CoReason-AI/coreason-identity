@@ -55,7 +55,7 @@ class TestIssuerTrust:
         with patch.object(validator.jwt, "decode") as mock_decode:
 
             class MockClaims(dict[str, Any]):
-                def validate(self) -> None:
+                def validate(self, *args: Any, **kwargs: Any) -> None:
                     pass
 
             mock_decode.return_value = MockClaims({"sub": "some-user-id"})

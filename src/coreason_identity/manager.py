@@ -72,6 +72,8 @@ class IdentityManagerAsync:
             audience=self.config.audience,
             pii_salt=self.config.pii_salt,
             issuer=self.config.issuer,
+            allowed_algorithms=self.config.allowed_algorithms,
+            leeway=self.config.clock_skew_leeway,
         )
         self.identity_mapper = IdentityMapper()
         self.device_client: DeviceFlowClient | None = None

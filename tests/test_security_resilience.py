@@ -143,7 +143,7 @@ async def test_pii_redaction_in_logs(log_capture: list[str]) -> None:
         # 3. dict(claims) must work
 
         class MockClaims(dict[str, Any]):
-            def validate(self) -> None:
+            def validate(self, *args: Any, **kwargs: Any) -> None:
                 pass
 
         claims_obj = MockClaims(mock_claims_dict)
@@ -233,7 +233,7 @@ class TestSecurityEdgeCases:
             mock_claims_dict = {"sub": unicode_user_id, "aud": "aud", "exp": 1234567890}
 
             class MockClaims(dict[str, Any]):
-                def validate(self) -> None:
+                def validate(self, *args: Any, **kwargs: Any) -> None:
                     pass
 
             mock_decode.return_value = MockClaims(mock_claims_dict)

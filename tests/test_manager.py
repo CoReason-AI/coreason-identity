@@ -246,6 +246,8 @@ def test_init_strict_issuer() -> None:
             audience=MOCK_AUDIENCE,
             issuer=expected_issuer,
             pii_salt=config.pii_salt,
+            allowed_algorithms=config.allowed_algorithms,
+            leeway=config.clock_skew_leeway,
         )
 
 

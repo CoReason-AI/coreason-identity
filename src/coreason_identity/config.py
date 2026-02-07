@@ -38,6 +38,8 @@ class CoreasonVerifierConfig(BaseSettings):
     audience: str
     pii_salt: SecretStr = Field(..., description="High-entropy salt for PII hashing. REQUIRED.")
     http_timeout: float = Field(..., description="Timeout in seconds for all IdP network operations.")
+    allowed_algorithms: list[str] = Field(..., description="List of allowed JWT signing algorithms (e.g., ['RS256']). REQUIRED.")
+    clock_skew_leeway: int = Field(0, description="Acceptable clock skew in seconds. Defaults to 0 for strict security.")
     unsafe_local_dev: bool = False
     issuer: str | None = None
 
