@@ -19,12 +19,13 @@ from urllib.parse import urljoin
 import anyio
 import httpx
 
-from coreason_identity.config import CoreasonIdentityConfig
+from coreason_identity.config import CoreasonClientConfig, CoreasonVerifierConfig
 from coreason_identity.device_flow_client import DeviceFlowClient
 from coreason_identity.exceptions import CoreasonIdentityError, InvalidTokenError
 from coreason_identity.identity_mapper import IdentityMapper
 from coreason_identity.models import DeviceFlowResponse, TokenResponse, UserContext
 from coreason_identity.oidc_provider import OIDCProvider
+from coreason_identity.transport import SafeHTTPTransport
 from coreason_identity.validator import TokenValidator
 
 
@@ -34,17 +35,23 @@ class IdentityManagerAsync:
     Handles resources via async context manager.
     """
 
-    def __init__(self, config: CoreasonIdentityConfig, client: httpx.AsyncClient | None = None) -> None:
+    def __init__(self, config: CoreasonVerifierConfig, client: httpx.AsyncClient | None = None) -> None:
         """
         Initialize the IdentityManagerAsync.
 
         Args:
             config: The configuration object.
-            client: Optional external async client.
+            client: External async client (optional).
         """
         self.config = config
         self._internal_client = client is None
-        self._client = client or httpx.AsyncClient()
+
+        if client:
+            self._client = client
+        else:
+            # Use SafeHTTPTransport to prevent SSRF and DNS Rebinding
+            transport = SafeHTTPTransport(unsafe_local_dev=self.config.unsafe_local_dev)
+            self._client = httpx.AsyncClient(transport=transport, timeout=self.config.http_timeout)
 
         # Domain is already normalized by Config validator to be just the hostname (e.g. auth.coreason.com)
         self.domain = self.config.domain
@@ -65,6 +72,8 @@ class IdentityManagerAsync:
             audience=self.config.audience,
             pii_salt=self.config.pii_salt,
             issuer=self.config.issuer,
+            allowed_algorithms=self.config.allowed_algorithms,
+            leeway=self.config.clock_skew_leeway,
         )
         self.identity_mapper = IdentityMapper()
         self.device_client: DeviceFlowClient | None = None
@@ -100,15 +109,18 @@ class IdentityManagerAsync:
         """
         Initiates the Device Authorization Flow.
         """
-        if not self.config.client_id:
-            raise CoreasonIdentityError("client_id is required for device login but not configured.")
+        if not isinstance(self.config, CoreasonClientConfig):
+            raise CoreasonIdentityError("Device login requires CoreasonClientConfig with a valid client_id.")
+
+        if not scope or not scope.strip():
+            raise ValueError("Scope must be explicitly provided (e.g., 'openid profile').")
 
         if not self.device_client:
             self.device_client = DeviceFlowClient(
                 client_id=self.config.client_id,
                 idp_url=f"https://{self.domain}",
                 client=self._client,
-                scope=scope or "openid profile email",
+                scope=scope,
             )
         else:
             # Re-init if needed to ensure correct client is passed if we ever support changing it,
@@ -119,7 +131,7 @@ class IdentityManagerAsync:
                 client_id=self.config.client_id,
                 idp_url=f"https://{self.domain}",
                 client=self._client,
-                scope=scope or "openid profile email",
+                scope=scope,
             )
 
         return await self.device_client.initiate_flow(audience=self.config.audience)
@@ -128,14 +140,15 @@ class IdentityManagerAsync:
         """
         Polls for the device token.
         """
-        if not self.config.client_id:
-            raise CoreasonIdentityError("client_id is required for device login but not configured.")
+        if not isinstance(self.config, CoreasonClientConfig):
+            raise CoreasonIdentityError("Device login requires CoreasonClientConfig with a valid client_id.")
 
         if not self.device_client:
             self.device_client = DeviceFlowClient(
                 client_id=self.config.client_id,
                 idp_url=f"https://{self.domain}",
                 client=self._client,
+                scope="",  # Scope is not used during polling
             )
 
         return await self.device_client.poll_token(flow)
@@ -147,7 +160,7 @@ class IdentityManager:
     Wraps IdentityManagerAsync and bridges Sync -> Async via anyio.run.
     """
 
-    def __init__(self, config: CoreasonIdentityConfig) -> None:
+    def __init__(self, config: CoreasonVerifierConfig) -> None:
         """
         Initialize the IdentityManager Facade.
 

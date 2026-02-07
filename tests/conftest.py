@@ -8,6 +8,7 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
+import os
 import socket
 from collections.abc import Generator
 from unittest.mock import MagicMock, patch
@@ -16,10 +17,28 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
+def set_default_env_vars() -> Generator[None, None, None]:
+    """
+    Sets default environment variables to ensure CoreasonVerifierConfig
+    can be instantiated in tests without mandatory fields causing errors.
+    """
+    with patch.dict(
+        os.environ,
+        {
+            "COREASON_AUTH_HTTP_TIMEOUT": "5.0",
+            "COREASON_AUTH_PII_SALT": "test-suite-mandatory-salt-123",
+            "COREASON_AUTH_ALLOWED_ALGORITHMS": '["RS256"]',
+            "COREASON_AUTH_CLOCK_SKEW_LEEWAY": "0",
+        },
+    ):
+        yield
+
+
+@pytest.fixture(autouse=True)
 def mock_dns_resolution() -> Generator[MagicMock, None, None]:
     """
     Globally patches socket.getaddrinfo to return a safe public IP by default.
-    This prevents SSRF validation logic in CoreasonIdentityConfig from failing
+    This prevents SSRF validation logic in CoreasonVerifierConfig from failing
     existing tests that use dummy domains (e.g., test.auth0.com).
 
     Tests that need to verify SSRF logic (like test_security_ssrf.py) should

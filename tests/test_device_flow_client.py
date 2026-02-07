@@ -32,6 +32,7 @@ def client(mock_client: AsyncMock) -> DeviceFlowClient:
         idp_url="https://test.auth0.com",
         client=mock_client,
         min_poll_interval=1.0,
+        scope="openid profile email",
     )
 
 

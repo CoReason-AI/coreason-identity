@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from coreason_identity.config import CoreasonIdentityConfig
+from coreason_identity.config import CoreasonVerifierConfig
 from coreason_identity.validator import TokenValidator
 
 
@@ -16,19 +16,19 @@ class TestIssuerTrust:
     def test_config_derives_issuer_from_domain(self) -> None:
         """
         Test Case 1: Config derivation.
-        Initialize CoreasonIdentityConfig(domain="auth.example.com") (no issuer).
+        Initialize CoreasonVerifierConfig(domain="auth.example.com") (no issuer).
         Assert config.issuer == "https://auth.example.com/".
         """
-        config = CoreasonIdentityConfig(domain="auth.example.com", audience="aud")
+        config = CoreasonVerifierConfig(domain="auth.example.com", audience="aud")
         assert config.issuer == "https://auth.example.com/"
 
     def test_config_explicit_issuer_override(self) -> None:
         """
         Test Case 2: Explicit override.
-        Initialize CoreasonIdentityConfig(domain="auth.example.com", issuer="https://other.com").
+        Initialize CoreasonVerifierConfig(domain="auth.example.com", issuer="https://other.com").
         Assert config.issuer == "https://other.com".
         """
-        config = CoreasonIdentityConfig(domain="auth.example.com", audience="aud", issuer="https://other.com")
+        config = CoreasonVerifierConfig(domain="auth.example.com", audience="aud", issuer="https://other.com")
         assert config.issuer == "https://other.com"
 
     @pytest.mark.asyncio
@@ -55,7 +55,7 @@ class TestIssuerTrust:
         with patch.object(validator.jwt, "decode") as mock_decode:
 
             class MockClaims(dict[str, Any]):
-                def validate(self) -> None:
+                def validate(self, *args: Any, **kwargs: Any) -> None:
                     pass
 
             mock_decode.return_value = MockClaims({"sub": "some-user-id"})

@@ -7,7 +7,7 @@ This document outlines the standard "Security & Identity" sections that must be 
 ## coreason-api (The Gateway)
 
 ### Security & Identity
-This service acts as the **Border Control**. It validates OIDC tokens and hydrates the `UserContext` passport before injecting it into the application context.
+This service acts as the **Border Control**. It initializes `CoreasonVerifierConfig` to validate OIDC tokens and hydrate the `UserContext` passport before injecting it into the application context. It strictly avoids handling `client_id` or initiating flows.
 
 ---
 
@@ -35,7 +35,7 @@ The Search engine does not store permissions. It accepts the `UserContext` and b
 ## coreason-connect (The Hands)
 
 ### Security & Identity
-This is the only service allowed to peek inside the `SecretStr`. It exchanges the `downstream_token` for a Microsoft Graph session to read emails or files exactly as the user.
+This is the only service allowed to peek inside the `SecretStr`. It exchanges the `downstream_token` for a Microsoft Graph session to read emails or files exactly as the user. It requires `CoreasonClientConfig` if it needs to refresh tokens or initiate new flows.
 
 ---
 

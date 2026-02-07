@@ -101,7 +101,7 @@ def test_wheel_contents(build_artifacts: Path) -> None:
 
         # Poetry/Packaging might use underscore or hyphen. Match the pyproject.toml name.
         assert "Name: coreason_identity" in metadata, "Incorrect Name in METADATA"
-        assert "Version: 0.6.0" in metadata, "Incorrect Version in METADATA"
+        assert "Version: 0.8.0" in metadata, "Incorrect Version in METADATA"
 
     # Mandatory inclusions
     assert "coreason_identity/__init__.py" in filenames, "Package root missing in wheel"

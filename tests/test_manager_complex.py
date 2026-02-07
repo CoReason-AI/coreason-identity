@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from coreason_identity.config import CoreasonIdentityConfig
+from coreason_identity.config import CoreasonClientConfig
 from coreason_identity.exceptions import (
     CoreasonIdentityError,
     InvalidTokenError,
@@ -31,12 +31,12 @@ MOCK_CLIENT_ID = "test-client-id"
 
 
 @pytest.fixture
-def config() -> CoreasonIdentityConfig:
-    return CoreasonIdentityConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id=MOCK_CLIENT_ID)
+def config() -> CoreasonClientConfig:
+    return CoreasonClientConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id=MOCK_CLIENT_ID)
 
 
 @pytest.fixture
-def manager(config: CoreasonIdentityConfig) -> Generator[IdentityManager, Any, None]:
+def manager(config: CoreasonClientConfig) -> Generator[IdentityManager, Any, None]:
     with (
         patch("coreason_identity.manager.OIDCProvider"),
         patch("coreason_identity.manager.TokenValidator"),
@@ -92,7 +92,7 @@ def test_device_login_network_failure(manager: IdentityManager) -> None:
         mock_instance.initiate_flow = AsyncMock(side_effect=CoreasonIdentityError("Network Error"))
 
         with pytest.raises(CoreasonIdentityError, match="Network Error"):
-            manager.start_device_login()
+            manager.start_device_login(scope="openid profile email")
 
 
 def test_await_device_token_polling_failure(manager: IdentityManager) -> None:

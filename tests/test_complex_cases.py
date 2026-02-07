@@ -76,9 +76,18 @@ class TestTokenValidatorComplex:
             "iss": "https://valid-issuer.com/",
             "exp": 9999999999,
         }
-        # Create token with alg: none
-        # Authlib jwt.encode might refuse 'none' if key is provided, so we pass None key
-        token = jwt.encode({"alg": "none"}, claims, None).decode("utf-8")
+        # Manually construct token with alg: none to bypass authlib strictness during creation
+        import base64
+        import json
+
+        def base64url_encode(data: bytes) -> str:
+            return base64.urlsafe_b64encode(data).rstrip(b"=").decode("utf-8")
+
+        header = {"alg": "none", "typ": "JWT"}
+        # Claims JSON
+        payload = json.dumps(claims).encode("utf-8")
+
+        token = f"{base64url_encode(json.dumps(header).encode('utf-8'))}.{base64url_encode(payload)}."
 
         with pytest.raises(CoreasonIdentityError, match="Token validation failed"):
             await validator.validate_token(token)
@@ -172,22 +181,25 @@ class TestIdentityMapperComplex:
             "sub": "u1",
             "email": "u@e.com",
             "https://coreason.com/project_id": "EXPLICIT_ID",
-            "groups": ["project:GROUP_ID"],
+            "groups": ["project:apollo"],
         }
         context = mapper.map_claims(claims)
         # Explicit claim wins
         assert context.claims["project_context"] == "EXPLICIT_ID"
 
     def test_mapper_admin_group_case_insensitive(self) -> None:
-        """Test 'AdMiN' does NOT map to permissions=['*'] anymore."""
+        """
+        Test 'AdMiN' is rejected due to strict enum validation.
+        Previously it just didn't map to permissions.
+        """
         mapper = IdentityMapper()
         claims = {
             "sub": "u1",
             "email": "u@e.com",
             "groups": ["AdMiN"],
         }
-        context = mapper.map_claims(claims)
-        assert context.claims["permissions"] == []
+        with pytest.raises(CoreasonIdentityError):
+            mapper.map_claims(claims)
 
 
 class TestDeviceFlowClientComplex:
@@ -203,7 +215,7 @@ class TestDeviceFlowClientComplex:
         """
         Verify that the client increases polling interval when receiving 'slow_down'.
         """
-        client = DeviceFlowClient("client-id", "https://idp.com", client=mock_client)
+        client = DeviceFlowClient("client-id", "https://idp.com", client=mock_client, scope="openid profile email")
         # Setup endpoints
         client._endpoints = {
             "device_authorization_endpoint": "https://idp.com/device",

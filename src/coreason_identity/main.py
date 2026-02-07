@@ -15,7 +15,7 @@ Demonstrates usage of the IdentityManager for both token validation and device f
 
 import sys  # pragma: no cover
 
-from coreason_identity.config import CoreasonIdentityConfig  # pragma: no cover
+from coreason_identity.config import CoreasonClientConfig  # pragma: no cover
 from coreason_identity.exceptions import CoreasonIdentityError  # pragma: no cover
 from coreason_identity.manager import IdentityManager  # pragma: no cover
 
@@ -31,7 +31,7 @@ def main() -> None:  # pragma: no cover
     # In a real app, these would come from env vars.
     # For this demo/check, we use placeholders or expect env vars to be set.
     try:
-        config = CoreasonIdentityConfig(
+        config = CoreasonClientConfig(
             domain="auth.example.com",  # Replace with real domain for live test
             audience="api://coreason",
             client_id="demo-client-id",

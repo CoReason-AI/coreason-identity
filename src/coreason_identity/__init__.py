@@ -12,7 +12,7 @@
 Coreason Identity SDK
 """
 
-from coreason_identity.config import CoreasonIdentityConfig
+from coreason_identity.config import CoreasonClientConfig, CoreasonVerifierConfig
 from coreason_identity.exceptions import (
     CoreasonIdentityError,
     InsufficientPermissionsError,
@@ -24,13 +24,14 @@ from coreason_identity.exceptions import (
 from coreason_identity.manager import IdentityManager, IdentityManagerAsync
 from coreason_identity.models import DeviceFlowResponse, TokenResponse, UserContext
 
-__version__ = "0.6.0"
+__version__ = "0.8.0"
 __author__ = "Gowtham A Rao"
 __email__ = "gowtham.rao@coreason.ai"
 
 __all__ = [
-    "CoreasonIdentityConfig",
+    "CoreasonClientConfig",
     "CoreasonIdentityError",
+    "CoreasonVerifierConfig",
     "DeviceFlowResponse",
     "IdentityManager",
     "IdentityManagerAsync",
