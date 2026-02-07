@@ -26,89 +26,83 @@ def mock_addr_info(ip: str) -> list[tuple[Any, Any, int, str, tuple[str, int]]]:
 
 
 class TestSSRFProtection:
-    """Test suite for SSRF protection in CoreasonIdentityConfig."""
+    """
+    Test suite for SSRF protection in CoreasonIdentityConfig.
+
+    NOTE: Validation logic has been moved to connection time (SafeHTTPTransport).
+    These tests now verify that CoreasonIdentityConfig does NOT perform DNS resolution,
+    preventing TOCTOU vulnerabilities and startup issues.
+    """
 
     def test_ssrf_localhost_ipv4(self) -> None:
-        """Test that localhost (127.0.0.1) is rejected."""
-        with patch("socket.getaddrinfo", return_value=mock_addr_info("127.0.0.1")):
-            with pytest.raises(ValidationError) as exc:
-                CoreasonIdentityConfig(domain="localhost", audience="aud")
-            # We check for a generic message part, exact text depends on implementation
-            assert "resolves to a prohibited IP" in str(exc.value) or "Security violation" in str(exc.value)
+        """Test that localhost (127.0.0.1) is NOT rejected by config (moved to transport)."""
+        with patch("socket.getaddrinfo") as mock_dns:
+            config = CoreasonIdentityConfig(domain="localhost", audience="aud")
+            assert config.domain == "localhost"
+            # Verify no DNS resolution happens at config time
+            mock_dns.assert_not_called()
 
     def test_ssrf_aws_metadata(self) -> None:
-        """Test that AWS metadata service (169.254.169.254) is rejected."""
-        with patch("socket.getaddrinfo", return_value=mock_addr_info("169.254.169.254")):
-            with pytest.raises(ValidationError) as exc:
-                CoreasonIdentityConfig(domain="metadata.aws", audience="aud")
-            assert "resolves to a prohibited IP" in str(exc.value)
+        """Test that AWS metadata service is NOT rejected by config."""
+        with patch("socket.getaddrinfo") as mock_dns:
+            CoreasonIdentityConfig(domain="metadata.aws", audience="aud")
+            mock_dns.assert_not_called()
 
     def test_ssrf_private_network_192(self) -> None:
-        """Test that private network (192.168.x.x) is rejected."""
-        with patch("socket.getaddrinfo", return_value=mock_addr_info("192.168.1.50")):
-            with pytest.raises(ValidationError) as exc:
-                CoreasonIdentityConfig(domain="internal.corp", audience="aud")
-            assert "resolves to a prohibited IP" in str(exc.value)
+        """Test that private network (192.168.x.x) is NOT rejected by config."""
+        with patch("socket.getaddrinfo") as mock_dns:
+            CoreasonIdentityConfig(domain="internal.corp", audience="aud")
+            mock_dns.assert_not_called()
 
     def test_ssrf_private_network_10(self) -> None:
-        """Test that private network (10.x.x.x) is rejected."""
-        with patch("socket.getaddrinfo", return_value=mock_addr_info("10.0.0.5")):
-            with pytest.raises(ValidationError) as exc:
-                CoreasonIdentityConfig(domain="database.internal", audience="aud")
-            assert "resolves to a prohibited IP" in str(exc.value)
+        """Test that private network (10.x.x.x) is NOT rejected by config."""
+        with patch("socket.getaddrinfo") as mock_dns:
+            CoreasonIdentityConfig(domain="database.internal", audience="aud")
+            mock_dns.assert_not_called()
 
     def test_ssrf_ipv6_localhost(self) -> None:
-        """Test that IPv6 localhost (::1) is rejected."""
-        with patch("socket.getaddrinfo", return_value=mock_addr_info("::1")):
-            with pytest.raises(ValidationError) as exc:
-                CoreasonIdentityConfig(domain="ipv6.local", audience="aud")
-            assert "resolves to a prohibited IP" in str(exc.value)
+        """Test that IPv6 localhost (::1) is NOT rejected by config."""
+        with patch("socket.getaddrinfo") as mock_dns:
+            CoreasonIdentityConfig(domain="ipv6.local", audience="aud")
+            mock_dns.assert_not_called()
 
     def test_ssrf_valid_public_domain(self) -> None:
-        """Test that a valid public domain (8.8.8.8) is accepted."""
-        # 8.8.8.8 is Google DNS, safe
-        with patch("socket.getaddrinfo", return_value=mock_addr_info("8.8.8.8")):
+        """Test that a valid public domain is accepted."""
+        with patch("socket.getaddrinfo") as mock_dns:
             config = CoreasonIdentityConfig(domain="google.com", audience="aud")
             assert config.domain == "google.com"
+            mock_dns.assert_not_called()
 
     def test_ssrf_dns_failure(self) -> None:
-        """Test that DNS resolution failure raises an error (Fail Closed)."""
-        with patch("socket.getaddrinfo", side_effect=socket.gaierror("Name or service not known")):
-            with pytest.raises(ValidationError) as exc:
-                CoreasonIdentityConfig(domain="nonexistent.domain", audience="aud")
-            assert "Unable to resolve domain" in str(exc.value)
+        """Test that DNS resolution failure does NOT raise an error at config time."""
+        with patch("socket.getaddrinfo") as mock_dns:
+            config = CoreasonIdentityConfig(domain="nonexistent.domain", audience="aud")
+            assert config.domain == "nonexistent.domain"
+            mock_dns.assert_not_called()
 
     def test_ssrf_bypass_mode(self) -> None:
-        """Test that validation is bypassed when COREASON_DEV_UNSAFE_MODE is true."""
+        """Test that validation bypass logic is removed/irrelevant for config."""
+        # This test is now less relevant but ensures no error regardless of env var
         with (
             patch.dict(os.environ, {"COREASON_DEV_UNSAFE_MODE": "true"}),
-            patch("socket.getaddrinfo", return_value=mock_addr_info("127.0.0.1")),
+            patch("socket.getaddrinfo") as mock_dns,
         ):
             config = CoreasonIdentityConfig(domain="localhost", audience="aud")
             assert config.domain == "localhost"
+            mock_dns.assert_not_called()
 
     def test_ssrf_bypass_mode_false_default(self) -> None:
-        """Test that validation is NOT bypassed if env var is missing or false."""
-        # Case 1: missing (already covered by other tests, but explicit check here)
+        """Test that validation bypass logic is irrelevant."""
         with (
-            patch("socket.getaddrinfo", return_value=mock_addr_info("127.0.0.1")),
-            pytest.raises(ValidationError),
+            patch("socket.getaddrinfo") as mock_dns,
         ):
-            CoreasonIdentityConfig(domain="localhost", audience="aud")
-
-        # Case 2: false
-        with (
-            patch.dict(os.environ, {"COREASON_DEV_UNSAFE_MODE": "false"}),
-            patch("socket.getaddrinfo", return_value=mock_addr_info("127.0.0.1")),
-            pytest.raises(ValidationError),
-        ):
-            CoreasonIdentityConfig(domain="localhost", audience="aud")
+            config = CoreasonIdentityConfig(domain="localhost", audience="aud")
+            assert config.domain == "localhost"
+            mock_dns.assert_not_called()
 
     def test_ssrf_invalid_ip_format(self) -> None:
-        """Test that invalid IP formats returned by DNS are ignored (robustness)."""
-        # Return an invalid IP string to trigger ValueError in ipaddress.ip_address
-        bad_response = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("NOT_AN_IP", 443))]
-        with patch("socket.getaddrinfo", return_value=bad_response):
-            # Should pass because it ignores the invalid IP and finds no other unsafe IPs
+        """Test that invalid IP formats are irrelevant since we don't resolve."""
+        with patch("socket.getaddrinfo") as mock_dns:
             config = CoreasonIdentityConfig(domain="example.com", audience="aud")
             assert config.domain == "example.com"
+            mock_dns.assert_not_called()

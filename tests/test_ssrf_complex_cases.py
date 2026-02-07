@@ -26,69 +26,55 @@ def mock_addr_info(ip: str) -> list[tuple[Any, Any, int, str, tuple[str, int]]]:
 
 
 class TestSSRFComplexCases:
-    """Complex workflow tests for SSRF protection."""
+    """
+    Complex workflow tests for SSRF protection.
+
+    NOTE: Validation moved to transport layer. Config validation is removed.
+    These tests now verify that config initialization succeeds without DNS resolution.
+    """
 
     def test_environment_toggling_workflow(self) -> None:
         """
-        Verify that the validation logic correctly respects the environment variable
-        changing dynamically (simulating config reloads or environment shifts in tests).
+        Verify that config initialization succeeds regardless of environment variables
+        since DNS validation is moved to connection time.
         """
         unsafe_domain = "localhost"
-        safe_ip_mock = mock_addr_info("127.0.0.1")  # Real resolution of localhost is unsafe
 
-        with patch("socket.getaddrinfo", return_value=safe_ip_mock):
-            # 1. Start Secure (Default) -> Should Fail
-            with pytest.raises(ValidationError):
-                CoreasonIdentityConfig(domain=unsafe_domain, audience="aud")
+        with patch("socket.getaddrinfo") as mock_dns:
+            # 1. Start Secure (Default) -> Should Pass (no check)
+            CoreasonIdentityConfig(domain=unsafe_domain, audience="aud")
+            mock_dns.assert_not_called()
 
             # 2. Enable Unsafe Mode -> Should Pass
             with patch.dict(os.environ, {"COREASON_DEV_UNSAFE_MODE": "true"}):
                 cfg = CoreasonIdentityConfig(domain=unsafe_domain, audience="aud")
                 assert cfg.domain == unsafe_domain
+                mock_dns.assert_not_called()
 
-            # 3. Disable Unsafe Mode (Explicit False) -> Should Fail
-            with (
-                patch.dict(os.environ, {"COREASON_DEV_UNSAFE_MODE": "false"}),
-                pytest.raises(ValidationError),
-            ):
+            # 3. Disable Unsafe Mode (Explicit False) -> Should Pass
+            with patch.dict(os.environ, {"COREASON_DEV_UNSAFE_MODE": "false"}):
                 CoreasonIdentityConfig(domain=unsafe_domain, audience="aud")
+                mock_dns.assert_not_called()
 
     def test_dns_flake_then_success_fail_closed(self) -> None:
         """
-        Simulate a flaky DNS resolver that first raises an error, then resolves to an unsafe IP.
-        This verifies that we fail closed on the first error and don't accidentally pass
-        if retries were implemented (which they aren't, but this ensures robust behavior).
+        Simulate a flaky DNS resolver. Config should succeed as it doesn't resolve DNS.
         """
         with patch("socket.getaddrinfo") as mock_dns:
-            # First call raises error
+            # Config init should not call DNS, so side_effect is irrelevant if not called
             mock_dns.side_effect = [socket.gaierror("Temporary failure"), mock_addr_info("127.0.0.1")]
 
-            # Attempt 1: Should fail due to DNS error
-            with pytest.raises(ValidationError) as exc1:
-                CoreasonIdentityConfig(domain="flaky.local", audience="aud")
-            assert "Unable to resolve" in str(exc1.value)
-
-            # Fix side effect for next call (simulate retry logic in a consumer)
-            mock_dns.side_effect = None
-            mock_dns.return_value = mock_addr_info("127.0.0.1")
-
-            # Attempt 2: Should fail due to Unsafe IP
-            with pytest.raises(ValidationError) as exc2:
-                CoreasonIdentityConfig(domain="flaky.local", audience="aud")
-            assert "resolves to a prohibited IP" in str(exc2.value)
+            # Should succeed
+            CoreasonIdentityConfig(domain="flaky.local", audience="aud")
+            mock_dns.assert_not_called()
 
     def test_recursive_cname_chain_resolution(self) -> None:
         """
-        Test a scenario where CNAMEs might lead to a safe IP then an unsafe one?
-        Actually socket.getaddrinfo does the recursion.
-        We simulate getaddrinfo returning multiple entries representing the chain logic
-        (though usually it just returns the final IPs).
-        We ensure that if the FINAL resolved IP is unsafe, it fails.
+        Test that config ignores recursive DNS resolution logic.
         """
         # Scenario: public.cname -> internal.cname -> 192.168.1.1
         final_resolution = mock_addr_info("192.168.1.1")
 
-        with patch("socket.getaddrinfo", return_value=final_resolution):
-            with pytest.raises(ValidationError) as exc:
-                CoreasonIdentityConfig(domain="public.alias.to.internal", audience="aud")
-            assert "resolves to a prohibited IP" in str(exc.value)
+        with patch("socket.getaddrinfo", return_value=final_resolution) as mock_dns:
+            CoreasonIdentityConfig(domain="public.alias.to.internal", audience="aud")
+            mock_dns.assert_not_called()

@@ -18,6 +18,7 @@ from coreason_identity.config import CoreasonIdentityConfig
 from coreason_identity.exceptions import CoreasonIdentityError, InvalidTokenError
 from coreason_identity.manager import IdentityManager
 from coreason_identity.models import DeviceFlowResponse, TokenResponse, UserContext
+from coreason_identity.transport import SafeHTTPTransport
 
 # Mock data
 MOCK_DOMAIN = "test.auth0.com"
@@ -254,3 +255,16 @@ def test_init_missing_issuer_raises_error() -> None:
 
     with pytest.raises(CoreasonIdentityError, match="Issuer configuration is missing"):
         IdentityManager(config)
+
+def test_init_uses_safe_transport(config: CoreasonIdentityConfig) -> None:
+    with (
+        patch("coreason_identity.manager.OIDCProvider"),
+        patch("coreason_identity.manager.TokenValidator"),
+        patch("coreason_identity.manager.IdentityMapper"),
+    ):
+        mgr = IdentityManager(config)
+        client = mgr._async._client
+        # Check that the transport is SafeHTTPTransport
+        # The transport might be wrapped in other things internally by httpx but usually it is what we passed.
+        # However, httpx.AsyncClient(transport=t)._transport IS t.
+        assert isinstance(client._transport, SafeHTTPTransport)
