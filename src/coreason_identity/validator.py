@@ -48,7 +48,7 @@ class TokenValidator:
     Attributes:
         oidc_provider (OIDCProvider): The OIDCProvider instance.
         audience (str): The expected audience claim.
-        issuer (str): The expected issuer claim.
+        issuer (str | None): The expected issuer claim.
     """
 
     def __init__(

@@ -40,7 +40,7 @@ class IdentityManagerAsync:
 
         Args:
             config: The configuration object.
-            client: Optional external async client.
+            client: External async client or None.
         """
         self.config = config
         self._internal_client = client is None

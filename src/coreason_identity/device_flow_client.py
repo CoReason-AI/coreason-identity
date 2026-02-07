@@ -106,7 +106,7 @@ class DeviceFlowClient:
         Initiates the Device Authorization Flow.
 
         Args:
-            audience: Optional audience for the token.
+            audience: Audience for the token or None.
 
         Returns:
             DeviceFlowResponse containing device_code, user_code, verification_uri, etc.

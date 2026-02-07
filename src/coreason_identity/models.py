@@ -82,7 +82,7 @@ class DeviceFlowResponse(BaseModel):
         device_code (str): The device verification code.
         user_code (str): The code the user should enter at the verification URI.
         verification_uri (str): The URI the user should visit to authorize the device.
-        verification_uri_complete (Optional[str]): The complete URI including the user code.
+        verification_uri_complete (str | None): The complete URI including the user code.
         expires_in (int): The lifetime in seconds of the device_code and user_code.
         interval (int): The minimum amount of time in seconds that the client SHOULD wait between polling requests.
     """
@@ -103,8 +103,8 @@ class TokenResponse(BaseModel):
 
     Attributes:
         access_token (str): The access token issued by the authorization server.
-        refresh_token (Optional[str]): The refresh token, if issued.
-        id_token (Optional[str]): The ID token, if issued.
+        refresh_token (str | None): The refresh token, if issued.
+        id_token (str | None): The ID token, if issued.
         token_type (str): The type of the token (e.g. "Bearer").
         expires_in (int): The lifetime in seconds of the access token.
     """
