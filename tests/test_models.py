@@ -19,15 +19,15 @@ def test_user_context_valid() -> None:
     user = UserContext(
         user_id="user123",
         email="test@example.com",
-        groups=("admin",),
-        scopes=("read",),
+        groups=["admin"],
+        scopes=["read"],
         downstream_token=SecretStr("secret"),
         claims={"custom": "value"},
     )
     assert user.user_id == "user123"
     assert user.email == "test@example.com"
-    assert user.groups == ("admin",)
-    assert user.scopes == ("read",)
+    assert user.groups == ["admin"]
+    assert user.scopes == ["read"]
     assert user.downstream_token is not None
     assert user.downstream_token.get_secret_value() == "secret"
     assert user.claims == {"custom": "value"}
@@ -38,8 +38,8 @@ def test_user_context_defaults() -> None:
     user = UserContext(user_id="user123", email="test@example.com")
     assert user.user_id == "user123"
     assert user.email == "test@example.com"
-    assert user.groups == ()
-    assert user.scopes == ()
+    assert user.groups == []
+    assert user.scopes == []
     assert user.downstream_token is None
     assert user.claims == {}
 

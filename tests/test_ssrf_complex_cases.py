@@ -39,11 +39,11 @@ class TestSSRFComplexCases:
         with patch("socket.getaddrinfo", return_value=safe_ip_mock):
             # 1. Start Secure (Default) -> Should Fail
             with pytest.raises(ValidationError):
-                CoreasonIdentityConfig(pii_salt="test-salt", domain=unsafe_domain, audience="aud")
+                CoreasonIdentityConfig(domain=unsafe_domain, audience="aud")
 
             # 2. Enable Unsafe Mode -> Should Pass
             with patch.dict(os.environ, {"COREASON_DEV_UNSAFE_MODE": "true"}):
-                cfg = CoreasonIdentityConfig(pii_salt="test-salt", domain=unsafe_domain, audience="aud")
+                cfg = CoreasonIdentityConfig(domain=unsafe_domain, audience="aud")
                 assert cfg.domain == unsafe_domain
 
             # 3. Disable Unsafe Mode (Explicit False) -> Should Fail
@@ -51,7 +51,7 @@ class TestSSRFComplexCases:
                 patch.dict(os.environ, {"COREASON_DEV_UNSAFE_MODE": "false"}),
                 pytest.raises(ValidationError),
             ):
-                CoreasonIdentityConfig(pii_salt="test-salt", domain=unsafe_domain, audience="aud")
+                CoreasonIdentityConfig(domain=unsafe_domain, audience="aud")
 
     def test_dns_flake_then_success_fail_closed(self) -> None:
         """
@@ -65,7 +65,7 @@ class TestSSRFComplexCases:
 
             # Attempt 1: Should fail due to DNS error
             with pytest.raises(ValidationError) as exc1:
-                CoreasonIdentityConfig(pii_salt="test-salt", domain="flaky.local", audience="aud")
+                CoreasonIdentityConfig(domain="flaky.local", audience="aud")
             assert "Unable to resolve" in str(exc1.value)
 
             # Fix side effect for next call (simulate retry logic in a consumer)
@@ -74,7 +74,7 @@ class TestSSRFComplexCases:
 
             # Attempt 2: Should fail due to Unsafe IP
             with pytest.raises(ValidationError) as exc2:
-                CoreasonIdentityConfig(pii_salt="test-salt", domain="flaky.local", audience="aud")
+                CoreasonIdentityConfig(domain="flaky.local", audience="aud")
             assert "resolves to a prohibited IP" in str(exc2.value)
 
     def test_recursive_cname_chain_resolution(self) -> None:
@@ -90,5 +90,5 @@ class TestSSRFComplexCases:
 
         with patch("socket.getaddrinfo", return_value=final_resolution):
             with pytest.raises(ValidationError) as exc:
-                CoreasonIdentityConfig(pii_salt="test-salt", domain="public.alias.to.internal", audience="aud")
+                CoreasonIdentityConfig(domain="public.alias.to.internal", audience="aud")
             assert "resolves to a prohibited IP" in str(exc.value)

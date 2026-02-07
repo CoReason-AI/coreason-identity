@@ -141,22 +141,22 @@ class IdentityManagerAsync:
         return await self.device_client.poll_token(flow)
 
 
-class IdentityManagerSync:
+class IdentityManager:
     """
-    Synchronous facade for IdentityManagerAsync. WARNING: This class uses blocking IO.
+    Sync Facade for IdentityManager.
     Wraps IdentityManagerAsync and bridges Sync -> Async via anyio.run.
     """
 
     def __init__(self, config: CoreasonIdentityConfig) -> None:
         """
-        Initialize the IdentityManagerSync Facade.
+        Initialize the IdentityManager Facade.
 
         Args:
             config: The configuration object.
         """
         self._async = IdentityManagerAsync(config)
 
-    def __enter__(self) -> "IdentityManagerSync":
+    def __enter__(self) -> "IdentityManager":
         return self
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:

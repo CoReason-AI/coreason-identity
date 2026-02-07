@@ -24,25 +24,19 @@ class TestConfigEdgeCases:
         """Test that http_timeout=0.0 is technically allowed by Pydantic (float) but might be dangerous."""
         # Pydantic validates type, but logic should handle it. httpx interprets 0.0 as instant timeout or invalid.
         # We don't enforce > 0 in config validator yet, but verify it passes schema.
-        config = CoreasonIdentityConfig(
-            domain="test.com", audience="aud", http_timeout=0.0
-        )
+        config = CoreasonIdentityConfig(domain="test.com", audience="aud", http_timeout=0.0)
         assert config.http_timeout == 0.0
 
     def test_http_timeout_negative(self) -> None:
         """Test that negative timeout is allowed by schema (float) but might be invalid for httpx."""
         # Pydantic allows negative floats unless constrained.
         # httpx might raise ValueError later, but config allows it.
-        config = CoreasonIdentityConfig(
-            domain="test.com", audience="aud", http_timeout=-1.0
-        )
+        config = CoreasonIdentityConfig(domain="test.com", audience="aud", http_timeout=-1.0)
         assert config.http_timeout == -1.0
 
     def test_http_timeout_extremely_small(self) -> None:
         """Test extremely small timeout values."""
-        config = CoreasonIdentityConfig(
-            domain="test.com", audience="aud", http_timeout=1e-6
-        )
+        config = CoreasonIdentityConfig(domain="test.com", audience="aud", http_timeout=1e-6)
         assert config.http_timeout == 1e-6
 
     def test_unsafe_local_dev_env_var_parsing(self) -> None:
@@ -100,16 +94,12 @@ class TestConfigEdgeCases:
         """
         # Case 1: domain="http://test.com" -> normalized to "test.com" -> issuer defaults to "https://test.com/"
         # This is safe.
-        config = CoreasonIdentityConfig(
-            domain="http://test.com", audience="aud", http_timeout=5.0
-        )
+        config = CoreasonIdentityConfig(domain="http://test.com", audience="aud", http_timeout=5.0)
         assert config.domain == "test.com"
         assert config.issuer == "https://test.com/"
 
         # Case 2: domain="test.com" -> normalized to "test.com" -> issuer defaults to "https://test.com/"
-        config2 = CoreasonIdentityConfig(
-            domain="test.com", audience="aud", http_timeout=5.0
-        )
+        config2 = CoreasonIdentityConfig(domain="test.com", audience="aud", http_timeout=5.0)
         assert config2.issuer == "https://test.com/"
 
     def test_explicit_http_issuer_without_flag(self) -> None:

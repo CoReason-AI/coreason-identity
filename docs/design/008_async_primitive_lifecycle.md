@@ -2,9 +2,9 @@
 
 ## The Problem
 
-`coreason-identity` uses an "Async-Native with Sync Facade" architecture. This means the core logic (`IdentityManagerAsync`) uses `async/await` and libraries like `httpx` and `anyio`. However, to support synchronous applications (e.g., standard Flask or Django apps), we provide a synchronous facade (`IdentityManagerSync`) that wraps these calls using `anyio.run()`.
+`coreason-identity` uses an "Async-Native with Sync Facade" architecture. This means the core logic (`IdentityManagerAsync`) uses `async/await` and libraries like `httpx` and `anyio`. However, to support synchronous applications (e.g., standard Flask or Django apps), we provide a synchronous facade (`IdentityManager`) that wraps these calls using `anyio.run()`.
 
-The `IdentityManagerSync` facade instantiates the async components (`IdentityManagerAsync`, `OIDCProvider`) once in its `__init__`. However, every method call (e.g., `validate_token`) invokes `anyio.run()`, which typically creates a **new event loop**.
+The `IdentityManager` facade instantiates the async components (`IdentityManagerAsync`, `OIDCProvider`) once in its `__init__`. However, every method call (e.g., `validate_token`) invokes `anyio.run()`, which typically creates a **new event loop**.
 
 Stateful objects like `anyio.Lock` are often bound to the event loop where they are created or first used. If an `OIDCProvider` instance persists across multiple `anyio.run()` calls (i.e., multiple ephemeral loops), its internal lock becomes stale or bound to a closed loop. Attempting to use this lock in a new loop raises a `RuntimeError` (e.g., "Task ... attached to a different loop").
 

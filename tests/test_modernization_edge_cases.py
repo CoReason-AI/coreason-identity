@@ -60,7 +60,7 @@ class TestIdentityMapperTypeBoundaries:
             "groups": ("group1", "group2"),
         }
         context = mapper.map_claims(claims)
-        assert context.groups == ("group1", "group2")
+        assert context.groups == ["group1", "group2"]
 
     def test_ensure_list_of_strings_single_string_in_list(self) -> None:
         """
@@ -73,7 +73,7 @@ class TestIdentityMapperTypeBoundaries:
             "groups": ["group1"],
         }
         context = mapper.map_claims(claims)
-        assert context.groups == ("group1",)
+        assert context.groups == ["group1"]
 
     def test_raw_claims_model_direct_instantiation(self) -> None:
         """

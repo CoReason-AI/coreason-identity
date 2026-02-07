@@ -34,27 +34,27 @@ def test_mapper_scopes_parsing_variations(mapper: IdentityMapper) -> None:
     """Test various formats of scope/scp claims."""
     # 1. 'scope' as space-delimited string
     c1 = {"sub": "u1", "email": "u@e.com", "scope": "read write"}
-    assert mapper.map_claims(c1).scopes == ("read", "write")
+    assert mapper.map_claims(c1).scopes == ["read", "write"]
 
     # 2. 'scp' as list
     c2 = {"sub": "u1", "email": "u@e.com", "scp": ["read", "write"]}
-    assert mapper.map_claims(c2).scopes == ("read", "write")
+    assert mapper.map_claims(c2).scopes == ["read", "write"]
 
     # 3. 'scopes' as list (explicit field)
     c3 = {"sub": "u1", "email": "u@e.com", "scopes": ["read", "write"]}
-    assert mapper.map_claims(c3).scopes == ("read", "write")
+    assert mapper.map_claims(c3).scopes == ["read", "write"]
 
     # 4. 'scope' as single string (no spaces)
     c4 = {"sub": "u1", "email": "u@e.com", "scope": "admin"}
-    assert mapper.map_claims(c4).scopes == ("admin",)
+    assert mapper.map_claims(c4).scopes == ["admin"]
 
     # 5. Missing scope
     c5 = {"sub": "u1", "email": "u@e.com"}
-    assert mapper.map_claims(c5).scopes == ()
+    assert mapper.map_claims(c5).scopes == []
 
     # 6. Empty string scope
     c6 = {"sub": "u1", "email": "u@e.com", "scope": ""}
-    assert mapper.map_claims(c6).scopes == ()
+    assert mapper.map_claims(c6).scopes == []
 
 
 def test_mapper_claims_conflicts(mapper: IdentityMapper) -> None:
@@ -88,14 +88,14 @@ def test_mapper_groups_mixed_types_robustness(mapper: IdentityMapper) -> None:
     # Integers in groups -> parsed as strings by ensure_list_of_strings
     c1 = {"sub": "u1", "email": "u@e.com", "groups": [123, "valid"]}
     ctx1 = mapper.map_claims(c1)
-    assert ctx1.groups == ("123", "valid")
+    assert ctx1.groups == ["123", "valid"]
 
     # None in groups -> filtered out
     c2 = {"sub": "u1", "email": "u@e.com", "groups": [None, "valid"]}
     # ensure_list_of_strings: "if item is not None"
     # But wait, [str(item) for item in v if item is not None]
     ctx2 = mapper.map_claims(c2)
-    assert ctx2.groups == ("valid",)
+    assert ctx2.groups == ["valid"]
 
 
 def test_mapper_malformed_email(mapper: IdentityMapper) -> None:

@@ -16,7 +16,7 @@ A new configuration field `pii_salt` has been added to `CoreasonIdentityConfig`.
 
 *   **Env Variable:** `COREASON_AUTH_PII_SALT`
 *   **Type:** `SecretStr`
-*   **Default:** None (REQUIRED).
+*   **Default:** `SecretStr("coreason-unsafe-default-salt")` (Backward compatible, but **strongly recommended** to override in production).
 
 ### Mechanism
 
@@ -32,7 +32,7 @@ The raw User ID is **never** written to logs or traces.
 ## 3. Implementation Details
 
 *   **`TokenValidator`**: Now accepts `pii_salt` in its constructor. The `_anonymize(value: str)` method encapsulates the HMAC logic.
-*   **`IdentityManagerSync`**: Propagates the salt from the global configuration to the validator.
+*   **`IdentityManager`**: Propagates the salt from the global configuration to the validator.
 *   **OpenTelemetry**: The span attribute `user.id` is explicitly set to the anonymized value.
 
 ## 4. Security Considerations

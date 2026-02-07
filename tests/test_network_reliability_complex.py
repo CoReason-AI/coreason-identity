@@ -8,7 +8,6 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
-import asyncio
 from unittest.mock import patch
 
 import httpx
@@ -28,9 +27,7 @@ class TestNetworkReliabilityComplex:
         the http_timeout from config is IGNORED (dependency injection priority).
         """
         # Config has 5.0s timeout
-        config = CoreasonIdentityConfig(
-            domain="test.com", audience="aud", http_timeout=5.0
-        )
+        config = CoreasonIdentityConfig(domain="test.com", audience="aud", http_timeout=5.0)
 
         # External client has 10.0s timeout
         external_timeout = httpx.Timeout(10.0)
@@ -51,9 +48,7 @@ class TestNetworkReliabilityComplex:
         Verify that internal client correctly adopts the configured timeout
         and that it persists across the lifecycle.
         """
-        config = CoreasonIdentityConfig(
-            domain="test.com", audience="aud", http_timeout=0.1
-        )
+        config = CoreasonIdentityConfig(domain="test.com", audience="aud", http_timeout=0.1)
 
         with (
             patch("coreason_identity.manager.OIDCProvider"),
@@ -78,9 +73,7 @@ class TestNetworkReliabilityComplex:
         # We'll skip a true integration test requiring network/respx
         # and trust httpx. But we can verify that the client passed to OIDCProvider
         # is indeed the one with the timeout.
-        config = CoreasonIdentityConfig(
-            domain="test.com", audience="aud", http_timeout=0.5
-        )
+        config = CoreasonIdentityConfig(domain="test.com", audience="aud", http_timeout=0.5)
 
         with (
             patch("coreason_identity.manager.OIDCProvider") as MockOIDC,
@@ -101,20 +94,14 @@ class TestNetworkReliabilityComplex:
         """
         Verify that timeout settings are safe under concurrency (multiple managers).
         """
-        config1 = CoreasonIdentityConfig(
-            domain="test1.com", audience="aud", http_timeout=1.0
-        )
-        config2 = CoreasonIdentityConfig(
-            domain="test2.com", audience="aud", http_timeout=2.0
-        )
+        config1 = CoreasonIdentityConfig(domain="test1.com", audience="aud", http_timeout=1.0)
+        config2 = CoreasonIdentityConfig(domain="test2.com", audience="aud", http_timeout=2.0)
 
         with (
             patch("coreason_identity.manager.OIDCProvider"),
             patch("coreason_identity.manager.TokenValidator"),
             patch("coreason_identity.manager.IdentityMapper"),
         ):
-            async with IdentityManagerAsync(config1) as mgr1, IdentityManagerAsync(
-                config2
-            ) as mgr2:
+            async with IdentityManagerAsync(config1) as mgr1, IdentityManagerAsync(config2) as mgr2:
                 assert mgr1._client.timeout.read == 1.0
                 assert mgr2._client.timeout.read == 2.0

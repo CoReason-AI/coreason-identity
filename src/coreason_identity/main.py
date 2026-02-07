@@ -10,14 +10,14 @@
 
 """
 Entry point for the coreason-identity package.
-Demonstrates usage of the IdentityManagerSync for both token validation and device flow.
+Demonstrates usage of the IdentityManager for both token validation and device flow.
 """
 
 import sys  # pragma: no cover
 
 from coreason_identity.config import CoreasonIdentityConfig  # pragma: no cover
 from coreason_identity.exceptions import CoreasonIdentityError  # pragma: no cover
-from coreason_identity.manager import IdentityManagerSync  # pragma: no cover
+from coreason_identity.manager import IdentityManager  # pragma: no cover
 
 
 def main() -> None:  # pragma: no cover
@@ -35,15 +35,14 @@ def main() -> None:  # pragma: no cover
             domain="auth.example.com",  # Replace with real domain for live test
             audience="api://coreason",
             client_id="demo-client-id",
-            pii_salt="demo-salt",
         )
     except Exception as e:
         print(f"Configuration Error: {e}")
         print("Please set COREASON_AUTH_DOMAIN and COREASON_AUTH_AUDIENCE env vars.")
         sys.exit(1)
 
-    identity = IdentityManagerSync(config)
-    print(f"Initialized IdentityManagerSync for domain: {config.domain}")
+    identity = IdentityManager(config)
+    print(f"Initialized IdentityManager for domain: {config.domain}")
 
     if len(sys.argv) > 1:
         command = sys.argv[1]
