@@ -15,7 +15,7 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 
-from coreason_identity.config import CoreasonIdentityConfig
+from coreason_identity.config import CoreasonVerifierConfig
 
 
 # Helper to mock DNS resolution for localhost
@@ -42,7 +42,7 @@ class TestLocalDevComplex:
         # Case 1: Enable NEITHER
         with patch("socket.getaddrinfo", side_effect=mock_localhost_addr):
             with pytest.raises(ValidationError) as exc:
-                CoreasonIdentityConfig(
+                CoreasonVerifierConfig(
                     domain="localhost:8080", audience="aud", http_timeout=5.0, issuer="http://localhost:8080"
                 )
             # Could be SSRF or HTTPS error depending on validation order
@@ -59,7 +59,7 @@ class TestLocalDevComplex:
             patch("socket.getaddrinfo", side_effect=mock_localhost_addr),
         ):
             with pytest.raises(ValidationError) as exc:
-                CoreasonIdentityConfig(
+                CoreasonVerifierConfig(
                     domain="localhost:8080",
                     audience="aud",
                     http_timeout=5.0,
@@ -77,7 +77,7 @@ class TestLocalDevComplex:
             patch.dict(os.environ, {"COREASON_DEV_UNSAFE_MODE": "true"}),
             patch("socket.getaddrinfo", side_effect=mock_localhost_addr),
         ):
-            config = CoreasonIdentityConfig(
+            config = CoreasonVerifierConfig(
                 domain="localhost:8080",
                 audience="aud",
                 http_timeout=5.0,
@@ -97,7 +97,7 @@ class TestLocalDevComplex:
             patch.dict(os.environ, {"COREASON_DEV_UNSAFE_MODE": "true"}),
             patch("socket.getaddrinfo", side_effect=mock_localhost_addr),
         ):
-            config = CoreasonIdentityConfig(
+            config = CoreasonVerifierConfig(
                 domain="localhost:8443",
                 audience="aud",
                 http_timeout=5.0,

@@ -18,14 +18,13 @@ from pydantic import Field, SecretStr, ValidationInfo, field_validator, model_va
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class CoreasonIdentityConfig(BaseSettings):
+class CoreasonVerifierConfig(BaseSettings):
     """
-    Configuration settings for coreason-identity.
+    Configuration settings for coreason-identity token verification.
 
     Attributes:
         domain (str): The domain of the Identity Provider (e.g. auth.coreason.com).
         audience (str): The expected audience for the token.
-        client_id (str | None): The OIDC Client ID (required for device flow).
         pii_salt (SecretStr): Salt for anonymizing PII in logs/traces.
         issuer (str | None): The expected issuer URL. Defaults to https://{domain}/.
     """
@@ -37,7 +36,6 @@ class CoreasonIdentityConfig(BaseSettings):
 
     domain: str
     audience: str
-    client_id: str | None = None
     pii_salt: SecretStr = Field(..., description="High-entropy salt for PII hashing. REQUIRED.")
     http_timeout: float = Field(..., description="Timeout in seconds for all IdP network operations.")
     unsafe_local_dev: bool = False
@@ -54,7 +52,7 @@ class CoreasonIdentityConfig(BaseSettings):
         return v
 
     @model_validator(mode="after")
-    def set_default_issuer(self) -> "CoreasonIdentityConfig":
+    def set_default_issuer(self) -> "CoreasonVerifierConfig":
         """
         Sets default issuer if not provided.
         """
@@ -82,3 +80,15 @@ class CoreasonIdentityConfig(BaseSettings):
 
         parsed = urlparse(v)
         return parsed.netloc or v
+
+
+class CoreasonClientConfig(CoreasonVerifierConfig):
+    """
+    Configuration settings for coreason-identity OIDC client operations.
+    Inherits from CoreasonVerifierConfig and adds client_id.
+
+    Attributes:
+        client_id (str): The OIDC Client ID (required for device flow).
+    """
+
+    client_id: str = Field(..., description="OIDC Client ID. Required for device flow.")
