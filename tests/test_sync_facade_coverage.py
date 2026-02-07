@@ -14,7 +14,7 @@ import httpx
 import pytest
 
 from coreason_identity.config import CoreasonIdentityConfig
-from coreason_identity.manager import IdentityManager, IdentityManagerAsync
+from coreason_identity.manager import IdentityManagerAsync, IdentityManagerSync
 from coreason_identity.models import DeviceFlowResponse, TokenResponse, UserContext
 
 
@@ -25,7 +25,7 @@ def test_sync_facade_context_manager() -> None:
         mock_instance = MockAsync.return_value
         mock_instance.__aexit__ = AsyncMock()
 
-        with IdentityManager(config) as mgr:
+        with IdentityManagerSync(config) as mgr:
             assert mgr._async == mock_instance
 
         mock_instance.__aexit__.assert_called_once()
@@ -46,7 +46,7 @@ def test_sync_facade_methods() -> None:
         mock_instance.start_device_login = AsyncMock(return_value=mock_flow)
         mock_instance.await_device_token = AsyncMock(return_value=mock_token)
 
-        mgr = IdentityManager(config)
+        mgr = IdentityManagerSync(config)
 
         # Test validate_token
         res = mgr.validate_token("header")

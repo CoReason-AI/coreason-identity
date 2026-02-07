@@ -21,7 +21,7 @@ from coreason_identity.exceptions import (
     SignatureVerificationError,
     TokenExpiredError,
 )
-from coreason_identity.manager import IdentityManager
+from coreason_identity.manager import IdentityManagerSync
 from coreason_identity.models import DeviceFlowResponse
 
 # Mock data
@@ -36,17 +36,17 @@ def config() -> CoreasonIdentityConfig:
 
 
 @pytest.fixture
-def manager(config: CoreasonIdentityConfig) -> Generator[IdentityManager, Any, None]:
+def manager(config: CoreasonIdentityConfig) -> Generator[IdentityManagerSync, Any, None]:
     with (
         patch("coreason_identity.manager.OIDCProvider"),
         patch("coreason_identity.manager.TokenValidator"),
         patch("coreason_identity.manager.IdentityMapper"),
     ):
-        mgr = IdentityManager(config)
+        mgr = IdentityManagerSync(config)
         yield mgr
 
 
-def test_validate_token_mapper_failure(manager: IdentityManager) -> None:
+def test_validate_token_mapper_failure(manager: IdentityManagerSync) -> None:
     """Test when Validator succeeds but Mapper fails (e.g., missing claims)."""
     # Validator returns a valid dictionary
     manager._async.validator.validate_token = AsyncMock(return_value={"sub": "123"})  # type: ignore
@@ -58,7 +58,7 @@ def test_validate_token_mapper_failure(manager: IdentityManager) -> None:
         manager.validate_token("Bearer valid_token")
 
 
-def test_validate_token_specific_exceptions(manager: IdentityManager) -> None:
+def test_validate_token_specific_exceptions(manager: IdentityManagerSync) -> None:
     """Test that specific validation exceptions bubble up correctly."""
 
     # SignatureVerificationError
@@ -72,7 +72,7 @@ def test_validate_token_specific_exceptions(manager: IdentityManager) -> None:
         manager.validate_token("Bearer expired")
 
 
-def test_validate_token_header_edge_cases(manager: IdentityManager) -> None:
+def test_validate_token_header_edge_cases(manager: IdentityManagerSync) -> None:
     """Test strict header parsing."""
 
     # Case sensitive "Bearer"
@@ -85,7 +85,7 @@ def test_validate_token_header_edge_cases(manager: IdentityManager) -> None:
         manager.validate_token("Bearer ")
 
 
-def test_device_login_network_failure(manager: IdentityManager) -> None:
+def test_device_login_network_failure(manager: IdentityManagerSync) -> None:
     """Test network failure during device flow initiation."""
     with patch("coreason_identity.manager.DeviceFlowClient") as MockClient:
         mock_instance = MockClient.return_value
@@ -95,7 +95,7 @@ def test_device_login_network_failure(manager: IdentityManager) -> None:
             manager.start_device_login()
 
 
-def test_await_device_token_polling_failure(manager: IdentityManager) -> None:
+def test_await_device_token_polling_failure(manager: IdentityManagerSync) -> None:
     """Test failure during polling (e.g. timeout or denied)."""
     mock_flow = DeviceFlowResponse(device_code="dcode", user_code="ucode", verification_uri="url", expires_in=300)
 
@@ -110,7 +110,7 @@ def test_await_device_token_polling_failure(manager: IdentityManager) -> None:
             manager.await_device_token(mock_flow)
 
 
-def test_await_device_token_stateless_failure(manager: IdentityManager) -> None:
+def test_await_device_token_stateless_failure(manager: IdentityManagerSync) -> None:
     """Test stateless polling failure propagates error."""
     mock_flow = DeviceFlowResponse(device_code="dcode", user_code="ucode", verification_uri="url", expires_in=300)
 
@@ -125,8 +125,8 @@ def test_await_device_token_stateless_failure(manager: IdentityManager) -> None:
             manager.await_device_token(mock_flow)
 
 
-def test_manager_malformed_bearer_headers(manager: IdentityManager) -> None:
-    """Test IdentityManager rejection of malformed Bearer headers."""
+def test_manager_malformed_bearer_headers(manager: IdentityManagerSync) -> None:
+    """Test IdentityManagerSync rejection of malformed Bearer headers."""
     # We can reuse the 'manager' fixture which is already typed and imported.
 
     # Mock the validator to avoid actual validation calls if header check passes (it shouldn't)

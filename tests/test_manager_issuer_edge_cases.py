@@ -9,7 +9,7 @@
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
 """
-Edge case tests for IdentityManager issuer validation.
+Edge case tests for IdentityManagerSync issuer validation.
 """
 
 import time
@@ -21,7 +21,7 @@ from authlib.jose import JsonWebKey, jwt
 
 from coreason_identity.config import CoreasonIdentityConfig
 from coreason_identity.exceptions import CoreasonIdentityError
-from coreason_identity.manager import IdentityManager
+from coreason_identity.manager import IdentityManagerSync
 
 
 @pytest.fixture
@@ -52,7 +52,7 @@ def test_init_with_trailing_slash_in_domain() -> None:
         patch("coreason_identity.manager.OIDCProvider"),
         patch("coreason_identity.manager.TokenValidator") as MockValidator,
     ):
-        IdentityManager(config)
+        IdentityManagerSync(config)
 
         MockValidator.assert_called_once()
         _, kwargs = MockValidator.call_args
@@ -72,7 +72,7 @@ def test_init_with_protocol_in_domain() -> None:
         patch("coreason_identity.manager.OIDCProvider"),
         patch("coreason_identity.manager.TokenValidator") as MockValidator,
     ):
-        IdentityManager(config)
+        IdentityManagerSync(config)
 
         MockValidator.assert_called_once()
         _, kwargs = MockValidator.call_args
@@ -91,7 +91,7 @@ def test_validate_token_missing_iss_claim(key_pair: Any, jwks: dict[str, Any]) -
         # Mock get_issuer to return a valid issuer
         mock_oidc_instance.get_issuer = AsyncMock(return_value=f"https://{domain}/")
 
-        manager = IdentityManager(config)
+        manager = IdentityManagerSync(config)
 
         now = int(time.time())
         claims = {
@@ -124,7 +124,7 @@ def test_validate_token_no_trailing_slash_match(key_pair: Any, jwks: dict[str, A
         mock_oidc_instance.get_jwks = AsyncMock(return_value=jwks)
         mock_oidc_instance.get_issuer = AsyncMock(return_value=oidc_issuer)
 
-        manager = IdentityManager(config)
+        manager = IdentityManagerSync(config)
 
         now = int(time.time())
         claims = {
@@ -154,7 +154,7 @@ def test_validate_token_http_protocol(key_pair: Any, jwks: dict[str, Any]) -> No
         mock_oidc_instance.get_jwks = AsyncMock(return_value=jwks)
         mock_oidc_instance.get_issuer = AsyncMock(return_value=oidc_issuer)
 
-        manager = IdentityManager(config)
+        manager = IdentityManagerSync(config)
 
         now = int(time.time())
         claims = {
@@ -182,7 +182,7 @@ def test_init_with_http_protocol_in_domain() -> None:
         patch("coreason_identity.manager.OIDCProvider"),
         patch("coreason_identity.manager.TokenValidator") as MockValidator,
     ):
-        IdentityManager(config)
+        IdentityManagerSync(config)
 
         MockValidator.assert_called_once()
         _, kwargs = MockValidator.call_args

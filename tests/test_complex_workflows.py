@@ -19,7 +19,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from coreason_identity.config import CoreasonIdentityConfig
-from coreason_identity.manager import IdentityManager
+from coreason_identity.manager import IdentityManagerSync
 from coreason_identity.models import UserContext
 
 # Mocks
@@ -28,7 +28,7 @@ MOCK_AUDIENCE = "api://test"
 
 
 @pytest.fixture
-def identity_manager() -> Generator[IdentityManager, Any, None]:
+def identity_manager() -> Generator[IdentityManagerSync, Any, None]:
     config = CoreasonIdentityConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id="cid")
 
     # We need to mock the internal async manager components to avoid real network calls
@@ -37,11 +37,11 @@ def identity_manager() -> Generator[IdentityManager, Any, None]:
         patch("coreason_identity.manager.TokenValidator"),
         patch("coreason_identity.manager.IdentityMapper"),
     ):
-        manager = IdentityManager(config)
+        manager = IdentityManagerSync(config)
         yield manager
 
 
-def test_full_auth_flow_simulation(identity_manager: IdentityManager) -> None:
+def test_full_auth_flow_simulation(identity_manager: IdentityManagerSync) -> None:
     """
     Simulate:
     1. Service receives token.
@@ -95,7 +95,7 @@ def test_full_auth_flow_simulation(identity_manager: IdentityManager) -> None:
     assert user.downstream_token.get_secret_value() == token
 
 
-def test_legacy_migration_flow(identity_manager: IdentityManager) -> None:
+def test_legacy_migration_flow(identity_manager: IdentityManagerSync) -> None:
     """
     Simulate a service that still relies on `project_context` and `permissions`.
     Verify they are accessible via `claims`.
@@ -116,16 +116,16 @@ def test_legacy_migration_flow(identity_manager: IdentityManager) -> None:
 
 # Redefine fixture to use REAL IdentityMapper for better integration tests
 @pytest.fixture
-def integration_manager() -> Generator[IdentityManager, Any, None]:
+def integration_manager() -> Generator[IdentityManagerSync, Any, None]:
     config = CoreasonIdentityConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id="cid")
 
     # Only mock networking parts (Provider, Validator's internal checks)
     with patch("coreason_identity.manager.OIDCProvider"), patch("coreason_identity.manager.TokenValidator"):
-        manager = IdentityManager(config)
+        manager = IdentityManagerSync(config)
         yield manager
 
 
-def test_integration_legacy_access(integration_manager: IdentityManager) -> None:
+def test_integration_legacy_access(integration_manager: IdentityManagerSync) -> None:
     """
     Integration test: Manager -> Validator(Mock) -> Mapper(Real) -> UserContext
     """
