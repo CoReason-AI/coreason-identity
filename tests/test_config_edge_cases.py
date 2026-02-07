@@ -134,9 +134,7 @@ class TestConfigEdgeCases:
         env_salt = "env-salt"
         arg_salt = "arg-salt"
         with patch.dict(os.environ, {"COREASON_AUTH_PII_SALT": env_salt}):
-            config = CoreasonIdentityConfig(
-                domain="test.com", audience="aud", pii_salt=SecretStr(arg_salt)
-            )
+            config = CoreasonIdentityConfig(domain="test.com", audience="aud", pii_salt=SecretStr(arg_salt))
             assert config.pii_salt.get_secret_value() == arg_salt
 
     def test_unsafe_local_dev_does_not_bypass_salt(self) -> None:
@@ -147,19 +145,13 @@ class TestConfigEdgeCases:
 
             # Even with unsafe_local_dev=True, it should fail
             with pytest.raises(ValidationError) as exc:
-                CoreasonIdentityConfig(
-                    domain="test.com", audience="aud", unsafe_local_dev=True
-                )
+                CoreasonIdentityConfig(domain="test.com", audience="aud", unsafe_local_dev=True)
             assert "pii_salt" in str(exc.value)
 
     def test_multiple_configs_independent_salts(self) -> None:
         """Complex Case: Multiple config instances can have different salts."""
-        c1 = CoreasonIdentityConfig(
-            domain="d1.com", audience="a1", pii_salt=SecretStr("salt1")
-        )
-        c2 = CoreasonIdentityConfig(
-            domain="d2.com", audience="a2", pii_salt=SecretStr("salt2")
-        )
+        c1 = CoreasonIdentityConfig(domain="d1.com", audience="a1", pii_salt=SecretStr("salt1"))
+        c2 = CoreasonIdentityConfig(domain="d2.com", audience="a2", pii_salt=SecretStr("salt2"))
 
         assert c1.pii_salt.get_secret_value() == "salt1"
         assert c2.pii_salt.get_secret_value() == "salt2"
