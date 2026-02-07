@@ -41,7 +41,7 @@ class CoreasonIdentityConfig(BaseSettings):
     domain: str
     audience: str
     client_id: str | None = None
-    pii_salt: SecretStr = SecretStr("coreason-unsafe-default-salt")
+    pii_salt: SecretStr = Field(..., description="High-entropy salt for PII hashing. REQUIRED.")
     http_timeout: float = Field(..., description="Timeout in seconds for all IdP network operations.")
     unsafe_local_dev: bool = False
     issuer: str | None = None

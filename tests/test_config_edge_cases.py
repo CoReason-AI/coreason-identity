@@ -12,7 +12,7 @@ import os
 from unittest.mock import patch
 
 import pytest
-from pydantic import ValidationError
+from pydantic import SecretStr, ValidationError
 
 from coreason_identity.config import CoreasonIdentityConfig
 
@@ -111,3 +111,55 @@ class TestConfigEdgeCases:
                 http_timeout=5.0,
                 issuer="http://test.com",
             )
+
+    def test_empty_salt_accepted(self) -> None:
+        """
+        Edge Case: Empty string salt.
+        Currently, SecretStr allows empty strings.
+        This test documents the behavior.
+        """
+        with patch.dict(os.environ, {"COREASON_AUTH_PII_SALT": ""}):
+            config = CoreasonIdentityConfig(domain="test.com", audience="aud")
+            assert config.pii_salt.get_secret_value() == ""
+
+    def test_whitespace_salt_preserved(self) -> None:
+        """Edge Case: Whitespace salt."""
+        salt = "   "
+        with patch.dict(os.environ, {"COREASON_AUTH_PII_SALT": salt}):
+            config = CoreasonIdentityConfig(domain="test.com", audience="aud")
+            assert config.pii_salt.get_secret_value() == salt
+
+    def test_salt_precedence_constructor_over_env(self) -> None:
+        """Complex Case: Constructor argument should override environment variable."""
+        env_salt = "env-salt"
+        arg_salt = "arg-salt"
+        with patch.dict(os.environ, {"COREASON_AUTH_PII_SALT": env_salt}):
+            config = CoreasonIdentityConfig(
+                domain="test.com", audience="aud", pii_salt=SecretStr(arg_salt)
+            )
+            assert config.pii_salt.get_secret_value() == arg_salt
+
+    def test_unsafe_local_dev_does_not_bypass_salt(self) -> None:
+        """Complex Case: unsafe_local_dev should not make pii_salt optional."""
+        with patch.dict(os.environ):
+            if "COREASON_AUTH_PII_SALT" in os.environ:
+                del os.environ["COREASON_AUTH_PII_SALT"]
+
+            # Even with unsafe_local_dev=True, it should fail
+            with pytest.raises(ValidationError) as exc:
+                CoreasonIdentityConfig(
+                    domain="test.com", audience="aud", unsafe_local_dev=True
+                )
+            assert "pii_salt" in str(exc.value)
+
+    def test_multiple_configs_independent_salts(self) -> None:
+        """Complex Case: Multiple config instances can have different salts."""
+        c1 = CoreasonIdentityConfig(
+            domain="d1.com", audience="a1", pii_salt=SecretStr("salt1")
+        )
+        c2 = CoreasonIdentityConfig(
+            domain="d2.com", audience="a2", pii_salt=SecretStr("salt2")
+        )
+
+        assert c1.pii_salt.get_secret_value() == "salt1"
+        assert c2.pii_salt.get_secret_value() == "salt2"

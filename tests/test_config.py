@@ -99,3 +99,15 @@ def test_https_success() -> None:
     """Test that HTTPS issuer is accepted."""
     config = CoreasonIdentityConfig(domain="test.com", audience="aud", issuer="https://auth.prod")
     assert config.issuer == "https://auth.prod"
+
+
+def test_missing_pii_salt_raises_error() -> None:
+    """Test that pii_salt is mandatory."""
+    # We must unset the env var set by the autouse fixture
+    with patch.dict(os.environ):
+        if "COREASON_AUTH_PII_SALT" in os.environ:
+            del os.environ["COREASON_AUTH_PII_SALT"]
+
+        with pytest.raises(ValidationError) as exc:
+            CoreasonIdentityConfig(domain="test.com", audience="aud")
+        assert "pii_salt" in str(exc.value)

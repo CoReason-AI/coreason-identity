@@ -76,9 +76,18 @@ class TestTokenValidatorComplex:
             "iss": "https://valid-issuer.com/",
             "exp": 9999999999,
         }
-        # Create token with alg: none
-        # Authlib jwt.encode might refuse 'none' if key is provided, so we pass None key
-        token = jwt.encode({"alg": "none"}, claims, None).decode("utf-8")
+        # Manually construct token with alg: none to bypass authlib strictness during creation
+        import base64
+        import json
+
+        def base64url_encode(data: bytes) -> str:
+            return base64.urlsafe_b64encode(data).rstrip(b"=").decode("utf-8")
+
+        header = {"alg": "none", "typ": "JWT"}
+        # Claims JSON
+        payload = json.dumps(claims).encode("utf-8")
+
+        token = f"{base64url_encode(json.dumps(header).encode('utf-8'))}.{base64url_encode(payload)}."
 
         with pytest.raises(CoreasonIdentityError, match="Token validation failed"):
             await validator.validate_token(token)
