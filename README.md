@@ -37,7 +37,7 @@ pip install coreason-identity
 ## Usage
 
 ```python
-from coreason_identity import IdentityManager, CoreasonIdentityConfig, InvalidTokenError
+from coreason_identity import IdentityManagerSync, CoreasonIdentityConfig, InvalidTokenError
 
 # 1. Initialize (The Borrowing)
 config = CoreasonIdentityConfig(
