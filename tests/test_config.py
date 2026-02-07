@@ -24,13 +24,11 @@ def test_config_loading() -> None:
         {
             "COREASON_AUTH_DOMAIN": "test.auth0.com",
             "COREASON_AUTH_AUDIENCE": "api://test",
-            "COREASON_AUTH_PII_SALT": "env-salt",
         },
     ):
         config = CoreasonIdentityConfig()
         assert config.domain == "test.auth0.com"
         assert config.audience == "api://test"
-        assert config.pii_salt.get_secret_value() == "env-salt"
 
 
 def test_config_case_insensitive() -> None:
@@ -40,38 +38,64 @@ def test_config_case_insensitive() -> None:
         {
             "coreason_auth_domain": "lower.auth0.com",
             "COREASON_AUTH_AUDIENCE": "api://lower",
-            "coreason_auth_pii_salt": "lower-salt",
         },
     ):
         config = CoreasonIdentityConfig()
         assert config.domain == "lower.auth0.com"
         assert config.audience == "api://lower"
-        assert config.pii_salt.get_secret_value() == "lower-salt"
 
 
 def test_config_domain_normalization() -> None:
     """Test that domain is normalized to hostname only."""
     # Simple hostname
-    c1 = CoreasonIdentityConfig(domain="test.com", audience="aud", pii_salt="test-salt")
+    c1 = CoreasonIdentityConfig(domain="test.com", audience="aud")
     assert c1.domain == "test.com"
 
     # With https://
-    c2 = CoreasonIdentityConfig(domain="https://test.com", audience="aud", pii_salt="test-salt")
+    c2 = CoreasonIdentityConfig(domain="https://test.com", audience="aud")
     assert c2.domain == "test.com"
 
     # With trailing slash
-    c3 = CoreasonIdentityConfig(domain="test.com/", audience="aud", pii_salt="test-salt")
+    c3 = CoreasonIdentityConfig(domain="test.com/", audience="aud")
     assert c3.domain == "test.com"
 
     # With path (should strip path)
-    c4 = CoreasonIdentityConfig(domain="https://test.com/auth", audience="aud", pii_salt="test-salt")
+    c4 = CoreasonIdentityConfig(domain="https://test.com/auth", audience="aud")
     assert c4.domain == "test.com"
 
 
-def test_missing_pii_salt_raises_error() -> None:
-    """Test that initialization fails if pii_salt is missing."""
-    with pytest.raises(ValidationError) as exc_info:
-        CoreasonIdentityConfig(domain="test.com", audience="aud")
+def test_timeout_required() -> None:
+    """Test that http_timeout is mandatory."""
+    # We must unset the env var set by the autouse fixture
+    with patch.dict(os.environ):
+        if "COREASON_AUTH_HTTP_TIMEOUT" in os.environ:
+            del os.environ["COREASON_AUTH_HTTP_TIMEOUT"]
 
-    errors = exc_info.value.errors()
-    assert any(error["loc"] == ("pii_salt",) for error in errors)
+        with pytest.raises(ValidationError) as exc:
+            CoreasonIdentityConfig(domain="test.com", audience="aud")
+        assert "http_timeout" in str(exc.value)
+
+
+def test_https_enforcement() -> None:
+    """Test that HTTP issuer is rejected by default."""
+    with pytest.raises(ValidationError) as exc:
+        CoreasonIdentityConfig(domain="test.com", audience="aud", issuer="http://auth.local")
+    assert "HTTPS is required for production" in str(exc.value)
+
+
+def test_https_override() -> None:
+    """Test that HTTP issuer is accepted with unsafe_local_dev=True."""
+    config = CoreasonIdentityConfig(
+        domain="test.com",
+        audience="aud",
+        issuer="http://auth.local",
+        unsafe_local_dev=True,
+    )
+    assert config.issuer == "http://auth.local"
+    assert config.unsafe_local_dev is True
+
+
+def test_https_success() -> None:
+    """Test that HTTPS issuer is accepted."""
+    config = CoreasonIdentityConfig(domain="test.com", audience="aud", issuer="https://auth.prod")
+    assert config.issuer == "https://auth.prod"

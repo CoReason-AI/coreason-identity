@@ -16,21 +16,19 @@ class TestIssuerTrust:
     def test_config_derives_issuer_from_domain(self) -> None:
         """
         Test Case 1: Config derivation.
-        Initialize CoreasonIdentityConfig(pii_salt="test-salt", domain="auth.example.com") (no issuer).
+        Initialize CoreasonIdentityConfig(domain="auth.example.com") (no issuer).
         Assert config.issuer == "https://auth.example.com/".
         """
-        config = CoreasonIdentityConfig(pii_salt="test-salt", domain="auth.example.com", audience="aud")
+        config = CoreasonIdentityConfig(domain="auth.example.com", audience="aud")
         assert config.issuer == "https://auth.example.com/"
 
     def test_config_explicit_issuer_override(self) -> None:
         """
         Test Case 2: Explicit override.
-        Initialize CoreasonIdentityConfig(pii_salt="test-salt", domain="auth.example.com", issuer="https://other.com").
+        Initialize CoreasonIdentityConfig(domain="auth.example.com", issuer="https://other.com").
         Assert config.issuer == "https://other.com".
         """
-        config = CoreasonIdentityConfig(
-            pii_salt="test-salt", domain="auth.example.com", audience="aud", issuer="https://other.com"
-        )
+        config = CoreasonIdentityConfig(domain="auth.example.com", audience="aud", issuer="https://other.com")
         assert config.issuer == "https://other.com"
 
     @pytest.mark.asyncio

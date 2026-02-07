@@ -16,7 +16,7 @@ import pytest
 
 from coreason_identity.config import CoreasonIdentityConfig
 from coreason_identity.exceptions import CoreasonIdentityError, InvalidTokenError
-from coreason_identity.manager import IdentityManagerSync
+from coreason_identity.manager import IdentityManager
 from coreason_identity.models import DeviceFlowResponse, TokenResponse, UserContext
 
 # Mock data
@@ -29,20 +29,18 @@ MOCK_AUTH_HEADER = f"Bearer {MOCK_TOKEN}"
 
 @pytest.fixture
 def config() -> CoreasonIdentityConfig:
-    return CoreasonIdentityConfig(
-        pii_salt="test-salt", domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id=MOCK_CLIENT_ID
-    )
+    return CoreasonIdentityConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id=MOCK_CLIENT_ID)
 
 
 @pytest.fixture
-def manager(config: CoreasonIdentityConfig) -> Generator[IdentityManagerSync, Any, None]:
+def manager(config: CoreasonIdentityConfig) -> Generator[IdentityManager, Any, None]:
     # Mock internal components during initialization
     with (
         patch("coreason_identity.manager.OIDCProvider"),
         patch("coreason_identity.manager.TokenValidator"),
         patch("coreason_identity.manager.IdentityMapper"),
     ):
-        mgr = IdentityManagerSync(config)
+        mgr = IdentityManager(config)
         yield mgr
 
 
@@ -51,7 +49,7 @@ def test_init(config: CoreasonIdentityConfig) -> None:
         patch("coreason_identity.manager.OIDCProvider") as MockOIDC,
         patch("coreason_identity.manager.TokenValidator") as MockValidator,
     ):
-        mgr = IdentityManagerSync(config)
+        mgr = IdentityManager(config)
 
         MockOIDC.assert_called_once()
         assert MockOIDC.call_args[0][0] == f"https://{MOCK_DOMAIN}/.well-known/openid-configuration"
@@ -60,7 +58,7 @@ def test_init(config: CoreasonIdentityConfig) -> None:
         assert mgr._async.config == config
 
 
-def test_validate_token_success(manager: IdentityManagerSync) -> None:
+def test_validate_token_success(manager: IdentityManager) -> None:
     # Setup mocks
     mock_claims = {"sub": "user123", "email": "test@example.com"}
     mock_user_context = UserContext(user_id="user123", email="test@example.com")
@@ -79,7 +77,7 @@ def test_validate_token_success(manager: IdentityManagerSync) -> None:
     assert result == mock_user_context
 
 
-def test_validate_token_invalid_header_format(manager: IdentityManagerSync) -> None:
+def test_validate_token_invalid_header_format(manager: IdentityManager) -> None:
     with pytest.raises(InvalidTokenError, match=r"Invalid Authorization header format\. Must start with 'Bearer '"):
         manager.validate_token("InvalidHeader")
 
@@ -87,14 +85,14 @@ def test_validate_token_invalid_header_format(manager: IdentityManagerSync) -> N
         manager.validate_token("")
 
 
-def test_validate_token_delegates_exceptions(manager: IdentityManagerSync) -> None:
+def test_validate_token_delegates_exceptions(manager: IdentityManager) -> None:
     manager._async.validator.validate_token = AsyncMock(side_effect=InvalidTokenError("Token invalid"))  # type: ignore[method-assign]
 
     with pytest.raises(InvalidTokenError):
         manager.validate_token(MOCK_AUTH_HEADER)
 
 
-def test_start_device_login_success(manager: IdentityManagerSync) -> None:
+def test_start_device_login_success(manager: IdentityManager) -> None:
     mock_response = DeviceFlowResponse(
         device_code="dcode", user_code="ucode", verification_uri="http://verify", expires_in=300
     )
@@ -117,7 +115,7 @@ def test_start_device_login_success(manager: IdentityManagerSync) -> None:
         assert response == mock_response
 
 
-def test_start_device_login_custom_scope(manager: IdentityManagerSync) -> None:
+def test_start_device_login_custom_scope(manager: IdentityManager) -> None:
     with patch("coreason_identity.manager.DeviceFlowClient") as MockClient:
         mock_client_instance = MockClient.return_value
         mock_client_instance.initiate_flow = AsyncMock()
@@ -132,7 +130,7 @@ def test_start_device_login_custom_scope(manager: IdentityManagerSync) -> None:
         )
 
 
-def test_start_device_login_recreation(manager: IdentityManagerSync) -> None:
+def test_start_device_login_recreation(manager: IdentityManager) -> None:
     """Test that calling start_device_login twice recreates the client."""
     with patch("coreason_identity.manager.DeviceFlowClient") as MockClient:
         mock_client_instance = MockClient.return_value
@@ -153,20 +151,20 @@ def test_start_device_login_recreation(manager: IdentityManagerSync) -> None:
 
 
 def test_start_device_login_missing_client_id() -> None:
-    config_no_client = CoreasonIdentityConfig(pii_salt="test-salt", domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE)
+    config_no_client = CoreasonIdentityConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE)
 
     with (
         patch("coreason_identity.manager.OIDCProvider"),
         patch("coreason_identity.manager.TokenValidator"),
         patch("coreason_identity.manager.IdentityMapper"),
     ):
-        mgr = IdentityManagerSync(config_no_client)
+        mgr = IdentityManager(config_no_client)
 
         with pytest.raises(CoreasonIdentityError, match="client_id is required"):
             mgr.start_device_login()
 
 
-def test_await_device_token_success(manager: IdentityManagerSync) -> None:
+def test_await_device_token_success(manager: IdentityManager) -> None:
     mock_flow = DeviceFlowResponse(
         device_code="dcode", user_code="ucode", verification_uri="http://verify", expires_in=300
     )
@@ -185,7 +183,7 @@ def test_await_device_token_success(manager: IdentityManagerSync) -> None:
         assert result == mock_token_response
 
 
-def test_await_device_token_stateless(manager: IdentityManagerSync) -> None:
+def test_await_device_token_stateless(manager: IdentityManager) -> None:
     """Test await_device_token without prior start_device_login."""
     mock_flow = DeviceFlowResponse(
         device_code="dcode", user_code="ucode", verification_uri="http://verify", expires_in=300
@@ -210,14 +208,14 @@ def test_await_device_token_stateless(manager: IdentityManagerSync) -> None:
 
 
 def test_await_device_token_missing_client_id() -> None:
-    config_no_client = CoreasonIdentityConfig(pii_salt="test-salt", domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE)
+    config_no_client = CoreasonIdentityConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE)
 
     with (
         patch("coreason_identity.manager.OIDCProvider"),
         patch("coreason_identity.manager.TokenValidator"),
         patch("coreason_identity.manager.IdentityMapper"),
     ):
-        mgr = IdentityManagerSync(config_no_client)
+        mgr = IdentityManager(config_no_client)
         mock_flow = DeviceFlowResponse(
             device_code="dcode", user_code="ucode", verification_uri="http://verify", expires_in=300
         )
@@ -227,16 +225,14 @@ def test_await_device_token_missing_client_id() -> None:
 
 
 def test_init_strict_issuer() -> None:
-    """Test that IdentityManagerSync initializes TokenValidator with strict issuer from config."""
-    config = CoreasonIdentityConfig(
-        pii_salt="test-salt", domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id=MOCK_CLIENT_ID
-    )
+    """Test that IdentityManager initializes TokenValidator with strict issuer from config."""
+    config = CoreasonIdentityConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id=MOCK_CLIENT_ID)
 
     with (
         patch("coreason_identity.manager.OIDCProvider") as MockOIDC,
         patch("coreason_identity.manager.TokenValidator") as MockValidator,
     ):
-        IdentityManagerSync(config)
+        IdentityManager(config)
 
         MockOIDC.assert_called_once()
         # Should match derived issuer
@@ -250,11 +246,12 @@ def test_init_strict_issuer() -> None:
 
 
 def test_init_missing_issuer_raises_error() -> None:
-    """Test that IdentityManagerSync raises error if issuer configuration is missing."""
+    """Test that IdentityManager raises error if issuer configuration is missing."""
     config = Mock(spec=CoreasonIdentityConfig)
     config.domain = "example.com"
     config.issuer = None  # Force None
     config.audience = "aud"
+    config.http_timeout = 5.0
 
     with pytest.raises(CoreasonIdentityError, match="Issuer configuration is missing"):
-        IdentityManagerSync(config)
+        IdentityManager(config)

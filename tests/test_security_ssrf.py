@@ -32,7 +32,7 @@ class TestSSRFProtection:
         """Test that localhost (127.0.0.1) is rejected."""
         with patch("socket.getaddrinfo", return_value=mock_addr_info("127.0.0.1")):
             with pytest.raises(ValidationError) as exc:
-                CoreasonIdentityConfig(pii_salt="test-salt", domain="localhost", audience="aud")
+                CoreasonIdentityConfig(domain="localhost", audience="aud")
             # We check for a generic message part, exact text depends on implementation
             assert "resolves to a prohibited IP" in str(exc.value) or "Security violation" in str(exc.value)
 
@@ -40,42 +40,42 @@ class TestSSRFProtection:
         """Test that AWS metadata service (169.254.169.254) is rejected."""
         with patch("socket.getaddrinfo", return_value=mock_addr_info("169.254.169.254")):
             with pytest.raises(ValidationError) as exc:
-                CoreasonIdentityConfig(pii_salt="test-salt", domain="metadata.aws", audience="aud")
+                CoreasonIdentityConfig(domain="metadata.aws", audience="aud")
             assert "resolves to a prohibited IP" in str(exc.value)
 
     def test_ssrf_private_network_192(self) -> None:
         """Test that private network (192.168.x.x) is rejected."""
         with patch("socket.getaddrinfo", return_value=mock_addr_info("192.168.1.50")):
             with pytest.raises(ValidationError) as exc:
-                CoreasonIdentityConfig(pii_salt="test-salt", domain="internal.corp", audience="aud")
+                CoreasonIdentityConfig(domain="internal.corp", audience="aud")
             assert "resolves to a prohibited IP" in str(exc.value)
 
     def test_ssrf_private_network_10(self) -> None:
         """Test that private network (10.x.x.x) is rejected."""
         with patch("socket.getaddrinfo", return_value=mock_addr_info("10.0.0.5")):
             with pytest.raises(ValidationError) as exc:
-                CoreasonIdentityConfig(pii_salt="test-salt", domain="database.internal", audience="aud")
+                CoreasonIdentityConfig(domain="database.internal", audience="aud")
             assert "resolves to a prohibited IP" in str(exc.value)
 
     def test_ssrf_ipv6_localhost(self) -> None:
         """Test that IPv6 localhost (::1) is rejected."""
         with patch("socket.getaddrinfo", return_value=mock_addr_info("::1")):
             with pytest.raises(ValidationError) as exc:
-                CoreasonIdentityConfig(pii_salt="test-salt", domain="ipv6.local", audience="aud")
+                CoreasonIdentityConfig(domain="ipv6.local", audience="aud")
             assert "resolves to a prohibited IP" in str(exc.value)
 
     def test_ssrf_valid_public_domain(self) -> None:
         """Test that a valid public domain (8.8.8.8) is accepted."""
         # 8.8.8.8 is Google DNS, safe
         with patch("socket.getaddrinfo", return_value=mock_addr_info("8.8.8.8")):
-            config = CoreasonIdentityConfig(pii_salt="test-salt", domain="google.com", audience="aud")
+            config = CoreasonIdentityConfig(domain="google.com", audience="aud")
             assert config.domain == "google.com"
 
     def test_ssrf_dns_failure(self) -> None:
         """Test that DNS resolution failure raises an error (Fail Closed)."""
         with patch("socket.getaddrinfo", side_effect=socket.gaierror("Name or service not known")):
             with pytest.raises(ValidationError) as exc:
-                CoreasonIdentityConfig(pii_salt="test-salt", domain="nonexistent.domain", audience="aud")
+                CoreasonIdentityConfig(domain="nonexistent.domain", audience="aud")
             assert "Unable to resolve domain" in str(exc.value)
 
     def test_ssrf_bypass_mode(self) -> None:
@@ -84,7 +84,7 @@ class TestSSRFProtection:
             patch.dict(os.environ, {"COREASON_DEV_UNSAFE_MODE": "true"}),
             patch("socket.getaddrinfo", return_value=mock_addr_info("127.0.0.1")),
         ):
-            config = CoreasonIdentityConfig(pii_salt="test-salt", domain="localhost", audience="aud")
+            config = CoreasonIdentityConfig(domain="localhost", audience="aud")
             assert config.domain == "localhost"
 
     def test_ssrf_bypass_mode_false_default(self) -> None:
@@ -94,7 +94,7 @@ class TestSSRFProtection:
             patch("socket.getaddrinfo", return_value=mock_addr_info("127.0.0.1")),
             pytest.raises(ValidationError),
         ):
-            CoreasonIdentityConfig(pii_salt="test-salt", domain="localhost", audience="aud")
+            CoreasonIdentityConfig(domain="localhost", audience="aud")
 
         # Case 2: false
         with (
@@ -102,7 +102,7 @@ class TestSSRFProtection:
             patch("socket.getaddrinfo", return_value=mock_addr_info("127.0.0.1")),
             pytest.raises(ValidationError),
         ):
-            CoreasonIdentityConfig(pii_salt="test-salt", domain="localhost", audience="aud")
+            CoreasonIdentityConfig(domain="localhost", audience="aud")
 
     def test_ssrf_invalid_ip_format(self) -> None:
         """Test that invalid IP formats returned by DNS are ignored (robustness)."""
@@ -110,5 +110,5 @@ class TestSSRFProtection:
         bad_response = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("NOT_AN_IP", 443))]
         with patch("socket.getaddrinfo", return_value=bad_response):
             # Should pass because it ignores the invalid IP and finds no other unsafe IPs
-            config = CoreasonIdentityConfig(pii_salt="test-salt", domain="example.com", audience="aud")
+            config = CoreasonIdentityConfig(domain="example.com", audience="aud")
             assert config.domain == "example.com"

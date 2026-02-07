@@ -4,7 +4,7 @@
 
 Two significant issues were identified in the previous implementation of `coreason-identity`:
 
-1.  **Brittle Issuer Validation:** The `IdentityManagerSync` manually constructed the expected OIDC Issuer URL by appending a trailing slash to the configured domain. This caused validation failures for Identity Providers (IdPs) that do not use trailing slashes in their issuer claims, leading to operational fragility.
+1.  **Brittle Issuer Validation:** The `IdentityManager` manually constructed the expected OIDC Issuer URL by appending a trailing slash to the configured domain. This caused validation failures for Identity Providers (IdPs) that do not use trailing slashes in their issuer claims, leading to operational fragility.
 2.  **Implicit Privilege Escalation:** The `IdentityMapper` contained logic that automatically granted `["*"]` permissions to any user belonging to a group named "admin" (case-insensitive). This implicit mapping posed a security risk, as group names from external IdPs might be created by delegated administrators or come from untrusted sources, leading to accidental privilege escalation.
 
 ## 2. Solution

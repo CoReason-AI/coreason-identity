@@ -14,25 +14,25 @@ import httpx
 import pytest
 
 from coreason_identity.config import CoreasonIdentityConfig
-from coreason_identity.manager import IdentityManagerAsync, IdentityManagerSync
+from coreason_identity.manager import IdentityManager, IdentityManagerAsync
 from coreason_identity.models import DeviceFlowResponse, TokenResponse, UserContext
 
 
 def test_sync_facade_context_manager() -> None:
-    config = CoreasonIdentityConfig(pii_salt="test-salt", domain="test.auth0.com", audience="aud", client_id="cid")
+    config = CoreasonIdentityConfig(domain="test.auth0.com", audience="aud", client_id="cid")
 
     with patch("coreason_identity.manager.IdentityManagerAsync") as MockAsync:
         mock_instance = MockAsync.return_value
         mock_instance.__aexit__ = AsyncMock()
 
-        with IdentityManagerSync(config) as mgr:
+        with IdentityManager(config) as mgr:
             assert mgr._async == mock_instance
 
         mock_instance.__aexit__.assert_called_once()
 
 
 def test_sync_facade_methods() -> None:
-    config = CoreasonIdentityConfig(pii_salt="test-salt", domain="test.auth0.com", audience="aud", client_id="cid")
+    config = CoreasonIdentityConfig(domain="test.auth0.com", audience="aud", client_id="cid")
 
     with patch("coreason_identity.manager.IdentityManagerAsync") as MockAsync:
         mock_instance = MockAsync.return_value
@@ -46,7 +46,7 @@ def test_sync_facade_methods() -> None:
         mock_instance.start_device_login = AsyncMock(return_value=mock_flow)
         mock_instance.await_device_token = AsyncMock(return_value=mock_token)
 
-        mgr = IdentityManagerSync(config)
+        mgr = IdentityManager(config)
 
         # Test validate_token
         res = mgr.validate_token("header")
@@ -68,7 +68,7 @@ def test_sync_facade_methods() -> None:
 @pytest.mark.asyncio
 async def test_async_manager_internal_client_cleanup() -> None:
     """Test that IdentityManagerAsync closes the internal client on exit."""
-    config = CoreasonIdentityConfig(pii_salt="test-salt", domain="test.auth0.com", audience="aud", client_id="cid")
+    config = CoreasonIdentityConfig(domain="test.auth0.com", audience="aud", client_id="cid")
 
     # Mock httpx.AsyncClient to track aclose
     with patch("httpx.AsyncClient") as MockClient:
@@ -85,7 +85,7 @@ async def test_async_manager_internal_client_cleanup() -> None:
 @pytest.mark.asyncio
 async def test_async_manager_external_client_no_cleanup() -> None:
     """Test that IdentityManagerAsync does NOT close an external client on exit."""
-    config = CoreasonIdentityConfig(pii_salt="test-salt", domain="test.auth0.com", audience="aud", client_id="cid")
+    config = CoreasonIdentityConfig(domain="test.auth0.com", audience="aud", client_id="cid")
     external_client = AsyncMock(spec=httpx.AsyncClient)
 
     async with IdentityManagerAsync(config, client=external_client) as mgr:

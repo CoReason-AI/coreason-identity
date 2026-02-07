@@ -23,14 +23,13 @@ from coreason_identity.exceptions import (
     InvalidAudienceError,
     InvalidTokenError,
 )
-from coreason_identity.manager import IdentityManagerSync
+from coreason_identity.manager import IdentityManager
 from coreason_identity.utils.logger import logger
 
 
 @pytest.fixture
 def mock_config() -> CoreasonIdentityConfig:
     return CoreasonIdentityConfig(
-        pii_salt="test-salt",
         domain="auth.coreason.com",
         audience="expected-audience",
         client_id="test-client",
@@ -38,14 +37,14 @@ def mock_config() -> CoreasonIdentityConfig:
 
 
 @pytest.fixture
-def identity_manager(mock_config: CoreasonIdentityConfig) -> Generator[IdentityManagerSync, Any, None]:
+def identity_manager(mock_config: CoreasonIdentityConfig) -> Generator[IdentityManager, Any, None]:
     # We patch OIDCProvider to avoid network calls during init
     with (
         patch("coreason_identity.manager.OIDCProvider"),
         patch("coreason_identity.manager.TokenValidator"),
         patch("coreason_identity.manager.IdentityMapper"),
     ):
-        manager = IdentityManagerSync(mock_config)
+        manager = IdentityManager(mock_config)
         yield manager
 
 
@@ -59,7 +58,7 @@ def log_capture() -> Generator[list[str], None, None]:
     logger.remove(handler_id)
 
 
-def test_audience_mismatch_rejection(identity_manager: IdentityManagerSync) -> None:
+def test_audience_mismatch_rejection(identity_manager: IdentityManager) -> None:
     """
     Security Verification:
     Verify that an audience mismatch triggers an InvalidAudienceError.
@@ -68,7 +67,7 @@ def test_audience_mismatch_rejection(identity_manager: IdentityManagerSync) -> N
     token = "some.jwt.token"
 
     # Configure the mock validator to raise InvalidAudienceError
-    # Access via _async since IdentityManagerSync is facade
+    # Access via _async since IdentityManager is facade
     mock_validator = cast("MagicMock", identity_manager._async.validator)
     # validate_token is async
     mock_validator.validate_token = AsyncMock(side_effect=InvalidAudienceError("Invalid audience"))
@@ -176,7 +175,7 @@ class TestSecurityEdgeCases:
     Additional complex and edge case tests for security resilience.
     """
 
-    def test_malformed_token_formats(self, identity_manager: IdentityManagerSync) -> None:
+    def test_malformed_token_formats(self, identity_manager: IdentityManager) -> None:
         """
         AuthN Edge Case: Verify rejection of invalid Authorization header formats.
         """
@@ -201,7 +200,7 @@ class TestSecurityEdgeCases:
         with pytest.raises(InvalidTokenError, match="Must start with 'Bearer '"):
             identity_manager.validate_token("Token 123")
 
-    def test_jwks_fetch_failure(self, identity_manager: IdentityManagerSync) -> None:
+    def test_jwks_fetch_failure(self, identity_manager: IdentityManager) -> None:
         """
         Resilience Edge Case: Verify behavior when JWKS cannot be fetched (e.g., IdP down).
         """

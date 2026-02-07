@@ -9,8 +9,8 @@
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
 """
-Functional test for IdentityManagerSync issuer validation.
-This test ensures that IdentityManagerSync correctly configures TokenValidator to enforce issuer checks.
+Functional test for IdentityManager issuer validation.
+This test ensures that IdentityManager correctly configures TokenValidator to enforce issuer checks.
 """
 
 import time
@@ -22,7 +22,7 @@ from authlib.jose import JsonWebKey, jwt
 
 from coreason_identity.config import CoreasonIdentityConfig
 from coreason_identity.exceptions import CoreasonIdentityError
-from coreason_identity.manager import IdentityManagerSync
+from coreason_identity.manager import IdentityManager
 
 
 @pytest.fixture
@@ -45,7 +45,7 @@ def create_token(key: Any, claims: dict[str, Any], headers: dict[str, Any] | Non
 
 def test_manager_enforces_strict_issuer(key_pair: Any, jwks: dict[str, Any]) -> None:
     """
-    Verify that IdentityManagerSync, when initialized, actually enforces issuer validation
+    Verify that IdentityManager, when initialized, actually enforces issuer validation
     by performing a real validation (no mock TokenValidator).
     """
     domain = "test.auth0.com"
@@ -53,7 +53,7 @@ def test_manager_enforces_strict_issuer(key_pair: Any, jwks: dict[str, Any]) -> 
     correct_issuer = f"https://{domain}/"
     wrong_issuer = "https://wrong-issuer.com/"
 
-    config = CoreasonIdentityConfig(pii_salt="test-salt", domain=domain, audience=audience, client_id="client")
+    config = CoreasonIdentityConfig(domain=domain, audience=audience, client_id="client")
 
     # We mock OIDCProvider to return our test keys, but we let TokenValidator run real logic
     with patch("coreason_identity.manager.OIDCProvider") as MockOIDC:
@@ -65,11 +65,11 @@ def test_manager_enforces_strict_issuer(key_pair: Any, jwks: dict[str, Any]) -> 
         # However, IdentityMapper might fail if we don't return expected claims structure.
         # But validation happens before mapping.
 
-        # NOTE: IdentityManagerSync creates TokenValidator internally.
+        # NOTE: IdentityManager creates TokenValidator internally.
         # We also need to mock IdentityMapper if we want the call to succeed fully,
         # but here we expect it to fail at validation stage.
 
-        manager = IdentityManagerSync(config)
+        manager = IdentityManager(config)
 
         # 1. Test with WRONG issuer
         now = int(time.time())
@@ -84,8 +84,7 @@ def test_manager_enforces_strict_issuer(key_pair: Any, jwks: dict[str, Any]) -> 
 
         # Expect failure (InvalidTokenError -> CoreasonIdentityError or specifically InvalidClaimError wrapped)
         # TokenValidator raises InvalidAudienceError or CoreasonIdentityError for invalid claims.
-        # IdentityManagerSync wraps validation in its own logic? No,
-        # validate_token calls validator.validate_token directly.
+        # IdentityManager wraps validation in its own logic? No, validate_token calls validator.validate_token directly.
 
         with pytest.raises(CoreasonIdentityError, match="Invalid claim"):
             manager.validate_token(f"Bearer {token_wrong}")
