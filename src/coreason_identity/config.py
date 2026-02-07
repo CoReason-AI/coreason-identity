@@ -17,7 +17,7 @@ import os
 import socket
 from urllib.parse import urlparse
 
-from pydantic import SecretStr, field_validator, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -42,7 +42,7 @@ class CoreasonIdentityConfig(BaseSettings):
     domain: str
     audience: str
     client_id: str | None = None
-    pii_salt: SecretStr = SecretStr("coreason-unsafe-default-salt")
+    pii_salt: SecretStr = Field(..., description="High-entropy salt for PII hashing. REQUIRED.")
     issuer: str | None = None
 
     @model_validator(mode="after")

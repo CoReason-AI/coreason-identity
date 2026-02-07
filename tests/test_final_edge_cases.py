@@ -33,7 +33,7 @@ from coreason_identity.validator import TokenValidator
 class TestIdentityManagerEdgeCases:
     @pytest.fixture
     def config(self) -> CoreasonIdentityConfig:
-        return CoreasonIdentityConfig(
+        return CoreasonIdentityConfig(pii_salt="test-salt",
             domain="test.auth0.com",
             audience="my-audience",
             client_id="cid",

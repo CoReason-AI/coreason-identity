@@ -44,7 +44,7 @@ def test_init_with_invalid_config_type() -> None:
 
 def test_context_manager_cleanup_idempotency() -> None:
     """Verify that __exit__ can be called multiple times without error (though unusual)."""
-    config = CoreasonIdentityConfig(domain="example.com", audience="aud", client_id="cid")
+    config = CoreasonIdentityConfig(pii_salt="test-salt", domain="example.com", audience="aud", client_id="cid")
 
     with patch("coreason_identity.manager.IdentityManagerAsync") as MockAsync:
         mock_instance = MockAsync.return_value
