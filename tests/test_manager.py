@@ -120,13 +120,13 @@ def test_start_device_login_custom_scope(manager: IdentityManager) -> None:
         mock_client_instance = MockClient.return_value
         mock_client_instance.initiate_flow = AsyncMock()
 
-        manager.start_device_login(scope="custom:scope")
+        manager.start_device_login(scope="read:reports")
 
         MockClient.assert_called_with(
             client_id=MOCK_CLIENT_ID,
             idp_url=f"https://{MOCK_DOMAIN}",
             client=manager._async._client,
-            scope="custom:scope",
+            scope="read:reports",
         )
 
 
@@ -141,12 +141,15 @@ def test_start_device_login_recreation(manager: IdentityManager) -> None:
         assert MockClient.call_count == 1
 
         # Second call
-        manager.start_device_login(scope="new:scope")
+        manager.start_device_login(scope="read:reports")
         assert MockClient.call_count == 2
 
         # Verify the second call used the new scope
         MockClient.assert_called_with(
-            client_id=MOCK_CLIENT_ID, idp_url=f"https://{MOCK_DOMAIN}", client=manager._async._client, scope="new:scope"
+            client_id=MOCK_CLIENT_ID,
+            idp_url=f"https://{MOCK_DOMAIN}",
+            client=manager._async._client,
+            scope="read:reports",
         )
 
 

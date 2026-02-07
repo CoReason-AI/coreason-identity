@@ -14,7 +14,7 @@ def test_user_context_repr_redaction() -> None:
         user_id="user123",
         email="test@example.com",
         groups=["admin"],
-        scopes=["read"],
+        scopes=["openid"],
         downstream_token=SecretStr("secret"),
         claims={"phone_number": "+1-555-0199", "address": sensitive_value, "other": "data"},
     )
@@ -35,7 +35,7 @@ def test_user_context_repr_redaction() -> None:
     assert "user123" in repr_str
     assert "test@example.com" in repr_str
     assert "admin" in repr_str
-    assert "read" in repr_str
+    assert "openid" in repr_str
 
     # Check structure resembles class signature
     assert repr_str.startswith("UserContext(")
