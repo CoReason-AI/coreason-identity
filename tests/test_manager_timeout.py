@@ -35,4 +35,7 @@ def test_manager_uses_configured_timeout() -> None:
         IdentityManager(config)
 
         # IdentityManager -> IdentityManagerAsync -> httpx.AsyncClient
-        MockClient.assert_called_with(timeout=timeout_value)
+        # Check that timeout is passed, and transport is also present (due to SafeHTTPTransport injection)
+        call_kwargs = MockClient.call_args.kwargs
+        assert call_kwargs["timeout"] == timeout_value
+        assert "transport" in call_kwargs

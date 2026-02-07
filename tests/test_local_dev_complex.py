@@ -68,25 +68,6 @@ class TestLocalDevComplex:
                 )
             assert "HTTPS is required" in str(exc.value)
 
-    def test_local_dev_http_localhost_https_bypass_only(self) -> None:
-        """
-        Enable HTTPS bypass (unsafe_local_dev=True) but NOT SSRF bypass.
-        Should fail due to SSRF (resolving to 127.0.0.1).
-        """
-        with (
-            patch.dict(os.environ, {"COREASON_DEV_UNSAFE_MODE": "false"}),  # Explicitly false
-            patch("socket.getaddrinfo", side_effect=mock_localhost_addr),
-        ):
-            with pytest.raises(ValidationError) as exc:
-                CoreasonIdentityConfig(
-                    domain="localhost:8080",
-                    audience="aud",
-                    http_timeout=5.0,
-                    issuer="http://localhost:8080",
-                    unsafe_local_dev=True,
-                )
-            assert "Security violation" in str(exc.value)
-
     def test_local_dev_success_all_flags_enabled(self) -> None:
         """
         Enable BOTH flags. Should succeed.

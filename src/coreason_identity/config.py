@@ -12,9 +12,7 @@
 Configuration for the coreason-identity package.
 """
 
-import ipaddress
 import os
-import socket
 from urllib.parse import urlparse
 
 from pydantic import Field, SecretStr, ValidationInfo, field_validator, model_validator
@@ -86,48 +84,3 @@ class CoreasonIdentityConfig(BaseSettings):
         parsed = urlparse(v)
         return parsed.netloc or v
 
-    @field_validator("domain")
-    @classmethod
-    def validate_domain_dns(cls, v: str) -> str:
-        """
-        Validates that the domain does not resolve to a prohibited IP address.
-        Prevents SSRF attacks.
-
-        Args:
-            v: The normalized domain string.
-
-        Returns:
-            The domain string if valid.
-
-        Raises:
-            ValueError: If the domain resolves to a private, loopback, or reserved IP.
-        """
-        # Bypass check if explicitly disabled in dev
-        if os.environ.get("COREASON_DEV_UNSAFE_MODE", "").lower() == "true":
-            return v
-
-        try:
-            # Resolve hostname to IP(s)
-            # Use default family/type/proto to get all results
-            addr_infos = socket.getaddrinfo(v, None)
-        except socket.gaierror as e:
-            raise ValueError(f"Unable to resolve domain '{v}': {e}") from e
-
-        for _, _, _, _, sockaddr in addr_infos:
-            ip_str = sockaddr[0]
-            try:
-                ip_obj = ipaddress.ip_address(ip_str)
-            except ValueError:
-                # Should not happen with valid socket.getaddrinfo results
-                continue
-
-            if (
-                ip_obj.is_private
-                or ip_obj.is_loopback
-                or ip_obj.is_link_local
-                or ip_obj.is_reserved
-                or ip_obj.is_multicast
-            ):
-                raise ValueError(f"Security violation: Domain '{v}' resolves to a prohibited IP ({ip_str})")
-
-        return v
