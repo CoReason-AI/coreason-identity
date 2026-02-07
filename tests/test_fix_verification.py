@@ -20,7 +20,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from authlib.jose import JsonWebKey, jwt
 
-from coreason_identity.config import CoreasonIdentityConfig
+from coreason_identity.config import CoreasonVerifierConfig
 from coreason_identity.exceptions import InvalidTokenError
 from coreason_identity.manager import IdentityManager
 
@@ -45,7 +45,7 @@ def test_missing_claim_raises_invalid_token_error(key_pair: Any, jwks: dict[str,
     Test that a token missing a required claim (like 'exp') raises InvalidTokenError.
     """
     domain = "test.auth0.com"
-    config = CoreasonIdentityConfig(domain=domain, audience="aud")
+    config = CoreasonVerifierConfig(domain=domain, audience="aud")
 
     # Mock OIDC provider to return keys
     with patch("coreason_identity.manager.OIDCProvider") as MockOIDC:
@@ -82,7 +82,7 @@ def test_mapper_validation_raises_invalid_token_error(key_pair: Any, jwks: dict[
     raises InvalidTokenError.
     """
     domain = "test.auth0.com"
-    config = CoreasonIdentityConfig(domain=domain, audience="aud")
+    config = CoreasonVerifierConfig(domain=domain, audience="aud")
 
     with patch("coreason_identity.manager.OIDCProvider") as MockOIDC:
         mock_oidc_instance = MockOIDC.return_value

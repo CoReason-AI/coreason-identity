@@ -19,7 +19,7 @@ import pytest
 @pytest.fixture(autouse=True)
 def set_default_env_vars() -> Generator[None, None, None]:
     """
-    Sets default environment variables to ensure CoreasonIdentityConfig
+    Sets default environment variables to ensure CoreasonVerifierConfig
     can be instantiated in tests without mandatory fields causing errors.
     """
     with patch.dict(
@@ -36,7 +36,7 @@ def set_default_env_vars() -> Generator[None, None, None]:
 def mock_dns_resolution() -> Generator[MagicMock, None, None]:
     """
     Globally patches socket.getaddrinfo to return a safe public IP by default.
-    This prevents SSRF validation logic in CoreasonIdentityConfig from failing
+    This prevents SSRF validation logic in CoreasonVerifierConfig from failing
     existing tests that use dummy domains (e.g., test.auth0.com).
 
     Tests that need to verify SSRF logic (like test_security_ssrf.py) should

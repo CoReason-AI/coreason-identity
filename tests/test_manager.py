@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from coreason_identity.config import CoreasonIdentityConfig
+from coreason_identity.config import CoreasonClientConfig, CoreasonVerifierConfig
 from coreason_identity.exceptions import CoreasonIdentityError, InvalidTokenError
 from coreason_identity.manager import IdentityManager
 from coreason_identity.models import DeviceFlowResponse, TokenResponse, UserContext
@@ -28,12 +28,12 @@ MOCK_AUTH_HEADER = f"Bearer {MOCK_TOKEN}"
 
 
 @pytest.fixture
-def config() -> CoreasonIdentityConfig:
-    return CoreasonIdentityConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id=MOCK_CLIENT_ID)
+def config() -> CoreasonClientConfig:
+    return CoreasonClientConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id=MOCK_CLIENT_ID)
 
 
 @pytest.fixture
-def manager(config: CoreasonIdentityConfig) -> Generator[IdentityManager, Any, None]:
+def manager(config: CoreasonClientConfig) -> Generator[IdentityManager, Any, None]:
     # Mock internal components during initialization
     with (
         patch("coreason_identity.manager.OIDCProvider"),
@@ -44,7 +44,7 @@ def manager(config: CoreasonIdentityConfig) -> Generator[IdentityManager, Any, N
         yield mgr
 
 
-def test_init(config: CoreasonIdentityConfig) -> None:
+def test_init(config: CoreasonClientConfig) -> None:
     with (
         patch("coreason_identity.manager.OIDCProvider") as MockOIDC,
         patch("coreason_identity.manager.TokenValidator") as MockValidator,
@@ -151,7 +151,8 @@ def test_start_device_login_recreation(manager: IdentityManager) -> None:
 
 
 def test_start_device_login_missing_client_id() -> None:
-    config_no_client = CoreasonIdentityConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE)
+    # Use CoreasonVerifierConfig which does NOT have client_id
+    config_no_client = CoreasonVerifierConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE)
 
     with (
         patch("coreason_identity.manager.OIDCProvider"),
@@ -160,7 +161,7 @@ def test_start_device_login_missing_client_id() -> None:
     ):
         mgr = IdentityManager(config_no_client)
 
-        with pytest.raises(CoreasonIdentityError, match="client_id is required"):
+        with pytest.raises(CoreasonIdentityError, match="Device login requires CoreasonClientConfig"):
             mgr.start_device_login()
 
 
@@ -208,7 +209,7 @@ def test_await_device_token_stateless(manager: IdentityManager) -> None:
 
 
 def test_await_device_token_missing_client_id() -> None:
-    config_no_client = CoreasonIdentityConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE)
+    config_no_client = CoreasonVerifierConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE)
 
     with (
         patch("coreason_identity.manager.OIDCProvider"),
@@ -220,13 +221,13 @@ def test_await_device_token_missing_client_id() -> None:
             device_code="dcode", user_code="ucode", verification_uri="http://verify", expires_in=300
         )
 
-        with pytest.raises(CoreasonIdentityError, match="client_id is required"):
+        with pytest.raises(CoreasonIdentityError, match="Device login requires CoreasonClientConfig"):
             mgr.await_device_token(mock_flow)
 
 
 def test_init_strict_issuer() -> None:
     """Test that IdentityManager initializes TokenValidator with strict issuer from config."""
-    config = CoreasonIdentityConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id=MOCK_CLIENT_ID)
+    config = CoreasonClientConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id=MOCK_CLIENT_ID)
 
     with (
         patch("coreason_identity.manager.OIDCProvider") as MockOIDC,
@@ -247,7 +248,7 @@ def test_init_strict_issuer() -> None:
 
 def test_init_missing_issuer_raises_error() -> None:
     """Test that IdentityManager raises error if issuer configuration is missing."""
-    config = Mock(spec=CoreasonIdentityConfig)
+    config = Mock(spec=CoreasonVerifierConfig)
     config.domain = "example.com"
     config.issuer = None  # Force None
     config.audience = "aud"

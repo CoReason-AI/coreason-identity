@@ -19,7 +19,7 @@ from urllib.parse import urljoin
 import anyio
 import httpx
 
-from coreason_identity.config import CoreasonIdentityConfig
+from coreason_identity.config import CoreasonClientConfig, CoreasonVerifierConfig
 from coreason_identity.device_flow_client import DeviceFlowClient
 from coreason_identity.exceptions import CoreasonIdentityError, InvalidTokenError
 from coreason_identity.identity_mapper import IdentityMapper
@@ -35,7 +35,7 @@ class IdentityManagerAsync:
     Handles resources via async context manager.
     """
 
-    def __init__(self, config: CoreasonIdentityConfig, client: httpx.AsyncClient | None = None) -> None:
+    def __init__(self, config: CoreasonVerifierConfig, client: httpx.AsyncClient | None = None) -> None:
         """
         Initialize the IdentityManagerAsync.
 
@@ -107,8 +107,8 @@ class IdentityManagerAsync:
         """
         Initiates the Device Authorization Flow.
         """
-        if not self.config.client_id:
-            raise CoreasonIdentityError("client_id is required for device login but not configured.")
+        if not isinstance(self.config, CoreasonClientConfig):
+            raise CoreasonIdentityError("Device login requires CoreasonClientConfig with a valid client_id.")
 
         if not self.device_client:
             self.device_client = DeviceFlowClient(
@@ -135,8 +135,8 @@ class IdentityManagerAsync:
         """
         Polls for the device token.
         """
-        if not self.config.client_id:
-            raise CoreasonIdentityError("client_id is required for device login but not configured.")
+        if not isinstance(self.config, CoreasonClientConfig):
+            raise CoreasonIdentityError("Device login requires CoreasonClientConfig with a valid client_id.")
 
         if not self.device_client:
             self.device_client = DeviceFlowClient(
@@ -154,7 +154,7 @@ class IdentityManager:
     Wraps IdentityManagerAsync and bridges Sync -> Async via anyio.run.
     """
 
-    def __init__(self, config: CoreasonIdentityConfig) -> None:
+    def __init__(self, config: CoreasonVerifierConfig) -> None:
         """
         Initialize the IdentityManager Facade.
 

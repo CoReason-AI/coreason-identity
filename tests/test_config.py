@@ -14,7 +14,7 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 
-from coreason_identity.config import CoreasonIdentityConfig
+from coreason_identity.config import CoreasonVerifierConfig
 
 
 def test_config_loading() -> None:
@@ -26,7 +26,7 @@ def test_config_loading() -> None:
             "COREASON_AUTH_AUDIENCE": "api://test",
         },
     ):
-        config = CoreasonIdentityConfig()
+        config = CoreasonVerifierConfig()
         assert config.domain == "test.auth0.com"
         assert config.audience == "api://test"
 
@@ -40,7 +40,7 @@ def test_config_case_insensitive() -> None:
             "COREASON_AUTH_AUDIENCE": "api://lower",
         },
     ):
-        config = CoreasonIdentityConfig()
+        config = CoreasonVerifierConfig()
         assert config.domain == "lower.auth0.com"
         assert config.audience == "api://lower"
 
@@ -48,19 +48,19 @@ def test_config_case_insensitive() -> None:
 def test_config_domain_normalization() -> None:
     """Test that domain is normalized to hostname only."""
     # Simple hostname
-    c1 = CoreasonIdentityConfig(domain="test.com", audience="aud")
+    c1 = CoreasonVerifierConfig(domain="test.com", audience="aud")
     assert c1.domain == "test.com"
 
     # With https://
-    c2 = CoreasonIdentityConfig(domain="https://test.com", audience="aud")
+    c2 = CoreasonVerifierConfig(domain="https://test.com", audience="aud")
     assert c2.domain == "test.com"
 
     # With trailing slash
-    c3 = CoreasonIdentityConfig(domain="test.com/", audience="aud")
+    c3 = CoreasonVerifierConfig(domain="test.com/", audience="aud")
     assert c3.domain == "test.com"
 
     # With path (should strip path)
-    c4 = CoreasonIdentityConfig(domain="https://test.com/auth", audience="aud")
+    c4 = CoreasonVerifierConfig(domain="https://test.com/auth", audience="aud")
     assert c4.domain == "test.com"
 
 
@@ -72,20 +72,20 @@ def test_timeout_required() -> None:
             del os.environ["COREASON_AUTH_HTTP_TIMEOUT"]
 
         with pytest.raises(ValidationError) as exc:
-            CoreasonIdentityConfig(domain="test.com", audience="aud")
+            CoreasonVerifierConfig(domain="test.com", audience="aud")
         assert "http_timeout" in str(exc.value)
 
 
 def test_https_enforcement() -> None:
     """Test that HTTP issuer is rejected by default."""
     with pytest.raises(ValidationError) as exc:
-        CoreasonIdentityConfig(domain="test.com", audience="aud", issuer="http://auth.local")
+        CoreasonVerifierConfig(domain="test.com", audience="aud", issuer="http://auth.local")
     assert "HTTPS is required for production" in str(exc.value)
 
 
 def test_https_override() -> None:
     """Test that HTTP issuer is accepted with unsafe_local_dev=True."""
-    config = CoreasonIdentityConfig(
+    config = CoreasonVerifierConfig(
         domain="test.com",
         audience="aud",
         issuer="http://auth.local",
@@ -97,7 +97,7 @@ def test_https_override() -> None:
 
 def test_https_success() -> None:
     """Test that HTTPS issuer is accepted."""
-    config = CoreasonIdentityConfig(domain="test.com", audience="aud", issuer="https://auth.prod")
+    config = CoreasonVerifierConfig(domain="test.com", audience="aud", issuer="https://auth.prod")
     assert config.issuer == "https://auth.prod"
 
 
@@ -109,5 +109,5 @@ def test_missing_pii_salt_raises_error() -> None:
             del os.environ["COREASON_AUTH_PII_SALT"]
 
         with pytest.raises(ValidationError) as exc:
-            CoreasonIdentityConfig(domain="test.com", audience="aud")
+            CoreasonVerifierConfig(domain="test.com", audience="aud")
         assert "pii_salt" in str(exc.value)

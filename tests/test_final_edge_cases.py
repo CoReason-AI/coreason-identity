@@ -19,7 +19,7 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 from authlib.jose import JsonWebKey, jwt
 
-from coreason_identity.config import CoreasonIdentityConfig
+from coreason_identity.config import CoreasonVerifierConfig
 from coreason_identity.exceptions import (
     InvalidAudienceError,
     InvalidTokenError,
@@ -32,14 +32,13 @@ from coreason_identity.validator import TokenValidator
 
 class TestIdentityManagerEdgeCases:
     @pytest.fixture
-    def config(self) -> CoreasonIdentityConfig:
-        return CoreasonIdentityConfig(
+    def config(self) -> CoreasonVerifierConfig:
+        return CoreasonVerifierConfig(
             domain="test.auth0.com",
             audience="my-audience",
-            client_id="cid",
         )
 
-    def test_validate_token_empty_bearer_string(self, config: CoreasonIdentityConfig) -> None:
+    def test_validate_token_empty_bearer_string(self, config: CoreasonVerifierConfig) -> None:
         """Test validation when header is just 'Bearer ' with no token."""
         with (
             patch("coreason_identity.manager.OIDCProvider"),

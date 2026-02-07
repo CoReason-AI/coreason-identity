@@ -13,7 +13,7 @@ from unittest.mock import patch
 import httpx
 import pytest
 
-from coreason_identity.config import CoreasonIdentityConfig
+from coreason_identity.config import CoreasonVerifierConfig
 from coreason_identity.manager import IdentityManagerAsync
 
 
@@ -27,7 +27,7 @@ class TestNetworkReliabilityComplex:
         the http_timeout from config is IGNORED (dependency injection priority).
         """
         # Config has 5.0s timeout
-        config = CoreasonIdentityConfig(domain="test.com", audience="aud", http_timeout=5.0)
+        config = CoreasonVerifierConfig(domain="test.com", audience="aud", http_timeout=5.0)
 
         # External client has 10.0s timeout
         external_timeout = httpx.Timeout(10.0)
@@ -48,7 +48,7 @@ class TestNetworkReliabilityComplex:
         Verify that internal client correctly adopts the configured timeout
         and that it persists across the lifecycle.
         """
-        config = CoreasonIdentityConfig(domain="test.com", audience="aud", http_timeout=0.1)
+        config = CoreasonVerifierConfig(domain="test.com", audience="aud", http_timeout=0.1)
 
         with (
             patch("coreason_identity.manager.OIDCProvider"),
@@ -73,7 +73,7 @@ class TestNetworkReliabilityComplex:
         # We'll skip a true integration test requiring network/respx
         # and trust httpx. But we can verify that the client passed to OIDCProvider
         # is indeed the one with the timeout.
-        config = CoreasonIdentityConfig(domain="test.com", audience="aud", http_timeout=0.5)
+        config = CoreasonVerifierConfig(domain="test.com", audience="aud", http_timeout=0.5)
 
         with (
             patch("coreason_identity.manager.OIDCProvider") as MockOIDC,
@@ -94,8 +94,8 @@ class TestNetworkReliabilityComplex:
         """
         Verify that timeout settings are safe under concurrency (multiple managers).
         """
-        config1 = CoreasonIdentityConfig(domain="test1.com", audience="aud", http_timeout=1.0)
-        config2 = CoreasonIdentityConfig(domain="test2.com", audience="aud", http_timeout=2.0)
+        config1 = CoreasonVerifierConfig(domain="test1.com", audience="aud", http_timeout=1.0)
+        config2 = CoreasonVerifierConfig(domain="test2.com", audience="aud", http_timeout=2.0)
 
         with (
             patch("coreason_identity.manager.OIDCProvider"),

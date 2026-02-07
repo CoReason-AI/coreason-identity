@@ -15,7 +15,7 @@ from unittest.mock import Mock, patch
 import pytest
 from pydantic import SecretStr
 
-from coreason_identity.config import CoreasonIdentityConfig
+from coreason_identity.config import CoreasonVerifierConfig
 from coreason_identity.manager import IdentityManager
 from coreason_identity.oidc_provider import OIDCProvider
 from coreason_identity.validator import TokenValidator
@@ -69,8 +69,8 @@ class TestPiiAnonymizationComplexScenarios:
         Verify IdentityManager correctly propagates the salt from a complex config object to the validator.
         """
         custom_salt = "super-secret-salt-value"
-        config = CoreasonIdentityConfig(
-            domain="auth.example.com", audience="aud", client_id="client", pii_salt=SecretStr(custom_salt)
+        config = CoreasonVerifierConfig(
+            domain="auth.example.com", audience="aud", pii_salt=SecretStr(custom_salt)
         )
 
         with (

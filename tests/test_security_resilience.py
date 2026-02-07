@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from authlib.jose.errors import InvalidClaimError
 
-from coreason_identity.config import CoreasonIdentityConfig
+from coreason_identity.config import CoreasonVerifierConfig
 from coreason_identity.exceptions import (
     CoreasonIdentityError,
     InvalidAudienceError,
@@ -28,16 +28,15 @@ from coreason_identity.utils.logger import logger
 
 
 @pytest.fixture
-def mock_config() -> CoreasonIdentityConfig:
-    return CoreasonIdentityConfig(
+def mock_config() -> CoreasonVerifierConfig:
+    return CoreasonVerifierConfig(
         domain="auth.coreason.com",
         audience="expected-audience",
-        client_id="test-client",
     )
 
 
 @pytest.fixture
-def identity_manager(mock_config: CoreasonIdentityConfig) -> Generator[IdentityManager, Any, None]:
+def identity_manager(mock_config: CoreasonVerifierConfig) -> Generator[IdentityManager, Any, None]:
     # We patch OIDCProvider to avoid network calls during init
     with (
         patch("coreason_identity.manager.OIDCProvider"),

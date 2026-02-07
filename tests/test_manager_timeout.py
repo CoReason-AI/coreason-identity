@@ -10,7 +10,7 @@
 
 from unittest.mock import patch
 
-from coreason_identity.config import CoreasonIdentityConfig
+from coreason_identity.config import CoreasonVerifierConfig
 from coreason_identity.manager import IdentityManager
 
 
@@ -20,7 +20,7 @@ def test_manager_uses_configured_timeout() -> None:
     with the http_timeout from configuration.
     """
     timeout_value = 10.5
-    config = CoreasonIdentityConfig(
+    config = CoreasonVerifierConfig(
         domain="test.auth0.com",
         audience="test",
         http_timeout=timeout_value,

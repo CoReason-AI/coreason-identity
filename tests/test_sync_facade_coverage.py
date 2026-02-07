@@ -13,13 +13,13 @@ from unittest.mock import AsyncMock, Mock, patch
 import httpx
 import pytest
 
-from coreason_identity.config import CoreasonIdentityConfig
+from coreason_identity.config import CoreasonClientConfig
 from coreason_identity.manager import IdentityManager, IdentityManagerAsync
 from coreason_identity.models import DeviceFlowResponse, TokenResponse, UserContext
 
 
 def test_sync_facade_context_manager() -> None:
-    config = CoreasonIdentityConfig(domain="test.auth0.com", audience="aud", client_id="cid")
+    config = CoreasonClientConfig(domain="test.auth0.com", audience="aud", client_id="cid")
 
     with patch("coreason_identity.manager.IdentityManagerAsync") as MockAsync:
         mock_instance = MockAsync.return_value
@@ -32,7 +32,7 @@ def test_sync_facade_context_manager() -> None:
 
 
 def test_sync_facade_methods() -> None:
-    config = CoreasonIdentityConfig(domain="test.auth0.com", audience="aud", client_id="cid")
+    config = CoreasonClientConfig(domain="test.auth0.com", audience="aud", client_id="cid")
 
     with patch("coreason_identity.manager.IdentityManagerAsync") as MockAsync:
         mock_instance = MockAsync.return_value
@@ -68,7 +68,7 @@ def test_sync_facade_methods() -> None:
 @pytest.mark.asyncio
 async def test_async_manager_internal_client_cleanup() -> None:
     """Test that IdentityManagerAsync closes the internal client on exit."""
-    config = CoreasonIdentityConfig(domain="test.auth0.com", audience="aud", client_id="cid")
+    config = CoreasonClientConfig(domain="test.auth0.com", audience="aud", client_id="cid")
 
     # Mock httpx.AsyncClient to track aclose
     with patch("httpx.AsyncClient") as MockClient:
@@ -85,7 +85,7 @@ async def test_async_manager_internal_client_cleanup() -> None:
 @pytest.mark.asyncio
 async def test_async_manager_external_client_no_cleanup() -> None:
     """Test that IdentityManagerAsync does NOT close an external client on exit."""
-    config = CoreasonIdentityConfig(domain="test.auth0.com", audience="aud", client_id="cid")
+    config = CoreasonClientConfig(domain="test.auth0.com", audience="aud", client_id="cid")
     external_client = AsyncMock(spec=httpx.AsyncClient)
 
     async with IdentityManagerAsync(config, client=external_client) as mgr:
