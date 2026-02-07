@@ -30,6 +30,7 @@ from coreason_identity.utils.logger import logger
 @pytest.fixture
 def mock_config() -> CoreasonIdentityConfig:
     return CoreasonIdentityConfig(
+        pii_salt="test-salt",
         domain="auth.coreason.com",
         audience="expected-audience",
         client_id="test-client",

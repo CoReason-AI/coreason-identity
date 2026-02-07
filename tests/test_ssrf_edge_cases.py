@@ -37,7 +37,7 @@ class TestSSRFEdgeCases:
         unsafe_mix = ["8.8.8.8", "127.0.0.1"]
         with patch("socket.getaddrinfo", return_value=mock_addr_info_list(unsafe_mix)):
             with pytest.raises(ValidationError) as exc:
-                CoreasonIdentityConfig(domain="mixed.risk", audience="aud")
+                CoreasonIdentityConfig(pii_salt="test-salt", domain="mixed.risk", audience="aud")
             assert "resolves to a prohibited IP" in str(exc.value)
 
     def test_ipv4_mapped_ipv6_localhost(self) -> None:
@@ -46,7 +46,7 @@ class TestSSRFEdgeCases:
         ipv6_mapped = "::ffff:127.0.0.1"
         with patch("socket.getaddrinfo", return_value=mock_addr_info_list([ipv6_mapped])):
             with pytest.raises(ValidationError) as exc:
-                CoreasonIdentityConfig(domain="mapped.local", audience="aud")
+                CoreasonIdentityConfig(pii_salt="test-salt", domain="mapped.local", audience="aud")
             assert "resolves to a prohibited IP" in str(exc.value)
 
     def test_ipv6_link_local(self) -> None:
@@ -54,7 +54,7 @@ class TestSSRFEdgeCases:
         link_local = "fe80::1"
         with patch("socket.getaddrinfo", return_value=mock_addr_info_list([link_local])):
             with pytest.raises(ValidationError) as exc:
-                CoreasonIdentityConfig(domain="link.local", audience="aud")
+                CoreasonIdentityConfig(pii_salt="test-salt", domain="link.local", audience="aud")
             assert "resolves to a prohibited IP" in str(exc.value)
 
     def test_boundary_long_domain_name(self) -> None:
@@ -65,7 +65,7 @@ class TestSSRFEdgeCases:
 
         # If it resolves to a safe IP, it should pass
         with patch("socket.getaddrinfo", return_value=mock_addr_info_list(["8.8.8.8"])):
-            config = CoreasonIdentityConfig(domain=long_domain, audience="aud")
+            config = CoreasonIdentityConfig(pii_salt="test-salt", domain=long_domain, audience="aud")
             assert config.domain == long_domain
 
     def test_idn_domain_handling(self) -> None:
@@ -78,7 +78,7 @@ class TestSSRFEdgeCases:
 
         # We simulate that the system resolves this IDN to a safe IP
         with patch("socket.getaddrinfo", return_value=mock_addr_info_list(["1.1.1.1"])):
-            config = CoreasonIdentityConfig(domain=idn_domain, audience="aud")
+            config = CoreasonIdentityConfig(pii_salt="test-salt", domain=idn_domain, audience="aud")
             # The validator returns the normalized domain.
             # Our normalize_domain lowercases.
             # Note: urlparse.netloc behavior on IDNs varies by python version/install,
@@ -99,5 +99,5 @@ class TestSSRFEdgeCases:
         # The key is that the resolver returns the RAW socket address which has the canonical IP
         with patch("socket.getaddrinfo", return_value=mock_addr_info_list(["127.0.0.1"])):
             with pytest.raises(ValidationError) as exc:
-                CoreasonIdentityConfig(domain=hex_ip_domain, audience="aud")
+                CoreasonIdentityConfig(pii_salt="test-salt", domain=hex_ip_domain, audience="aud")
             assert "resolves to a prohibited IP" in str(exc.value)
