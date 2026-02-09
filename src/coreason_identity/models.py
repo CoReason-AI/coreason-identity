@@ -13,7 +13,6 @@ Data models for the coreason-identity package.
 """
 
 from enum import StrEnum
-from typing import Any
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr
 
@@ -40,7 +39,7 @@ class UserContext(BaseModel):
 
     model_config = ConfigDict(
         frozen=True,
-        extra="ignore",
+        extra="forbid",
         json_schema_extra={
             "example": {
                 "user_id": "auth0|123456",
@@ -72,7 +71,6 @@ class UserContext(BaseModel):
     downstream_token: SecretStr | None = Field(
         default=None, description="The On-Behalf-Of (OBO) token for downstream API calls. Protected from logging."
     )
-    claims: dict[str, Any] = Field(default_factory=dict, description="Extended attributes and legacy field mappings.")
 
     def __repr__(self) -> str:
         return (
@@ -80,8 +78,7 @@ class UserContext(BaseModel):
             f"email={self.email!r}, "
             f"groups={self.groups!r}, "
             f"scopes={self.scopes!r}, "
-            f"downstream_token={self.downstream_token!r}, "
-            f"claims='<REDACTED>')"
+            f"downstream_token={self.downstream_token!r})"
         )
 
     def __str__(self) -> str:

@@ -90,6 +90,7 @@ class TestTokenValidatorComplex:
         # Claims JSON
         payload = json.dumps(claims).encode("utf-8")
 
+        # Signature is empty for none alg
         token = f"{base64url_encode(json.dumps(header).encode('utf-8'))}.{base64url_encode(payload)}."
 
         with pytest.raises(CoreasonIdentityError, match="Token validation failed"):
@@ -170,30 +171,12 @@ class TestIdentityMapperComplex:
             "groups": None,  # Explicit None
         }
         context = mapper.map_claims(claims)
-        assert context.claims["permissions"] == []
-        assert "project_context" not in context.claims
-
-    def test_mapper_mixed_source_precedence(self) -> None:
-        """
-        Test complex precedence:
-        - project_id_claim (Highest)
-        - groups project: match
-        """
-        mapper = IdentityMapper()
-        claims = {
-            "sub": "u1",
-            "email": "u@e.com",
-            "https://coreason.com/project_id": "EXPLICIT_ID",
-            "groups": ["project:apollo"],
-        }
-        context = mapper.map_claims(claims)
-        # Explicit claim wins
-        assert context.claims["project_context"] == "EXPLICIT_ID"
+        assert context.groups == []
+        # Removed assertions for 'permissions' and 'project_context'
 
     def test_mapper_admin_group_case_insensitive(self) -> None:
         """
         Test 'AdMiN' is rejected due to strict enum validation.
-        Previously it just didn't map to permissions.
         """
         mapper = IdentityMapper()
         claims = {
@@ -201,8 +184,10 @@ class TestIdentityMapperComplex:
             "email": "u@e.com",
             "groups": ["AdMiN"],
         }
-        with pytest.raises(CoreasonIdentityError):
+        with pytest.raises(CoreasonIdentityError, match="UserContext validation failed"):
             mapper.map_claims(claims)
+
+    # Removed test_mapper_mixed_source_precedence as project_id logic is gone
 
 
 class TestDeviceFlowClientComplex:
@@ -259,17 +244,6 @@ class TestDeviceFlowClientComplex:
             assert token.access_token == "at"
 
             # Check sleep calls
-            # Interval starts at 5.
-            # 1. slow_down -> interval becomes 10. sleep(10) (Wait, code logic: interval += 5, then sleep(interval))
-            #    Wait, in previous sync code:
-            #    error == "slow_down" -> interval += 5
-            #    time.sleep(interval)
-            #    So if interval=5, it becomes 10, then sleeps 10.
-
-            # 2. authorization_pending -> interval remains 10. time.sleep(10)
-
-            # 3. Success -> return.
-
             assert mock_sleep.call_count == 2
             args_list = mock_sleep.call_args_list
             # First sleep: after slow_down. interval was 5, became 10.

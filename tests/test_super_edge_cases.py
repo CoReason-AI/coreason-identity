@@ -80,20 +80,6 @@ class TestIdentityMapperSuperEdgeCases:
         context = mapper.map_claims(claims)
         assert context.user_id == ""
 
-    def test_project_id_empty_string(self) -> None:
-        """
-        Verify project_id empty string from claim.
-        """
-        mapper = IdentityMapper()
-        claims = {
-            "sub": "u1",
-            "email": "u@e.com",
-            "https://coreason.com/project_id": "",  # Empty string
-        }
-        context = mapper.map_claims(claims)
-        # Empty string should be passed through if it exists
-        assert context.claims["project_context"] == ""
-
 
 class TestDeviceFlowSuperEdgeCases:
     @pytest.fixture
