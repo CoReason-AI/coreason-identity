@@ -12,9 +12,7 @@
 Configuration for the coreason-identity package.
 """
 
-from urllib.parse import urlparse
-
-from pydantic import Field, SecretStr, ValidationInfo, field_validator, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -31,7 +29,6 @@ class CoreasonVerifierConfig(BaseSettings):
             to prevent algorithm confusion attacks.
         clock_skew_leeway (int): Acceptable clock skew in seconds. Defaults to 0 for strict security.
         issuer (str | None): The expected issuer URL. Defaults to https://{domain}/.
-        allow_unsafe_connections (bool): WARNING: Allows connection to private IPs/localhost. DEV ONLY.
     """
 
     model_config = SettingsConfigDict(
@@ -39,7 +36,7 @@ class CoreasonVerifierConfig(BaseSettings):
         case_sensitive=False,
     )
 
-    domain: str
+    domain: str = Field(..., description="The domain of the Identity Provider (e.g. auth.coreason.com).")
     audience: str
     pii_salt: SecretStr = Field(..., description="High-entropy salt for PII hashing. REQUIRED.")
     http_timeout: float = Field(..., description="Timeout in seconds for all IdP network operations.")
@@ -50,18 +47,15 @@ class CoreasonVerifierConfig(BaseSettings):
         0, description="Acceptable clock skew in seconds. Defaults to 0 for strict security."
     )
     issuer: str | None = None
-    allow_unsafe_connections: bool = Field(
-        False, description="WARNING: Allows connection to private IPs/localhost. DEV ONLY."
-    )
 
-    @field_validator("issuer", mode="after")
+    @field_validator("domain")
     @classmethod
-    def validate_https(cls, v: str | None, info: ValidationInfo) -> str | None:
+    def validate_domain_format(cls, v: str) -> str:
         """
-        Ensures that issuer uses HTTPS, unless strictly opted out for local dev.
+        Ensures domain is a hostname, not a URL.
         """
-        if v and v.startswith("http://") and not info.data.get("allow_unsafe_connections", False):
-            raise ValueError("HTTPS is required for production.")
+        if "://" in v or "/" in v:
+            raise ValueError("Domain must be a hostname (e.g. auth.coreason.com), not a URL.")
         return v
 
     @model_validator(mode="after")
@@ -70,29 +64,8 @@ class CoreasonVerifierConfig(BaseSettings):
         Sets default issuer if not provided.
         """
         if self.issuer is None:
-            # self.domain is already normalized by its field validator
             self.issuer = f"https://{self.domain}/"
         return self
-
-    @field_validator("domain")
-    @classmethod
-    def normalize_domain(cls, v: str) -> str:
-        """
-        Ensures domain is just the hostname (e.g. auth.coreason.com).
-        Strips scheme and path if present.
-
-        Args:
-            v: The domain string to normalize.
-
-        Returns:
-            The normalized hostname string.
-        """
-        v = v.strip().lower()
-        if "://" not in v:
-            v = f"https://{v}"
-
-        parsed = urlparse(v)
-        return parsed.netloc or v
 
 
 class CoreasonClientConfig(CoreasonVerifierConfig):

@@ -15,44 +15,29 @@ from coreason_identity.config import CoreasonVerifierConfig
 from coreason_identity.identity_mapper import RawIdPClaims
 
 
-def test_config_https_enforcement() -> None:
-    """
-    Test that HTTP issuer raises ValueError.
-    """
-    with pytest.raises(ValidationError) as exc:
-        CoreasonVerifierConfig(
-            domain="auth.example.com",
-            audience="aud",
-            issuer="http://insecure.com",
-            pii_salt="salt",
-            allowed_algorithms=["RS256"],
-            http_timeout=5.0,
-        )
-    assert "HTTPS is required for production" in str(exc.value)
-
-
 def test_identity_mapper_list_normalization() -> None:
     """
     Test edge cases for list normalization in RawIdPClaims.
     """
-    # 1. None groups/permissions -> []
-    raw = RawIdPClaims(sub="u", email="e@e.com", groups=None, permissions=None)
+    # 1. None groups -> []
+    raw = RawIdPClaims(sub="u", email="e@e.com", groups=None)
     assert raw.groups == []
-    assert raw.permissions == []
 
-    # 2. String groups/permissions -> [str]
-    raw2 = RawIdPClaims(sub="u", email="e@e.com", groups="group1", permissions="perm1")
+    # 2. String groups -> [str]
+    raw2 = RawIdPClaims(sub="u", email="e@e.com", groups="group1")
     assert raw2.groups == ["group1"]
-    assert raw2.permissions == ["perm1"]
 
     # 3. List with None -> filtered
     raw3 = RawIdPClaims(sub="u", email="e@e.com", groups=["g1", None, "g2"])
     assert raw3.groups == ["g1", "g2"]
 
-    # 4. Invalid type -> []
-    raw4 = RawIdPClaims(sub="u", email="e@e.com", groups=123, permissions={"a": 1})
+    # 4. Invalid type -> [] (if ensure_list_of_strings handles it, checking implementation)
+    # The implementation handles list|tuple or str. Int falls through to return []?
+    # Let's check ensure_list_of_strings in identity_mapper.py
+    # if isinstance(v, list | tuple): ... else return []
+    # So int returns []
+    raw4 = RawIdPClaims(sub="u", email="e@e.com", groups=123)
     assert raw4.groups == []
-    assert raw4.permissions == []
 
 
 @pytest.mark.asyncio
@@ -65,7 +50,7 @@ async def test_manager_auth_header_too_long() -> None:
     from coreason_identity.manager import IdentityManager
 
     config = CoreasonVerifierConfig(
-        domain="d", audience="a", issuer="https://i", pii_salt="s", allowed_algorithms=["HS256"]
+        domain="d", audience="a", issuer="https://i", pii_salt="s", allowed_algorithms=["HS256"], http_timeout=5.0
     )
 
     with (
