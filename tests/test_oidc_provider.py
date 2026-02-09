@@ -10,6 +10,7 @@
 
 import asyncio
 import time
+from collections.abc import Generator
 from unittest.mock import AsyncMock, patch
 
 import httpx
@@ -23,9 +24,6 @@ from coreason_identity.oidc_provider import OIDCProvider
 @pytest.fixture
 def mock_client() -> AsyncMock:
     return AsyncMock(spec=httpx.AsyncClient)
-
-
-from collections.abc import Generator
 
 
 @pytest.fixture
