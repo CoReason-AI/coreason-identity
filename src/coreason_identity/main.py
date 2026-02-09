@@ -38,6 +38,9 @@ async def main_async() -> None:  # pragma: no cover
             domain="auth.example.com",  # Replace with real domain for live test
             audience="api://coreason",
             client_id="demo-client-id",
+            pii_salt="salt",
+            http_timeout=30.0,
+            allowed_algorithms=["RS256"],
         )
     except Exception as e:
         print(f"Configuration Error: {e}")
@@ -66,7 +69,6 @@ async def main_async() -> None:  # pragma: no cover
                     print(f"Email:   {user.email}")
                     print(f"Groups:  {user.groups}")
                     print(f"Scopes:  {user.scopes}")
-                    print(f"Claims:  {user.claims}")
                 except CoreasonIdentityError as e:
                     print(f"\nFAILURE: Validation Failed - {e}")
 

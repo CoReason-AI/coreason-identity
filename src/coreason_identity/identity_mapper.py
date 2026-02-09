@@ -12,7 +12,6 @@
 IdentityMapper component for mapping IdP claims to internal UserContext.
 """
 
-import re
 from typing import Any
 
 from pydantic import BaseModel, EmailStr, Field, SecretStr, ValidationError, field_validator
@@ -30,26 +29,20 @@ class RawIdPClaims(BaseModel):
     Attributes:
         sub (str): The subject (user ID) from the IdP.
         email (EmailStr): The user's email address.
-        project_id_claim (str | None): Custom claim for project ID.
         groups (list[str]): List of groups the user belongs to.
-        permissions (list[str]): List of permissions granted to the user.
         scope (str | None): The raw scope string (standard OAuth2 claim).
     """
 
     sub: str
     email: EmailStr
 
-    # Optional raw fields
-    project_id_claim: str | None = Field(default=None, alias="https://coreason.com/project_id")
-
     # Normalized lists from standard keys
     groups: list[str] = Field(default_factory=list)
-    permissions: list[str] = Field(default_factory=list)
 
     # Standard OAuth2 claim is 'scope' (string space-delimited)
     scope: str | None = None
 
-    @field_validator("groups", "permissions", mode="before")
+    @field_validator("groups", mode="before")
     @classmethod
     def ensure_list_of_strings(cls, v: Any) -> list[str]:
         """Ensures the value is a list of strings, filtering out None values."""
@@ -95,46 +88,19 @@ class IdentityMapper:
             sub = raw_claims.sub
             email = raw_claims.email
             groups = raw_claims.groups
-            permissions = raw_claims.permissions
 
             # Parse scopes from standard 'scope' claim
             scopes = raw_claims.scope.split() if raw_claims.scope else []
 
-            # 3. Resolve Project Context
-            # Priority: https://coreason.com/project_id -> group pattern "project:<id>"
-            project_context = raw_claims.project_id_claim
-
-            if not project_context:
-                for group in groups:
-                    # Use regex for robust case-insensitive matching and extraction
-                    match = re.match(r"^project:\s*(.*)", group, re.IGNORECASE)
-                    if match:
-                        possible_id = match.group(1).strip()
-                        if possible_id:
-                            project_context = possible_id
-                            break
-
-            # 4. Resolve Permissions
-            # Priority: explicit 'permissions' claim (already parsed)
-            # No fallback logic to "admin" group for security reasons (avoid implicit privilege escalation)
-
-            # 5. Construct Extended Claims
-            # We preserve all original claims and add derived ones for convenience if not present
-            extended_claims = claims.copy()
-            if project_context is not None:
-                extended_claims["project_context"] = project_context
-
-            # Always ensure permissions is a list
-            extended_claims["permissions"] = permissions
-
-            # 6. Construct UserContext
+            # 3. Construct UserContext
+            # Note: Pydantic validation in UserContext will enforce strict Enum values for groups/scopes.
+            # Any invalid value will raise ValidationError, caught below.
             user_context = UserContext(
                 user_id=sub,
                 email=email,
                 groups=groups,
                 scopes=scopes,
                 downstream_token=SecretStr(token) if token else None,
-                claims=extended_claims,
             )
 
             logger.debug(f"Mapped identity for user {sub}")
@@ -144,5 +110,11 @@ class IdentityMapper:
             # Catch unexpected exceptions (InvalidTokenError raised above bypasses this)
             if isinstance(e, CoreasonIdentityError):
                 raise
+            # Specifically catch ValidationError from UserContext instantiation
+            if isinstance(e, ValidationError):
+                # This happens if groups or scopes contain invalid values not in Enums
+                logger.error(f"UserContext validation failed due to invalid claims: {e}")
+                raise CoreasonIdentityError(f"UserContext validation failed: {e}") from e
+
             logger.exception("Unexpected error during identity mapping")
             raise CoreasonIdentityError(f"Identity mapping error: {e}") from e
