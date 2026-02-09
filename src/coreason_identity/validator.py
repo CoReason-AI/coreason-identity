@@ -88,7 +88,7 @@ class TokenValidator:
             value: The value to anonymize.
 
         Returns:
-            The anonymized hex digest.
+            str: The anonymized hex digest.
         """
         return hmac.new(
             self.pii_salt.get_secret_value().encode("utf-8"),
@@ -100,17 +100,20 @@ class TokenValidator:
         """
         Validates the JWT signature and claims.
 
+        Emits an OpenTelemetry span `validate_token`.
+        Sets attribute `user.id` (anonymized) on success.
+
         Args:
             token: The raw Bearer token string.
 
         Returns:
-            The validated claims dictionary.
+            dict[str, Any]: The validated claims dictionary.
 
         Raises:
             TokenExpiredError: If the token has expired.
             InvalidAudienceError: If the audience is invalid.
-            SignatureVerificationError: If the signature is invalid.
-            InvalidTokenError: If claims are missing or invalid.
+            SignatureVerificationError: If the signature is invalid or key is missing.
+            InvalidTokenError: If claims are missing or invalid, or for general JOSE errors.
             CoreasonIdentityError: For unexpected errors.
         """
         with tracer.start_as_current_span("validate_token") as span:

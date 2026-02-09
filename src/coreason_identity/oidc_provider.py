@@ -63,13 +63,16 @@ class OIDCProvider:
     async def _fetch_oidc_config(self) -> OIDCConfig:
         """
         Fetches the OIDC configuration to find the jwks_uri.
+
+        Retries on `httpx.HTTPError` up to 3 times with exponential backoff (initial=0.1s, max=1.0s).
+
         Uses manual HTTP (Authlib AsyncOAuth2Client has limited metadata support) but strict Pydantic validation.
 
         Returns:
-            The OIDC configuration object.
+            OIDCConfig: The OIDC configuration object.
 
         Raises:
-            CoreasonIdentityError: If the request fails or returns invalid data.
+            CoreasonIdentityError: If the request fails after retries or returns invalid data.
         """
         try:
             response = await self.client.get(self.discovery_url)
@@ -85,14 +88,16 @@ class OIDCProvider:
         """
         Fetches the JWKS from the given URI.
 
+        Retries on `httpx.HTTPError` up to 3 times with exponential backoff (initial=0.1s, max=1.0s).
+
         Args:
             jwks_uri: The URI to fetch JWKS from.
 
         Returns:
-            The JWKS dictionary.
+            dict[str, Any]: The JWKS dictionary.
 
         Raises:
-            CoreasonIdentityError: If the request fails.
+            CoreasonIdentityError: If the request fails after retries.
         """
         try:
             response = await self.client.get(jwks_uri)
@@ -145,7 +150,7 @@ class OIDCProvider:
             force_refresh: If True, bypasses the cache and fetches fresh keys.
 
         Returns:
-            The JWKS dictionary.
+            dict[str, Any]: The JWKS dictionary.
 
         Raises:
             CoreasonIdentityError: If fetching fails.
@@ -179,7 +184,7 @@ class OIDCProvider:
         Refreshes configuration if not cached or expired (via get_jwks).
 
         Returns:
-            The issuer string.
+            str: The issuer string.
 
         Raises:
             CoreasonIdentityError: If configuration is invalid or fetching fails.
