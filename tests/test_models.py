@@ -38,7 +38,7 @@ def test_user_context_rejects_invalid_enums() -> None:
         UserContext(
             user_id="user123",
             email="test@example.com",
-            groups=["hacker_group"],  # type: ignore
+            groups=["hacker_group"],
         )
     assert "Input should be 'admin', 'developer' or 'project:apollo'" in str(excinfo.value)
 
@@ -47,7 +47,7 @@ def test_user_context_rejects_invalid_enums() -> None:
         UserContext(
             user_id="user123",
             email="test@example.com",
-            scopes=["invalid_scope"],  # type: ignore
+            scopes=["invalid_scope"],
         )
     assert "Input should be 'openid', 'profile', 'email' or 'read:reports'" in str(excinfo.value)
 

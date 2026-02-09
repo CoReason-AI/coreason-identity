@@ -1,4 +1,3 @@
-
 from pydantic import SecretStr
 
 from coreason_identity.models import CoreasonGroup, CoreasonScope, UserContext
