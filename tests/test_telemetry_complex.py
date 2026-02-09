@@ -155,7 +155,7 @@ async def test_telemetry_unicode_user_id(
     # Check attribute
     assert span.attributes is not None
     expected_hash = hmac.new(b"test-salt", user_id.encode("utf-8"), hashlib.sha256).hexdigest()
-    assert span.attributes["user.id"] == expected_hash
+    assert span.attributes["enduser.id"] == expected_hash
 
     # Check log hash
     assert any(f"Token validated for user {expected_hash}" in record.record["message"] for record in logs)

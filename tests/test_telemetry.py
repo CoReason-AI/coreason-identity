@@ -91,7 +91,7 @@ async def test_validate_token_success_telemetry(
     # The attributes might be None if empty, but we set it, so it should be a BoundedAttributes
     assert span.attributes is not None
     expected_hash = hmac.new(b"test-salt", b"user123", hashlib.sha256).hexdigest()
-    assert span.attributes["user.id"] == expected_hash
+    assert span.attributes["enduser.id"] == expected_hash
 
 
 @pytest.mark.asyncio

@@ -160,7 +160,7 @@ class TokenValidator:
                 logger.info(f"Token validated for user {user_hash}")
 
                 # Set span attributes
-                span.set_attribute("user.id", user_hash)
+                span.set_attribute("enduser.id", user_hash)
                 span.set_status(Status(StatusCode.OK))
 
                 return payload

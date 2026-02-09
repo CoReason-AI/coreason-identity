@@ -78,7 +78,7 @@ class TestPiiSecurity:
         Test Case 2 (Telemetry Protection):
         - Mock the trace.get_tracer or check the span attributes.
         - Call validate_token.
-        - Assert that the span attribute "user.id" contains the hashed value, not the raw ID.
+        - Assert that the span attribute "enduser.id" contains the hashed value, not the raw ID.
         """
         salt = "test-salt"
         validator = TokenValidator(
@@ -113,8 +113,8 @@ class TestPiiSecurity:
             expected_anonymized = hmac.new(salt.encode("utf-8"), user_id.encode("utf-8"), hashlib.sha256).hexdigest()
 
             # Verify set_attribute was called with the anonymized ID
-            mock_span.set_attribute.assert_any_call("user.id", expected_anonymized)
+            mock_span.set_attribute.assert_any_call("enduser.id", expected_anonymized)
 
             # Verify raw ID was NOT used
             with pytest.raises(AssertionError):
-                mock_span.set_attribute.assert_any_call("user.id", user_id)
+                mock_span.set_attribute.assert_any_call("enduser.id", user_id)
