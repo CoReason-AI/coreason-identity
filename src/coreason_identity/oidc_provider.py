@@ -17,6 +17,7 @@ from typing import Any
 
 import anyio
 import httpx
+import stamina
 from pydantic import ValidationError
 
 from coreason_identity.exceptions import CoreasonIdentityError
@@ -58,6 +59,7 @@ class OIDCProvider:
         self._last_update: float = 0.0
         self._lock: anyio.Lock | None = None
 
+    @stamina.retry(on=httpx.HTTPError, attempts=3, wait_initial=0.1, wait_max=1.0)
     async def _fetch_oidc_config(self) -> OIDCConfig:
         """
         Fetches the OIDC configuration to find the jwks_uri.
@@ -78,6 +80,7 @@ class OIDCProvider:
         except ValidationError as e:
             raise CoreasonIdentityError(f"Invalid OIDC configuration from {self.discovery_url}: {e}") from e
 
+    @stamina.retry(on=httpx.HTTPError, attempts=3, wait_initial=0.1, wait_max=1.0)
     async def _fetch_jwks(self, jwks_uri: str) -> dict[str, Any]:
         """
         Fetches the JWKS from the given URI.

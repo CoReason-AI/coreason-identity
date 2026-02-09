@@ -88,8 +88,10 @@ async def test_async_manager_external_client_no_cleanup() -> None:
     config = CoreasonClientConfig(domain="test.auth0.com", audience="aud", client_id="cid")
     external_client = AsyncMock(spec=httpx.AsyncClient)
 
-    async with IdentityManagerAsync(config, client=external_client) as mgr:
-        assert mgr._internal_client is False
-        assert mgr._client == external_client
+    # Patch instrumentation to avoid needing internal attributes on the mock client
+    with patch("coreason_identity.manager.HTTPXClientInstrumentor"):
+        async with IdentityManagerAsync(config, client=external_client) as mgr:
+            assert mgr._internal_client is False
+            assert mgr._client == external_client
 
     external_client.aclose.assert_not_awaited()
