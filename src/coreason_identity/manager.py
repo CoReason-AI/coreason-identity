@@ -68,6 +68,10 @@ class IdentityManager:
         self.oidc_provider = OIDCProvider(discovery_url, self._client)
 
         # Initialize TokenValidator with strict issuer from config
+        # Pydantic validator guarantees issuer is populated, but we assert for MyPy
+        if self.config.issuer is None:
+            raise CoreasonIdentityError("Issuer configuration is missing")
+
         self.validator = TokenValidator(
             oidc_provider=self.oidc_provider,
             audience=self.config.audience,
