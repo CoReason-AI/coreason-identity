@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import os
 import sys
 
@@ -6,11 +7,13 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
 from anyio import create_task_group
-from coreason_identity.manager import IdentityManagerAsync
-from coreason_identity.config import CoreasonVerifierConfig
 from pydantic import SecretStr
 
-async def main():
+from coreason_identity.config import CoreasonVerifierConfig
+from coreason_identity.manager import IdentityManagerAsync
+
+
+async def main() -> None:
     """
     Demonstrates Async OIDC Discovery using the modernized stack.
     Includes:
@@ -28,7 +31,7 @@ async def main():
         pii_salt=SecretStr("super-secret-salt-for-pii-hashing"),
         http_timeout=5.0,
         allowed_algorithms=["RS256"],
-        unsafe_local_dev=True # Enabled for example to allow 'example.com' if needed
+        unsafe_local_dev=True,  # Enabled for example to allow 'example.com' if needed
     )
 
     # Initialize the Manager (Async Context Manager)
@@ -56,9 +59,8 @@ async def main():
 
         print(">>> Concurrent tasks finished.")
 
+
 if __name__ == "__main__":
     # Use anyio.run or asyncio.run
-    try:
+    with contextlib.suppress(KeyboardInterrupt):
         asyncio.run(main())
-    except KeyboardInterrupt:
-        pass
