@@ -137,7 +137,7 @@ async def test_start_device_login_custom_scope(manager: IdentityManager) -> None
 
 @pytest.mark.asyncio
 async def test_start_device_login_recreation(manager: IdentityManager) -> None:
-    """Test that calling start_device_login twice recreates the client."""
+    """Test that calling start_device_login twice does NOT recreate the client (reusable)."""
     with patch("coreason_identity.manager.DeviceFlowClient") as MockClient:
         mock_client_instance = MockClient.return_value
         mock_client_instance.initiate_flow = AsyncMock()
@@ -148,15 +148,8 @@ async def test_start_device_login_recreation(manager: IdentityManager) -> None:
 
         # Second call
         await manager.start_device_login(scope="read:reports")
-        assert MockClient.call_count == 2
-
-        # Verify the second call used the new scope
-        MockClient.assert_called_with(
-            client_id=MOCK_CLIENT_ID,
-            idp_url=f"https://{MOCK_DOMAIN}",
-            client=manager._client,
-            scope="read:reports",
-        )
+        # Should NOT recreate per instructions "assume the client is reusable"
+        assert MockClient.call_count == 1
 
 
 @pytest.mark.asyncio
@@ -271,7 +264,7 @@ def test_init_missing_issuer_raises_error() -> None:
     config.issuer = None  # Force None
     config.audience = "aud"
     config.http_timeout = 5.0
-    config.allow_unsafe_connections = False
+    # allow_unsafe_connections removed
 
     with pytest.raises(CoreasonIdentityError, match="Issuer configuration is missing"):
         IdentityManager(config)
@@ -279,6 +272,6 @@ def test_init_missing_issuer_raises_error() -> None:
 
 @pytest.mark.asyncio
 async def test_start_device_login_no_scope_raises_error(manager: IdentityManager) -> None:
-    """Test that start_device_login raises ValueError if scope is not provided."""
+    """Test that start_device_login raises ValueError if scope is empty string."""
     with pytest.raises(ValueError, match="Scope must be explicitly provided"):
-        await manager.start_device_login()
+        await manager.start_device_login(scope="")

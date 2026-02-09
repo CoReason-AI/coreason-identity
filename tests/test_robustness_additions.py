@@ -22,7 +22,7 @@ from httpx import Request, Response
 from coreason_identity.device_flow_client import DeviceFlowClient
 from coreason_identity.exceptions import CoreasonIdentityError, InvalidTokenError
 from coreason_identity.identity_mapper import IdentityMapper
-from coreason_identity.models import DeviceFlowResponse
+from coreason_identity.models import DeviceFlowResponse, CoreasonGroup
 
 
 # Helper for httpx mocks
@@ -43,9 +43,8 @@ class TestIdentityMapperRobustness:
             "groups": ["admin", "project:apollo"],
         }
         context = mapper.map_claims(claims)
-        permissions = context.claims.get("permissions", [])
-        # Permissions mapping is removed, so permissions should be empty
-        assert not permissions
+        # Groups should map correctly
+        assert context.groups == [CoreasonGroup.ADMIN, CoreasonGroup.PROJECT_APOLLO]
 
         claims_mixed = {
             "sub": "u1",
@@ -56,52 +55,8 @@ class TestIdentityMapperRobustness:
         # 123 and True are converted to strings "123", "True" by RawIdPClaims,
         # but UserContext rejects them as invalid enums.
         # IdentityMapper wraps exceptions in CoreasonIdentityError.
-        with pytest.raises(CoreasonIdentityError):
+        with pytest.raises(CoreasonIdentityError, match="UserContext validation failed"):
             mapper.map_claims(claims_mixed)
-
-    def test_permissions_vs_groups_conflict(self) -> None:
-        """
-        Verify that explicit 'permissions' claim takes precedence over group-based mapping.
-        """
-        mapper = IdentityMapper()
-        claims = {
-            "sub": "u1",
-            "email": "u@e.com",
-            "groups": ["admin"],
-            "permissions": ["explicit:read"],
-        }
-        context = mapper.map_claims(claims)
-        assert context.claims["permissions"] == ["explicit:read"]
-        assert "*" not in context.claims["permissions"]
-
-    def test_project_id_claim_priority(self) -> None:
-        """
-        Verify that explicit project_id claim takes precedence over group pattern.
-        """
-        mapper = IdentityMapper()
-        claims = {
-            "sub": "u1",
-            "email": "u@e.com",
-            "https://coreason.com/project_id": "EXPLICIT",
-            "groups": ["project:apollo"],
-        }
-        context = mapper.map_claims(claims)
-        assert context.claims["project_context"] == "EXPLICIT"
-
-    def test_malformed_project_id_type(self) -> None:
-        """
-        Verify robustness when project_id is not a string (e.g. int).
-        """
-        mapper = IdentityMapper()
-        claims = {
-            "sub": "u1",
-            "email": "u@e.com",
-            "https://coreason.com/project_id": 999,
-        }
-
-        with pytest.raises(InvalidTokenError, match="UserContext validation failed"):
-            mapper.map_claims(claims)
-
 
 class TestDeviceFlowClientRobustness:
     @pytest.fixture

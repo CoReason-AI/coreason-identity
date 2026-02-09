@@ -164,19 +164,8 @@ class OIDCProvider:
             if self._jwks_cache is not None and (current_time - self._last_update) < self.cache_ttl:
                 return self._jwks_cache
 
-        # Robust Locking:
-        # If the lock belongs to a different loop (e.g. OIDCProvider reused across anyio.run calls),
-        # acquiring it will raise RuntimeError. We must catch this and recreate the lock.
-        try:
-            async with self._lock:
-                return await self._refresh_jwks_critical_section(force_refresh)
-        except RuntimeError as e:  # pragma: no cover
-            if "attached to a different loop" in str(e):
-                logger.warning(f"OIDCProvider lock loop mismatch detected ('{e}'). Recreating lock for current loop.")
-                self._lock = anyio.Lock()
-                async with self._lock:
-                    return await self._refresh_jwks_critical_section(force_refresh)
-            raise
+        async with self._lock:
+            return await self._refresh_jwks_critical_section(force_refresh)
 
     async def get_issuer(self) -> str:
         """

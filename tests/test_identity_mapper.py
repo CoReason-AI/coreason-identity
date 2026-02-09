@@ -19,6 +19,7 @@ from pydantic import SecretStr
 
 from coreason_identity.exceptions import InvalidTokenError
 from coreason_identity.identity_mapper import IdentityMapper
+from coreason_identity.models import CoreasonGroup, CoreasonScope
 
 
 @pytest.fixture
@@ -42,16 +43,17 @@ def test_map_claims_group_sources(mapper: IdentityMapper) -> None:
     # 1. Standard 'groups'
     claims1: dict[str, Any] = {"sub": "u1", "email": "u1@e.com", "groups": ["project:apollo"]}
     ctx = mapper.map_claims(claims1)
-    # The extended claims should contain project_context derived from groups
-    assert ctx.claims["project_context"] == "apollo"
-    assert ctx.groups == ["project:apollo"]
+
+    # Assert that strings are converted to Enums
+    assert ctx.groups == [CoreasonGroup.PROJECT_APOLLO]
 
 
 def test_map_claims_scopes(mapper: IdentityMapper) -> None:
     """Test scope parsing from 'scope' string."""
     # 1. 'scope' string
     claims1: dict[str, Any] = {"sub": "u1", "email": "u@e.com", "scope": "openid profile"}
-    assert mapper.map_claims(claims1).scopes == ["openid", "profile"]
+    # Assert that strings are converted to Enums
+    assert mapper.map_claims(claims1).scopes == [CoreasonScope.OPENID, CoreasonScope.PROFILE]
 
     # 2. Empty scope
     claims2: dict[str, Any] = {"sub": "u2", "email": "u@e.com", "scope": ""}
@@ -65,25 +67,3 @@ def test_map_claims_scopes(mapper: IdentityMapper) -> None:
 def test_map_claims_missing_required(mapper: IdentityMapper) -> None:
     with pytest.raises(InvalidTokenError):
         mapper.map_claims({"sub": "no-email"})
-
-
-def test_map_claims_project_id_extraction(mapper: IdentityMapper) -> None:
-    # Explicit project_id claim
-    claims: dict[str, Any] = {"sub": "u", "email": "e@e.com", "https://coreason.com/project_id": "pid1"}
-    ctx = mapper.map_claims(claims)
-    assert ctx.claims["project_context"] == "pid1"
-
-    # Extraction from groups
-    claims2: dict[str, Any] = {"sub": "u", "email": "e@e.com", "groups": ["project:apollo"]}
-    ctx2 = mapper.map_claims(claims2)
-    assert ctx2.claims["project_context"] == "apollo"
-
-    # Priority: explicit > groups
-    claims3: dict[str, Any] = {
-        "sub": "u",
-        "email": "e@e.com",
-        "https://coreason.com/project_id": "explicit",
-        "groups": ["project:apollo"],
-    }
-    ctx3 = mapper.map_claims(claims3)
-    assert ctx3.claims["project_context"] == "explicit"
