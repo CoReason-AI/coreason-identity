@@ -90,9 +90,11 @@ async def test_fetch_oidc_config_error(provider: OIDCProvider, mock_client: Asyn
     mock_client.get.side_effect = httpx.HTTPError("Network error")
 
     # Patch sleep to avoid waiting during retries
-    with patch("anyio.sleep", new_callable=AsyncMock):
-        with pytest.raises(CoreasonIdentityError, match="Failed to fetch OIDC configuration"):
-            await provider.get_jwks()
+    with (
+        patch("anyio.sleep", new_callable=AsyncMock),
+        pytest.raises(CoreasonIdentityError, match="Failed to fetch OIDC configuration"),
+    ):
+        await provider.get_jwks()
 
 
 @pytest.mark.asyncio
@@ -113,9 +115,11 @@ async def test_fetch_jwks_error(provider: OIDCProvider, mock_client: AsyncMock) 
         httpx.HTTPError("Network error 3"),
     ]
 
-    with patch("anyio.sleep", new_callable=AsyncMock):
-        with pytest.raises(CoreasonIdentityError, match="Failed to fetch JWKS"):
-            await provider.get_jwks()
+    with (
+        patch("anyio.sleep", new_callable=AsyncMock),
+        pytest.raises(CoreasonIdentityError, match="Failed to fetch JWKS"),
+    ):
+        await provider.get_jwks()
 
 
 @pytest.mark.asyncio

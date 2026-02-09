@@ -11,7 +11,6 @@
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from pydantic import SecretStr
 
 from coreason_identity.config import CoreasonClientConfig
 from coreason_identity.device_flow_client import DeviceFlowClient

@@ -138,7 +138,7 @@ class TokenValidator:
 
                 def _decode(jwks_data: dict[str, Any], opts: dict[str, Any]) -> Any:
                     # Cast self.jwt to Any to bypass MyPy overload confusion or missing stubs
-                    jwt_any = cast(Any, self.jwt)
+                    jwt_any = cast("Any", self.jwt)
                     claims = jwt_any.decode(token, jwks_data, claims_options=opts)
                     claims.validate(leeway=self.leeway)
                     return claims
