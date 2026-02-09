@@ -87,7 +87,7 @@ class OIDCProvider:
                         f"Failed to fetch OIDC configuration from {self.discovery_url}: {e}"
                     ) from e
 
-                sleep_time = min(wait_initial * (2 ** attempt), wait_max)
+                sleep_time = min(wait_initial * (2**attempt), wait_max)
                 await anyio.sleep(sleep_time)
             except ValidationError as e:
                 # Validation error is fatal, do not retry
@@ -125,7 +125,7 @@ class OIDCProvider:
                 if attempt == attempts - 1:
                     raise CoreasonIdentityError(f"Failed to fetch JWKS from {jwks_uri}: {e}") from e
 
-                sleep_time = min(wait_initial * (2 ** attempt), wait_max)
+                sleep_time = min(wait_initial * (2**attempt), wait_max)
                 await anyio.sleep(sleep_time)
 
         raise CoreasonIdentityError(f"Failed to fetch JWKS from {jwks_uri}")  # pragma: no cover
