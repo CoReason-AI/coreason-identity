@@ -9,7 +9,6 @@
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
 import pytest
-from pydantic import ValidationError
 
 from coreason_identity.config import CoreasonVerifierConfig
 from coreason_identity.identity_mapper import RawIdPClaims
@@ -45,7 +44,6 @@ async def test_manager_auth_header_too_long() -> None:
     """Test rejection of overly long auth header."""
     from unittest.mock import patch
 
-    from coreason_identity.config import CoreasonVerifierConfig
     from coreason_identity.exceptions import InvalidTokenError
     from coreason_identity.manager import IdentityManager
 

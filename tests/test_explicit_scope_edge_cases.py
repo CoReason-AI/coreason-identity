@@ -8,12 +8,12 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
-import pytest
 from unittest.mock import AsyncMock, patch
 
+import pytest
 from pydantic import SecretStr
 
-from coreason_identity.config import CoreasonClientConfig, CoreasonVerifierConfig
+from coreason_identity.config import CoreasonClientConfig
 from coreason_identity.device_flow_client import DeviceFlowClient
 from coreason_identity.manager import IdentityManager
 from coreason_identity.models import DeviceFlowResponse

@@ -1,8 +1,7 @@
-from typing import Any
 
 from pydantic import SecretStr
 
-from coreason_identity.models import UserContext, CoreasonGroup, CoreasonScope
+from coreason_identity.models import CoreasonGroup, CoreasonScope, UserContext
 
 
 def test_user_context_repr_security() -> None:

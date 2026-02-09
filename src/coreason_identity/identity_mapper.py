@@ -98,8 +98,8 @@ class IdentityMapper:
             user_context = UserContext(
                 user_id=sub,
                 email=email,
-                groups=groups,  # type: ignore[arg-type] # Pydantic coerces str to Enum
-                scopes=scopes,  # type: ignore[arg-type] # Pydantic coerces str to Enum
+                groups=groups,
+                scopes=scopes,
                 downstream_token=SecretStr(token) if token else None,
             )
 
@@ -112,9 +112,9 @@ class IdentityMapper:
                 raise
             # Specifically catch ValidationError from UserContext instantiation
             if isinstance(e, ValidationError):
-                 # This happens if groups or scopes contain invalid values not in Enums
-                 logger.error(f"UserContext validation failed due to invalid claims: {e}")
-                 raise CoreasonIdentityError(f"UserContext validation failed: {e}") from e
+                # This happens if groups or scopes contain invalid values not in Enums
+                logger.error(f"UserContext validation failed due to invalid claims: {e}")
+                raise CoreasonIdentityError(f"UserContext validation failed: {e}") from e
 
             logger.exception("Unexpected error during identity mapping")
             raise CoreasonIdentityError(f"Identity mapping error: {e}") from e

@@ -20,9 +20,9 @@ import pytest
 from httpx import Request, Response
 
 from coreason_identity.device_flow_client import DeviceFlowClient
-from coreason_identity.exceptions import CoreasonIdentityError, InvalidTokenError
+from coreason_identity.exceptions import CoreasonIdentityError
 from coreason_identity.identity_mapper import IdentityMapper
-from coreason_identity.models import DeviceFlowResponse, CoreasonGroup
+from coreason_identity.models import CoreasonGroup, DeviceFlowResponse
 
 
 # Helper for httpx mocks
@@ -57,6 +57,7 @@ class TestIdentityMapperRobustness:
         # IdentityMapper wraps exceptions in CoreasonIdentityError.
         with pytest.raises(CoreasonIdentityError, match="UserContext validation failed"):
             mapper.map_claims(claims_mixed)
+
 
 class TestDeviceFlowClientRobustness:
     @pytest.fixture

@@ -8,11 +8,11 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, patch
 
 import anyio
 import httpx
+import pytest
 
 from coreason_identity.config import CoreasonVerifierConfig
 from coreason_identity.manager import IdentityManager
@@ -25,7 +25,7 @@ def mock_client() -> AsyncMock:
 
 
 @pytest.mark.asyncio
-async def test_manager_context_cleanup(mock_client: AsyncMock) -> None:
+async def test_manager_context_cleanup() -> None:
     """
     Verify that IdentityManager.__aexit__ closes the client.
     """
@@ -45,8 +45,8 @@ async def test_manager_context_cleanup(mock_client: AsyncMock) -> None:
         patch("coreason_identity.manager.OIDCProvider"),
         patch("coreason_identity.manager.TokenValidator"),
         patch("coreason_identity.manager.IdentityMapper"),
-        patch("coreason_identity.manager.HTTPXClientInstrumentor"), # Patch instrumentor
-        patch("httpx.AsyncClient") as MockHttpxClient, # Patch httpx.AsyncClient constructor
+        patch("coreason_identity.manager.HTTPXClientInstrumentor"),  # Patch instrumentor
+        patch("httpx.AsyncClient") as MockHttpxClient,  # Patch httpx.AsyncClient constructor
     ):
         mock_internal_client = MockHttpxClient.return_value
         mock_internal_client.aclose = AsyncMock()
@@ -75,9 +75,7 @@ async def test_oidc_provider_lock_safety(mock_client: AsyncMock) -> None:
     provider = OIDCProvider("https://idp", mock_client)
 
     # We mock the critical section to verify lock usage
-    with patch.object(
-        provider, "_refresh_jwks_critical_section", new_callable=AsyncMock
-    ) as mock_critical:
+    with patch.object(provider, "_refresh_jwks_critical_section", new_callable=AsyncMock) as mock_critical:
         mock_critical.return_value = {"keys": []}
 
         # Call get_jwks with force_refresh=True to force lock usage
