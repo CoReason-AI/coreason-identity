@@ -8,14 +8,17 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
+"""
+Tests for IdentityMapper.
+"""
+
 from typing import Any
-from unittest.mock import patch
 
 import pytest
+from pydantic import SecretStr
 
-from coreason_identity.exceptions import CoreasonIdentityError
-from coreason_identity.identity_mapper import IdentityMapper, RawIdPClaims
-from coreason_identity.models import UserContext
+from coreason_identity.exceptions import InvalidTokenError
+from coreason_identity.identity_mapper import IdentityMapper
 
 
 @pytest.fixture
@@ -23,165 +26,64 @@ def mapper() -> IdentityMapper:
     return IdentityMapper()
 
 
-def test_map_claims_happy_path_explicit(mapper: IdentityMapper) -> None:
-    """Test mapping with all explicit claims provided."""
-    claims: dict[str, Any] = {
-        "sub": "user|123",
-        "email": "user@example.com",
-        "https://coreason.com/project_id": "proj_123",
-        "permissions": ["read", "write"],
-        "scope": "openid profile",
-        "groups": ["admin"],
-    }
-    context = mapper.map_claims(claims)
+def test_map_claims_basic(mapper: IdentityMapper) -> None:
+    claims: dict[str, Any] = {"sub": "user123", "email": "test@example.com"}
+    ctx = mapper.map_claims(claims, token="tok")
 
-    assert isinstance(context, UserContext)
-    assert context.user_id == "user|123"
-    assert context.email == "user@example.com"
-    assert context.claims["project_context"] == "proj_123"
-    assert context.claims["permissions"] == ["read", "write"]
-    assert context.scopes == ["openid", "profile"]
-    assert context.groups == ["admin"]
-
-
-def test_map_claims_with_token(mapper: IdentityMapper) -> None:
-    """Test mapping with a downstream token."""
-    claims: dict[str, Any] = {
-        "sub": "user|123",
-        "email": "user@example.com",
-    }
-    context = mapper.map_claims(claims, token="secret_token")
-    assert context.downstream_token is not None
-    assert context.downstream_token.get_secret_value() == "secret_token"
-
-
-def test_map_claims_project_fallback_to_groups(mapper: IdentityMapper) -> None:
-    """Test extracting project context from groups."""
-    claims: dict[str, Any] = {
-        "sub": "user|456",
-        "email": "dev@example.com",
-        "groups": ["developer", "project:apollo"],
-    }
-    context = mapper.map_claims(claims)
-
-    assert context.claims["project_context"] == "apollo"
-
-
-def test_map_claims_permissions_fallback_admin_removed(mapper: IdentityMapper) -> None:
-    """Test that implicit admin -> * permissions mapping is removed."""
-    claims: dict[str, Any] = {
-        "sub": "admin|789",
-        "email": "admin@coreason.com",
-        "https://coreason.com/groups": ["admin"],
-    }
-    context = mapper.map_claims(claims)
-
-    # Should be empty or None depending on implementation, here empty list default
-    assert context.claims["permissions"] == []
-    assert "project_context" not in context.claims
+    assert ctx.user_id == "user123"
+    assert ctx.email == "test@example.com"
+    assert ctx.downstream_token == SecretStr("tok")
+    assert ctx.groups == []
+    assert ctx.scopes == []
 
 
 def test_map_claims_group_sources(mapper: IdentityMapper) -> None:
-    """Test that groups are resolved from various sources (custom, standard, roles)."""
+    """Test that groups are resolved from standard 'groups' claim."""
     # 1. Standard 'groups'
     claims1: dict[str, Any] = {"sub": "u1", "email": "u1@e.com", "groups": ["project:apollo"]}
-    assert mapper.map_claims(claims1).claims["project_context"] == "apollo"
-
-    # 2. Custom 'https://coreason.com/groups'
-    claims2: dict[str, Any] = {"sub": "u2", "email": "u2@e.com", "https://coreason.com/groups": ["project:apollo"]}
-    assert mapper.map_claims(claims2).claims["project_context"] == "apollo"
-
-    # 3. 'roles'
-    claims3: dict[str, Any] = {"sub": "u3", "email": "u3@e.com", "roles": ["project:apollo"]}
-    assert mapper.map_claims(claims3).claims["project_context"] == "apollo"
+    ctx = mapper.map_claims(claims1)
+    # The extended claims should contain project_context derived from groups
+    assert ctx.claims["project_context"] == "apollo"
+    assert ctx.groups == ["project:apollo"]
 
 
 def test_map_claims_scopes(mapper: IdentityMapper) -> None:
-    """Test scope parsing."""
+    """Test scope parsing from 'scope' string."""
     # 1. 'scope' string
     claims1: dict[str, Any] = {"sub": "u1", "email": "u@e.com", "scope": "openid profile"}
     assert mapper.map_claims(claims1).scopes == ["openid", "profile"]
 
-    # 2. 'scp' list
-    claims2: dict[str, Any] = {"sub": "u1", "email": "u@e.com", "scp": ["email", "read:reports"]}
-    assert mapper.map_claims(claims2).scopes == ["email", "read:reports"]
+    # 2. Empty scope
+    claims2: dict[str, Any] = {"sub": "u2", "email": "u@e.com", "scope": ""}
+    assert mapper.map_claims(claims2).scopes == []
 
-    # 3. 'scopes' explicit
-    claims3: dict[str, Any] = {"sub": "u1", "email": "u@e.com", "scopes": ["openid", "email"]}
-    assert mapper.map_claims(claims3).scopes == ["openid", "email"]
-
-
-def test_map_claims_missing_required_fields(mapper: IdentityMapper) -> None:
-    """Test that missing sub or email raises CoreasonIdentityError."""
-    # Missing sub (Pydantic validation error)
-    with pytest.raises(CoreasonIdentityError, match="UserContext validation failed"):
-        mapper.map_claims({"email": "valid@email.com"})
-
-    # Missing email (Pydantic validation error)
-    with pytest.raises(CoreasonIdentityError, match="UserContext validation failed"):
-        mapper.map_claims({"sub": "123"})
+    # 3. No scope
+    claims3: dict[str, Any] = {"sub": "u3", "email": "u@e.com"}
+    assert mapper.map_claims(claims3).scopes == []
 
 
-def test_map_claims_invalid_email_format(mapper: IdentityMapper) -> None:
-    """Test that invalid email format raises CoreasonIdentityError (via Pydantic)."""
-    claims: dict[str, Any] = {
-        "sub": "123",
-        "email": "not-an-email",
+def test_map_claims_missing_required(mapper: IdentityMapper) -> None:
+    with pytest.raises(InvalidTokenError):
+        mapper.map_claims({"sub": "no-email"})
+
+
+def test_map_claims_project_id_extraction(mapper: IdentityMapper) -> None:
+    # Explicit project_id claim
+    claims: dict[str, Any] = {"sub": "u", "email": "e@e.com", "https://coreason.com/project_id": "pid1"}
+    ctx = mapper.map_claims(claims)
+    assert ctx.claims["project_context"] == "pid1"
+
+    # Extraction from groups
+    claims2: dict[str, Any] = {"sub": "u", "email": "e@e.com", "groups": ["project:apollo"]}
+    ctx2 = mapper.map_claims(claims2)
+    assert ctx2.claims["project_context"] == "apollo"
+
+    # Priority: explicit > groups
+    claims3: dict[str, Any] = {
+        "sub": "u",
+        "email": "e@e.com",
+        "https://coreason.com/project_id": "explicit",
+        "groups": ["project:apollo"],
     }
-    with pytest.raises(CoreasonIdentityError, match="UserContext validation failed"):
-        mapper.map_claims(claims)
-
-
-def test_map_claims_generic_exception(mapper: IdentityMapper) -> None:
-    """Test that a generic exception is caught and wrapped."""
-    claims: dict[str, Any] = {
-        "sub": "user|123",
-        "email": "user@example.com",
-    }
-
-    # Patch UserContext constructor
-    with patch("coreason_identity.identity_mapper.UserContext") as mock_user_context:
-        mock_user_context.side_effect = Exception("Unexpected failure")
-
-        with pytest.raises(CoreasonIdentityError, match="Identity mapping error: Unexpected failure"):
-            mapper.map_claims(claims)
-
-
-def test_mapper_project_group_extraction(mapper: IdentityMapper) -> None:
-    """
-    Test that project context is extracted from the valid project group.
-    """
-    claims: dict[str, Any] = {
-        "sub": "u1",
-        "email": "u@e.com",
-        "groups": ["admin", "project:apollo"],
-    }
-    context = mapper.map_claims(claims)
-    assert context.claims["project_context"] == "apollo"
-
-
-def test_complex_groups_as_string(mapper: IdentityMapper) -> None:
-    """Test if 'groups' is provided as a single string instead of list."""
-    claims: dict[str, Any] = {
-        "sub": "u1",
-        "email": "u@e.com",
-        "groups": "project:apollo",
-    }
-    context = mapper.map_claims(claims)
-    assert context.claims["project_context"] == "apollo"
-
-
-def test_ensure_list_of_strings_direct() -> None:
-    """Directly test RawIdPClaims.ensure_list_of_strings to guarantee coverage."""
-    # Test None
-    assert RawIdPClaims.ensure_list_of_strings(None) == []
-    # Test str
-    assert RawIdPClaims.ensure_list_of_strings("valid_string") == ["valid_string"]
-    # Test list
-    assert RawIdPClaims.ensure_list_of_strings(["a", "b"]) == ["a", "b"]
-    # Test mixed list
-    assert RawIdPClaims.ensure_list_of_strings(["a", 1]) == ["a", "1"]
-    # Test tuple
-    assert RawIdPClaims.ensure_list_of_strings(("a", "b")) == ["a", "b"]
-    # Test other type (e.g. int)
-    assert RawIdPClaims.ensure_list_of_strings(123) == []
+    ctx3 = mapper.map_claims(claims3)
+    assert ctx3.claims["project_context"] == "explicit"

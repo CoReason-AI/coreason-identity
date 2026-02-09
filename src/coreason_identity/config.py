@@ -30,9 +30,8 @@ class CoreasonVerifierConfig(BaseSettings):
         allowed_algorithms (list[str]): Security boundary: Restricts accepted signing algorithms
             to prevent algorithm confusion attacks.
         clock_skew_leeway (int): Acceptable clock skew in seconds. Defaults to 0 for strict security.
-        unsafe_local_dev (bool): WARNING: Setting this to True disables SSRF protection and HTTPS enforcement.
-            Use ONLY for local development.
         issuer (str | None): The expected issuer URL. Defaults to https://{domain}/.
+        allow_unsafe_connections (bool): WARNING: Allows connection to private IPs/localhost. DEV ONLY.
     """
 
     model_config = SettingsConfigDict(
@@ -50,8 +49,10 @@ class CoreasonVerifierConfig(BaseSettings):
     clock_skew_leeway: int = Field(
         0, description="Acceptable clock skew in seconds. Defaults to 0 for strict security."
     )
-    unsafe_local_dev: bool = False
     issuer: str | None = None
+    allow_unsafe_connections: bool = Field(
+        False, description="WARNING: Allows connection to private IPs/localhost. DEV ONLY."
+    )
 
     @field_validator("issuer", mode="after")
     @classmethod
@@ -59,8 +60,8 @@ class CoreasonVerifierConfig(BaseSettings):
         """
         Ensures that issuer uses HTTPS, unless strictly opted out for local dev.
         """
-        if v and v.startswith("http://") and not info.data.get("unsafe_local_dev", False):
-            raise ValueError("HTTPS is required for production. Set 'unsafe_local_dev=True' only for local testing.")
+        if v and v.startswith("http://") and not info.data.get("allow_unsafe_connections", False):
+            raise ValueError("HTTPS is required for production.")
         return v
 
     @model_validator(mode="after")
