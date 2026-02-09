@@ -12,6 +12,7 @@
 IdentityManager component for orchestrating authentication and authorization.
 """
 
+import functools
 import re
 from typing import Any
 from urllib.parse import urljoin
@@ -243,14 +244,15 @@ class IdentityManager:
         """
         return anyio.run(self._async.validate_token, auth_header)
 
-    def start_device_login(self, scope: str | None = None) -> DeviceFlowResponse:
+    def start_device_login(self, *args: Any, **kwargs: Any) -> DeviceFlowResponse:
         """
         Initiates the Device Authorization Flow.
 
         Blocking wrapper for `IdentityManagerAsync.start_device_login`. Executes via `anyio.run`.
 
         Args:
-            scope: The OAuth2 scopes to request.
+            *args: Positional arguments passed to the async method.
+            **kwargs: Keyword arguments passed to the async method (e.g., `scope`).
 
         Returns:
             DeviceFlowResponse: The device flow response.
@@ -259,7 +261,7 @@ class IdentityManager:
             CoreasonIdentityError: If initiation fails.
             ValueError: If scope is invalid.
         """
-        return anyio.run(self._async.start_device_login, scope)
+        return anyio.run(functools.partial(self._async.start_device_login, *args, **kwargs))
 
     def await_device_token(self, flow: DeviceFlowResponse) -> TokenResponse:
         """
