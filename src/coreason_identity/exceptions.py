@@ -38,3 +38,15 @@ class SignatureVerificationError(InvalidTokenError):
 
 class InsufficientPermissionsError(CoreasonIdentityError):
     """Raised when the user does not have the required permissions."""
+
+
+class IdentityMappingError(CoreasonIdentityError):
+    """Raised when identity mapping fails (e.g. invalid claims structure)."""
+
+
+class TokenReplayError(InvalidTokenError):
+    """Raised when a token has already been used (JTI replay)."""
+
+
+class OversizedResponseError(CoreasonIdentityError):
+    """Raised when an HTTP response is too large."""

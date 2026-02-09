@@ -17,7 +17,7 @@ from typing import Any
 import pytest
 from pydantic import SecretStr
 
-from coreason_identity.exceptions import InvalidTokenError
+from coreason_identity.exceptions import IdentityMappingError
 from coreason_identity.identity_mapper import IdentityMapper
 from coreason_identity.models import CoreasonGroup, CoreasonScope
 
@@ -65,5 +65,5 @@ def test_map_claims_scopes(mapper: IdentityMapper) -> None:
 
 
 def test_map_claims_missing_required(mapper: IdentityMapper) -> None:
-    with pytest.raises(InvalidTokenError):
+    with pytest.raises(IdentityMappingError):
         mapper.map_claims({"sub": "no-email"})
