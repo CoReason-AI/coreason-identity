@@ -66,10 +66,8 @@ class IdentityManager:
         discovery_url = urljoin(base_url, "/.well-known/openid-configuration")
 
         self.oidc_provider = OIDCProvider(discovery_url, self._client)
-        # Initialize TokenValidator with strict issuer from config
-        if not self.config.issuer:
-            raise CoreasonIdentityError("Issuer configuration is missing")
 
+        # Initialize TokenValidator with strict issuer from config
         self.validator = TokenValidator(
             oidc_provider=self.oidc_provider,
             audience=self.config.audience,
@@ -111,7 +109,8 @@ class IdentityManager:
             raise InvalidTokenError("Missing Authorization header.")
 
         # Strict regex validation to avoid raw string splitting
-        match = re.match(r"^Bearer\s+(.+)$", auth_header)
+        # Disallow spaces/garbage in the token part
+        match = re.match(r"^Bearer\s+(\S+)$", auth_header)
         if not match:
             raise InvalidTokenError("Invalid Authorization header format. Must start with 'Bearer '.")
 

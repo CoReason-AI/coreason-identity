@@ -91,8 +91,7 @@ async def test_safe_transport_ipv6() -> None:
             await transport.handle_async_request(request)
 
             called_request = mock_super.call_args[0][0]
-            # httpx normalizes URL host, usually unbracketed if it parses it?
-            # Or keeps it. Assert logic matches observed behavior.
+            # httpx normalizes URL host, typically unbracketed for IPv6 host string
             assert called_request.url.host == ip_v6
 
 
