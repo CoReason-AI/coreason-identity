@@ -62,12 +62,9 @@ class SafeHTTPTransport(httpx.AsyncHTTPTransport):
 
         # Modify the request URL to use the IP address
         # Handle IPv6 formatting for URL (needs brackets)
-        try:
-            ip_obj = ipaddress.ip_address(ip_str)
-            host_replacement = f"[{ip_str}]" if isinstance(ip_obj, ipaddress.IPv6Address) else ip_str
-        except ValueError:
-            # Should not happen if getaddrinfo returned it
-            host_replacement = ip_str
+        # ip_str is guaranteed to be valid IP here because _validate_ip succeeded
+        ip_obj = ipaddress.ip_address(ip_str)
+        host_replacement = f"[{ip_str}]" if isinstance(ip_obj, ipaddress.IPv6Address) else ip_str
 
         # Create a new URL with the IP
         new_url = request.url.copy_with(host=host_replacement)

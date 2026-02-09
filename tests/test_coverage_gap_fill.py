@@ -48,3 +48,15 @@ def test_identity_mapper_list_normalization() -> None:
     # 3. List with None -> filtered
     raw3 = RawIdPClaims(sub="u", email="e@e.com", groups=["g1", None, "g2"])
     assert raw3.groups == ["g1", "g2"]
+
+    # 4. Invalid type -> []
+    # Passing an integer or dict should result in empty list if not handled by standard Pydantic coercion?
+    # Pydantic might try to coerce int to list? No.
+    # The validator says `mode="before"`.
+    # `ensure_list_of_strings` receives `123`.
+    # `isinstance(123, str)` -> False.
+    # `isinstance(123, list|tuple)` -> False.
+    # Returns `[]`.
+    raw4 = RawIdPClaims(sub="u", email="e@e.com", groups=123, permissions={"a": 1})
+    assert raw4.groups == []
+    assert raw4.permissions == []
