@@ -23,15 +23,13 @@ class SafeHTTPTransport(httpx.AsyncHTTPTransport):
     the connection to that specific IP while preserving SSL/SNI verification.
     """
 
-    def __init__(self, unsafe_local_dev: bool = False, **kwargs: Any) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         """
         Initialize the SafeHTTPTransport.
 
         Args:
-            unsafe_local_dev: If True, allows connections to private/loopback IPs.
             **kwargs: Arguments passed to httpx.AsyncHTTPTransport.
         """
-        self.unsafe_local_dev = unsafe_local_dev
         super().__init__(**kwargs)
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
@@ -89,14 +87,9 @@ class SafeHTTPTransport(httpx.AsyncHTTPTransport):
 
     def _validate_ip(self, ip_str: str) -> bool:
         """
-        Validates if an IP is allowed based on the configuration.
+        Validates if an IP is allowed.
         Returns True if allowed, False otherwise.
         """
-        # If unsafe local dev is enabled, allow everything (except maybe 0.0.0.0?)
-        # The requirement says "Allow private IPs *only if* unsafe_local_dev is True"
-        if self.unsafe_local_dev:
-            return True
-
         try:
             ip_obj = ipaddress.ip_address(ip_str)
             if (

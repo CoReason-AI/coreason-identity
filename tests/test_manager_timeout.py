@@ -16,7 +16,7 @@ from coreason_identity.manager import IdentityManager
 
 def test_manager_uses_configured_timeout() -> None:
     """
-    Verify that IdentityManagerAsync initializes httpx.AsyncClient
+    Verify that IdentityManager initializes httpx.AsyncClient
     with the http_timeout from configuration.
     """
     timeout_value = 10.5
@@ -34,7 +34,7 @@ def test_manager_uses_configured_timeout() -> None:
     ):
         IdentityManager(config)
 
-        # IdentityManager -> IdentityManagerAsync -> httpx.AsyncClient
+        # IdentityManager -> httpx.AsyncClient
         # Check that timeout is passed, and transport is also present (due to SafeHTTPTransport injection)
         call_kwargs = MockClient.call_args.kwargs
         assert call_kwargs["timeout"] == timeout_value

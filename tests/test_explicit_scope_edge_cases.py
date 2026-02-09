@@ -19,7 +19,7 @@ import pytest
 
 from coreason_identity.config import CoreasonClientConfig
 from coreason_identity.device_flow_client import DeviceFlowClient
-from coreason_identity.manager import IdentityManager, IdentityManagerAsync
+from coreason_identity.manager import IdentityManager
 from coreason_identity.models import DeviceFlowResponse
 
 # Mocks
@@ -44,7 +44,7 @@ class TestExplicitScopeEdgeCases:
             patch("coreason_identity.manager.TokenValidator"),
             patch("coreason_identity.manager.IdentityMapper"),
         ):
-            async with IdentityManagerAsync(config) as manager:
+            async with IdentityManager(config) as manager:
                 with pytest.raises(ValueError, match="Scope must be explicitly provided"):
                     await manager.start_device_login(scope="   ")
 
@@ -58,7 +58,7 @@ class TestExplicitScopeEdgeCases:
             patch("coreason_identity.manager.TokenValidator"),
             patch("coreason_identity.manager.IdentityMapper"),
         ):
-            async with IdentityManagerAsync(config) as manager:
+            async with IdentityManager(config) as manager:
                 with pytest.raises(ValueError, match="Scope must be explicitly provided"):
                     await manager.start_device_login(scope="")
 
@@ -105,7 +105,7 @@ class TestComplexScopeScenarios:
 
             MockClient.side_effect = [mock_client_1, mock_client_2]
 
-            async with IdentityManagerAsync(config) as manager:
+            async with IdentityManager(config) as manager:
                 # 1. Start flow A with scope A
                 resp1 = await manager.start_device_login(scope="scope:A")
                 assert resp1.user_code == "u1"
@@ -122,16 +122,3 @@ class TestComplexScopeScenarios:
                 # Check most recent call
                 call_args = MockClient.call_args
                 assert call_args.kwargs["scope"] == "scope:B"
-
-    def test_sync_manager_scope_propagation(self, config: CoreasonClientConfig) -> None:
-        """
-        Complex Scenario: Verify Sync Facade correctly propagates whitespace error.
-        """
-        with (
-            patch("coreason_identity.manager.OIDCProvider"),
-            patch("coreason_identity.manager.TokenValidator"),
-            patch("coreason_identity.manager.IdentityMapper"),
-        ):
-            manager = IdentityManager(config)
-            with pytest.raises(ValueError, match="Scope must be explicitly provided"):
-                manager.start_device_login(scope="   ")

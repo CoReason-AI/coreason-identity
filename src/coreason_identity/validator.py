@@ -55,9 +55,9 @@ class TokenValidator:
         self,
         oidc_provider: OIDCProvider,
         audience: str,
-        issuer: str | None = None,
-        pii_salt: SecretStr | None = None,
-        allowed_algorithms: list[str] | None = None,
+        issuer: str,
+        pii_salt: SecretStr,
+        allowed_algorithms: list[str],
         leeway: int = 0,
     ) -> None:
         """
@@ -66,16 +66,16 @@ class TokenValidator:
         Args:
             oidc_provider: The OIDCProvider instance to fetch JWKS.
             audience: The expected audience (aud) claim.
-            issuer: The expected issuer (iss) claim. If None, it will be fetched dynamically from OIDCProvider.
-            pii_salt: Salt for anonymizing PII. Defaults to unsafe static salt if not provided.
-            allowed_algorithms: List of allowed JWT signing algorithms. Defaults to ["RS256"].
+            issuer: The expected issuer (iss) claim.
+            pii_salt: Salt for anonymizing PII. REQUIRED.
+            allowed_algorithms: List of allowed JWT signing algorithms. REQUIRED.
             leeway: Acceptable clock skew in seconds. Defaults to 0.
         """
         self.oidc_provider = oidc_provider
         self.audience = audience
         self.issuer = issuer
-        self.pii_salt = pii_salt or SecretStr("coreason-unsafe-default-salt")
-        self.allowed_algorithms = allowed_algorithms or ["RS256"]
+        self.pii_salt = pii_salt
+        self.allowed_algorithms = allowed_algorithms
         self.leeway = leeway
         # Use a specific JsonWebToken instance to enforce allowed algorithms and reject others
         self.jwt = JsonWebToken(self.allowed_algorithms)
@@ -134,26 +134,7 @@ class TokenValidator:
                         "iss": {"essential": True, "value": iss},
                     }
 
-                # Ensure issuer is not None before passing to get_claims_options
-                # self.issuer should be populated if initialized correctly,
-                # otherwise we fetch it or raise.
-                # However, type hint says str | None.
-                # If dynamic discovery is disabled (implicit in current design), issuer MUST be present.
-                # We can fallback to fetching if None, or assume it's set if we are enforcing it.
-                # Given previous context, we might want to fetch it if missing.
-                # But Config validator sets default.
-                # So we can assert or handle it.
-                # Let's use the fetched/configured issuer.
-
-                # For MyPy, we need to ensure it's not None.
-                # If we are here, we might have skipped dynamic fetch if self.issuer was set.
-                # If self.issuer is None, we need to handle it.
-
-                final_issuer = self.issuer
-                if not final_issuer:
-                    final_issuer = await self.oidc_provider.get_issuer()
-
-                claims_options = get_claims_options(final_issuer)
+                claims_options = get_claims_options(self.issuer)
 
                 def _decode(jwks_data: dict[str, Any], opts: dict[str, Any]) -> Any:
                     claims = self.jwt.decode(token, jwks_data, claims_options=opts)  # type: ignore[call-overload]

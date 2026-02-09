@@ -9,6 +9,7 @@
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
 from typing import Any
+from pydantic import SecretStr
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -40,8 +41,7 @@ class TestTokenValidatorEdgeCases:
         return TokenValidator(
             oidc_provider=mock_oidc_provider,
             audience="my-audience",
-            issuer="https://valid-issuer.com/",
-        )
+            issuer="https://valid-issuer.com/", pii_salt=SecretStr("test-salt"), allowed_algorithms=["RS256"])
 
     def create_token(
         self,

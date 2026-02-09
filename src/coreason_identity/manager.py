@@ -12,12 +12,10 @@
 IdentityManager component for orchestrating authentication and authorization.
 """
 
-import functools
 import re
 from typing import Any
 from urllib.parse import urljoin
 
-import anyio
 import httpx
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 
@@ -31,7 +29,7 @@ from coreason_identity.transport import SafeHTTPTransport
 from coreason_identity.validator import TokenValidator
 
 
-class IdentityManagerAsync:
+class IdentityManager:
     """
     Async implementation of IdentityManager (The Core).
     Handles resources via async context manager.
@@ -39,7 +37,7 @@ class IdentityManagerAsync:
 
     def __init__(self, config: CoreasonVerifierConfig, client: httpx.AsyncClient | None = None) -> None:
         """
-        Initialize the IdentityManagerAsync.
+        Initialize the IdentityManager.
 
         Args:
             config: The configuration object.
@@ -52,7 +50,7 @@ class IdentityManagerAsync:
             self._client = client
         else:
             # Use SafeHTTPTransport to prevent SSRF and DNS Rebinding
-            transport = SafeHTTPTransport(unsafe_local_dev=self.config.unsafe_local_dev)
+            transport = SafeHTTPTransport()
             self._client = httpx.AsyncClient(transport=transport, timeout=self.config.http_timeout)
 
         # Instrument the client for distributed tracing
@@ -83,7 +81,7 @@ class IdentityManagerAsync:
         self.identity_mapper = IdentityMapper()
         self.device_client: DeviceFlowClient | None = None
 
-    async def __aenter__(self) -> "IdentityManagerAsync":
+    async def __aenter__(self) -> "IdentityManager":
         return self
 
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
@@ -155,10 +153,7 @@ class IdentityManagerAsync:
                 scope=scope,
             )
         else:
-            # Re-init if needed to ensure correct client is passed if we ever support changing it,
-            # but more importantly to match the synchronous re-init logic if we want to be safe.
-            # However, since we persist self.device_client and it has self._client, it should be fine.
-            # But let's follow the pattern of the sync code which re-created it.
+            # Re-init if needed to ensure correct client is passed
             self.device_client = DeviceFlowClient(
                 client_id=self.config.client_id,
                 idp_url=f"https://{self.domain}",
@@ -195,87 +190,3 @@ class IdentityManagerAsync:
             )
 
         return await self.device_client.poll_token(flow)
-
-
-class IdentityManager:
-    """
-    Sync Facade for IdentityManager.
-    Wraps IdentityManagerAsync and bridges Sync -> Async via anyio.run.
-    """
-
-    def __init__(self, config: CoreasonVerifierConfig) -> None:
-        """
-        Initialize the IdentityManager Facade.
-
-        Blocking wrapper for `IdentityManagerAsync.__init__`.
-
-        Args:
-            config: The configuration object.
-        """
-        self._async = IdentityManagerAsync(config)
-
-    def __enter__(self) -> "IdentityManager":
-        return self
-
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        # anyio.run expects a coroutine function or a coroutine object?
-        # anyio.run(func, *args)
-        # self._async.__aexit__ is a method, so we can pass it and arguments.
-        # But wait, __aexit__ returns a coroutine.
-        # anyio.run(self._async.__aexit__, exc_type, exc_val, exc_tb) is correct.
-        anyio.run(self._async.__aexit__, exc_type, exc_val, exc_tb)
-
-    def validate_token(self, auth_header: str) -> UserContext:
-        """
-        Validates the Bearer token and returns the UserContext.
-
-        Blocking wrapper for `IdentityManagerAsync.validate_token`. Executes via `anyio.run`.
-
-        Args:
-            auth_header: The raw 'Authorization' header value.
-
-        Returns:
-            UserContext: The validated user context.
-
-        Raises:
-            InvalidTokenError: If the token is invalid.
-            TokenExpiredError: If the token has expired.
-            CoreasonIdentityError: For other errors.
-        """
-        return anyio.run(self._async.validate_token, auth_header)
-
-    def start_device_login(self, *args: Any, **kwargs: Any) -> DeviceFlowResponse:
-        """
-        Initiates the Device Authorization Flow.
-
-        Blocking wrapper for `IdentityManagerAsync.start_device_login`. Executes via `anyio.run`.
-
-        Args:
-            *args: Positional arguments passed to the async method.
-            **kwargs: Keyword arguments passed to the async method (e.g., `scope`).
-
-        Returns:
-            DeviceFlowResponse: The device flow response.
-
-        Raises:
-            CoreasonIdentityError: If initiation fails.
-            ValueError: If scope is invalid.
-        """
-        return anyio.run(functools.partial(self._async.start_device_login, *args, **kwargs))
-
-    def await_device_token(self, flow: DeviceFlowResponse) -> TokenResponse:
-        """
-        Polls for the device token.
-
-        Blocking wrapper for `IdentityManagerAsync.await_device_token`. Executes via `anyio.run`.
-
-        Args:
-            flow: The device flow response.
-
-        Returns:
-            TokenResponse: The token response.
-
-        Raises:
-            CoreasonIdentityError: If polling fails.
-        """
-        return anyio.run(self._async.await_device_token, flow)

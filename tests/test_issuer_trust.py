@@ -4,6 +4,7 @@ Verifies that the issuer is correctly configured and enforced.
 """
 
 from typing import Any
+from pydantic import SecretStr
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -48,7 +49,7 @@ class TestIssuerTrust:
         mock_oidc.get_issuer.return_value = "https://malicious.com"
 
         expected_issuer = "https://trustworthy.com"
-        validator = TokenValidator(oidc_provider=mock_oidc, audience="aud", issuer=expected_issuer)
+        validator = TokenValidator(oidc_provider=mock_oidc, audience="aud", issuer=expected_issuer, pii_salt=SecretStr("test-salt"), allowed_algorithms=["RS256"])
 
         # Mock JWT decode to avoid actual crypto
         # We want to verify that claims_options['iss']['value'] == expected_issuer

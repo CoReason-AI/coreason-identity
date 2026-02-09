@@ -12,6 +12,7 @@ import hashlib
 import hmac
 import time
 from typing import Any
+from pydantic import SecretStr
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -65,10 +66,10 @@ async def test_validate_token_success_telemetry(
 
     # Patch the module-level tracer
     with patch("coreason_identity.validator.tracer", tracer):
-        validator = TokenValidator(mock_oidc_provider, audience, issuer="https://test-issuer.com")
+        validator = TokenValidator(mock_oidc_provider, audience, issuer="https://test-issuer.com", pii_salt=SecretStr("test-salt"), allowed_algorithms=["RS256"])
 
         # Mock JWT decode to succeed
-        claims = MockClaims({"sub": "user123", "aud": audience, "exp": time.time() + 3600})
+        claims = MockClaims({"iss": "https://test-issuer.com", "sub": "user123", "aud": audience, "exp": time.time() + 3600})
 
         with patch("authlib.jose.JsonWebToken.decode") as mock_decode:
             mock_decode.return_value = claims
@@ -81,7 +82,7 @@ async def test_validate_token_success_telemetry(
     assert span.status.status_code == StatusCode.OK
     # The attributes might be None if empty, but we set it, so it should be a BoundedAttributes
     assert span.attributes is not None
-    expected_hash = hmac.new(b"coreason-unsafe-default-salt", b"user123", hashlib.sha256).hexdigest()
+    expected_hash = hmac.new(b"test-salt", b"user123", hashlib.sha256).hexdigest()
     assert span.attributes["user.id"] == expected_hash
 
 
@@ -95,7 +96,7 @@ async def test_validate_token_failure_telemetry(
     audience = "test-audience"
 
     with patch("coreason_identity.validator.tracer", tracer):
-        validator = TokenValidator(mock_oidc_provider, audience, issuer="https://test-issuer.com")
+        validator = TokenValidator(mock_oidc_provider, audience, issuer="https://test-issuer.com", pii_salt=SecretStr("test-salt"), allowed_algorithms=["RS256"])
 
         # Mock JWT decode to raise ExpiredTokenError
         with patch("authlib.jose.JsonWebToken.decode") as mock_decode:
@@ -127,17 +128,17 @@ async def test_logging_strictness(mock_oidc_provider: MagicMock) -> None:
     logger.add(logs.append, level="INFO", format="{message}")
 
     audience = "test-audience"
-    validator = TokenValidator(mock_oidc_provider, audience, issuer="https://test-issuer.com")
+    validator = TokenValidator(mock_oidc_provider, audience, issuer="https://test-issuer.com", pii_salt=SecretStr("test-salt"), allowed_algorithms=["RS256"])
     user_id = "sensitive-user-id"
 
     # Mock JWT decode to succeed
-    claims = MockClaims({"sub": user_id, "aud": audience, "exp": time.time() + 3600})
+    claims = MockClaims({"iss": "https://test-issuer.com", "sub": user_id, "aud": audience, "exp": time.time() + 3600})
     with patch("authlib.jose.JsonWebToken.decode") as mock_decode:
         mock_decode.return_value = claims
         await validator.validate_token("dummy_token")
 
     # Calculate expected hash
-    expected_hash = hmac.new(b"coreason-unsafe-default-salt", user_id.encode("utf-8"), hashlib.sha256).hexdigest()
+    expected_hash = hmac.new(b"test-salt", user_id.encode("utf-8"), hashlib.sha256).hexdigest()
 
     # Check if the message is in the captured logs
     assert any(f"Token validated for user {expected_hash}" in record.record["message"] for record in logs)

@@ -10,6 +10,7 @@
 
 import time
 from typing import Any
+from pydantic import SecretStr
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -62,8 +63,7 @@ class TestValidatorSecurityComplex:
             oidc_provider=mock_oidc_provider,
             audience="aud",
             issuer="https://valid-issuer.com",
-            allowed_algorithms=["RS256", "ES256"],
-        )
+            allowed_algorithms=["RS256", "ES256"], pii_salt=SecretStr("test-salt"))
 
         claims = {
             "sub": "user123",
@@ -96,8 +96,7 @@ class TestValidatorSecurityComplex:
             oidc_provider=mock_oidc_provider,
             audience="aud",
             issuer="https://valid-issuer.com",
-            allowed_algorithms=["ES256"],
-        )
+            allowed_algorithms=["ES256"], pii_salt=SecretStr("test-salt"))
 
         claims = {
             "sub": "user123",
@@ -125,8 +124,7 @@ class TestValidatorSecurityComplex:
             oidc_provider=mock_oidc_provider,
             audience="aud",
             issuer="https://valid-issuer.com",
-            allowed_algorithms=["RS256"],
-        )
+            allowed_algorithms=["RS256"], pii_salt=SecretStr("test-salt"))
 
         claims = {"sub": "hacker", "aud": "aud", "iss": "https://valid-issuer.com", "exp": int(time.time()) + 3600}
 
@@ -166,8 +164,7 @@ class TestValidatorSecurityComplex:
             oidc_provider=mock_oidc_provider,
             audience="aud",
             issuer="https://valid-issuer.com",
-            allowed_algorithms=["RS256"],
-        )
+            allowed_algorithms=["RS256"], pii_salt=SecretStr("test-salt"))
 
         claims = {"sub": "hacker", "aud": "aud", "iss": "https://valid-issuer.com", "exp": int(time.time()) + 3600}
 

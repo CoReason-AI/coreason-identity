@@ -14,6 +14,7 @@ Testing missing claims, empty strings, and malformed responses.
 """
 
 from typing import Any
+from pydantic import SecretStr
 from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
@@ -152,8 +153,7 @@ class TestTokenValidatorSuperEdgeCases:
         return TokenValidator(
             oidc_provider=mock_oidc_provider,
             audience="my-audience",
-            issuer="https://valid-issuer.com/",
-        )
+            issuer="https://valid-issuer.com/", pii_salt=SecretStr("test-salt"), allowed_algorithms=["RS256"])
 
     @pytest.mark.asyncio
     async def test_malformed_json_payload_after_signature_check(self, validator: TokenValidator) -> None:
