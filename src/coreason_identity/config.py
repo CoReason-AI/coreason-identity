@@ -27,9 +27,11 @@ class CoreasonVerifierConfig(BaseSettings):
         audience (str): The expected audience for the token.
         pii_salt (SecretStr): WARNING: High-entropy salt required for irreversible PII anonymization.
         http_timeout (float): Security boundary: Enforces timeout (in seconds) to prevent DoS via slow responses.
-        allowed_algorithms (list[str]): Security boundary: Restricts accepted signing algorithms to prevent algorithm confusion attacks.
+        allowed_algorithms (list[str]): Security boundary: Restricts accepted signing algorithms
+            to prevent algorithm confusion attacks.
         clock_skew_leeway (int): Acceptable clock skew in seconds. Defaults to 0 for strict security.
-        unsafe_local_dev (bool): WARNING: Setting this to True disables SSRF protection and HTTPS enforcement. Use ONLY for local development.
+        unsafe_local_dev (bool): WARNING: Setting this to True disables SSRF protection and HTTPS enforcement.
+            Use ONLY for local development.
         issuer (str | None): The expected issuer URL. Defaults to https://{domain}/.
     """
 
