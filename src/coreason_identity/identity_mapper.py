@@ -33,7 +33,7 @@ class RawIdPClaims(BaseModel):
         project_id_claim (str | None): Custom claim for project ID.
         groups (list[str]): List of groups the user belongs to.
         permissions (list[str]): List of permissions granted to the user.
-        scopes (list[str]): List of OAuth scopes.
+        scope (str | None): The raw scope string (standard OAuth2 claim).
     """
 
     sub: str
@@ -42,49 +42,24 @@ class RawIdPClaims(BaseModel):
     # Optional raw fields
     project_id_claim: str | None = Field(default=None, alias="https://coreason.com/project_id")
 
-    # Normalized lists from potentially diverse keys
-    # We will use a root validator or specific field validators to populate these
+    # Normalized lists from standard keys
     groups: list[str] = Field(default_factory=list)
     permissions: list[str] = Field(default_factory=list)
-    scopes: list[str] = Field(default_factory=list)
 
-    @field_validator("groups", "permissions", "scopes", mode="before")
+    # Standard OAuth2 claim is 'scope' (string space-delimited)
+    scope: str | None = None
+
+    @field_validator("groups", "permissions", mode="before")
     @classmethod
     def ensure_list_of_strings(cls, v: Any) -> list[str]:
         """Ensures the value is a list of strings, filtering out None values."""
         if v is None:
             return []
         if isinstance(v, str):
-            # For scopes, this might be called if we didn't split in __init__
-            # But normally we want to handle list or single string item.
-            # If it's a single string, we treat it as one item here.
-            # Splitting happens in __init__ for scopes.
             return [v]
         if isinstance(v, list | tuple):
             return [str(item) for item in v if item is not None]
         return []
-
-    def __init__(self, **data: Any) -> None:
-        # Pre-process groups from multiple possible sources
-        # Logic: If 'groups' is missing OR empty, try other sources.
-        groups_val = data.get("groups")
-        if not groups_val:
-            raw_groups = data.get("https://coreason.com/groups") or data.get("groups") or data.get("roles") or []
-            data["groups"] = raw_groups
-
-        # Pre-process scopes
-        # Logic: Look for 'scope' (string space-delimited usually) or 'scp'.
-        scopes_val = data.get("scopes")
-        if not scopes_val:
-            raw_scope = data.get("scope") or data.get("scp")
-            if raw_scope:
-                if isinstance(raw_scope, str):
-                    # Split space-separated scopes
-                    data["scopes"] = raw_scope.split()
-                else:
-                    data["scopes"] = raw_scope
-
-        super().__init__(**data)
 
 
 class IdentityMapper:
@@ -121,7 +96,9 @@ class IdentityMapper:
             email = raw_claims.email
             groups = raw_claims.groups
             permissions = raw_claims.permissions
-            scopes = raw_claims.scopes
+
+            # Parse scopes from standard 'scope' claim
+            scopes = raw_claims.scope.split() if raw_claims.scope else []
 
             # 3. Resolve Project Context
             # Priority: https://coreason.com/project_id -> group pattern "project:<id>"

@@ -55,9 +55,9 @@ class TokenValidator:
         self,
         oidc_provider: OIDCProvider,
         audience: str,
-        issuer: str | None = None,
-        pii_salt: SecretStr | None = None,
-        allowed_algorithms: list[str] | None = None,
+        issuer: str,
+        pii_salt: SecretStr,
+        allowed_algorithms: list[str],
         leeway: int = 0,
     ) -> None:
         """
@@ -66,16 +66,16 @@ class TokenValidator:
         Args:
             oidc_provider: The OIDCProvider instance to fetch JWKS.
             audience: The expected audience (aud) claim.
-            issuer: The expected issuer (iss) claim. If None, it will be fetched dynamically from OIDCProvider.
-            pii_salt: Salt for anonymizing PII. Defaults to unsafe static salt if not provided.
-            allowed_algorithms: List of allowed JWT signing algorithms. Defaults to ["RS256"].
+            issuer: The expected issuer (iss) claim.
+            pii_salt: Salt for anonymizing PII. REQUIRED.
+            allowed_algorithms: List of allowed JWT signing algorithms. REQUIRED.
             leeway: Acceptable clock skew in seconds. Defaults to 0.
         """
         self.oidc_provider = oidc_provider
         self.audience = audience
         self.issuer = issuer
-        self.pii_salt = pii_salt or SecretStr("coreason-unsafe-default-salt")
-        self.allowed_algorithms = allowed_algorithms or ["RS256"]
+        self.pii_salt = pii_salt
+        self.allowed_algorithms = allowed_algorithms
         self.leeway = leeway
         # Use a specific JsonWebToken instance to enforce allowed algorithms and reject others
         self.jwt = JsonWebToken(self.allowed_algorithms)
@@ -134,26 +134,7 @@ class TokenValidator:
                         "iss": {"essential": True, "value": iss},
                     }
 
-                # Ensure issuer is not None before passing to get_claims_options
-                # self.issuer should be populated if initialized correctly,
-                # otherwise we fetch it or raise.
-                # However, type hint says str | None.
-                # If dynamic discovery is disabled (implicit in current design), issuer MUST be present.
-                # We can fallback to fetching if None, or assume it's set if we are enforcing it.
-                # Given previous context, we might want to fetch it if missing.
-                # But Config validator sets default.
-                # So we can assert or handle it.
-                # Let's use the fetched/configured issuer.
-
-                # For MyPy, we need to ensure it's not None.
-                # If we are here, we might have skipped dynamic fetch if self.issuer was set.
-                # If self.issuer is None, we need to handle it.
-
-                final_issuer = self.issuer
-                if not final_issuer:
-                    final_issuer = await self.oidc_provider.get_issuer()
-
-                claims_options = get_claims_options(final_issuer)
+                claims_options = get_claims_options(self.issuer)
 
                 def _decode(jwks_data: dict[str, Any], opts: dict[str, Any]) -> Any:
                     claims = self.jwt.decode(token, jwks_data, claims_options=opts)  # type: ignore[call-overload]
@@ -179,18 +160,19 @@ class TokenValidator:
                 logger.info(f"Token validated for user {user_hash}")
 
                 # Set span attributes
-                span.set_attribute("user.id", user_hash)
+                span.set_attribute("enduser.id", user_hash)
                 span.set_status(Status(StatusCode.OK))
 
                 return payload
 
             except ExpiredTokenError as e:
-                logger.warning(f"Validation failed: Token expired - {e}")
+                # Token expired is safe to log, but we use exception formatting just in case
+                logger.warning("Validation failed: Token expired", exc_info=True)
                 span.record_exception(e)
                 span.set_status(Status(StatusCode.ERROR, str(e)))
                 raise TokenExpiredError(f"Token has expired: {e}") from e
             except InvalidClaimError as e:
-                logger.warning(f"Validation failed: Invalid claim - {e}")
+                logger.warning("Validation failed: Invalid claim", exc_info=True)
                 span.record_exception(e)
                 span.set_status(Status(StatusCode.ERROR, str(e)))
                 if "aud" in str(e):
@@ -198,25 +180,25 @@ class TokenValidator:
                 # Wrap generic invalid claims as InvalidTokenError, not base error
                 raise InvalidTokenError(f"Invalid claim: {e}") from e
             except MissingClaimError as e:
-                logger.warning(f"Validation failed: Missing claim - {e}")
+                logger.warning("Validation failed: Missing claim", exc_info=True)
                 span.record_exception(e)
                 span.set_status(Status(StatusCode.ERROR, str(e)))
                 # Wrap missing claims as InvalidTokenError
                 raise InvalidTokenError(f"Missing claim: {e}") from e
             except BadSignatureError as e:
-                logger.error(f"Validation failed: Bad signature - {e}")
+                logger.error("Validation failed: Bad signature", exc_info=True)
                 span.record_exception(e)
                 span.set_status(Status(StatusCode.ERROR, str(e)))
                 raise SignatureVerificationError(f"Invalid signature: {e}") from e
             except JoseError as e:
-                logger.error(f"Validation failed: JOSE error - {e}")
+                logger.error("Validation failed: JOSE error", exc_info=True)
                 span.record_exception(e)
                 span.set_status(Status(StatusCode.ERROR, str(e)))
                 # Generic JOSE error implies invalid token
                 raise InvalidTokenError(f"Token validation failed: {e}") from e
             except ValueError as e:
                 # Authlib raises ValueError for "Invalid JSON Web Key Set" or "kid" not found sometimes
-                logger.error(f"Validation failed: Value error (likely key missing) - {e}")
+                logger.error("Validation failed: Value error (likely key missing)", exc_info=True)
                 span.record_exception(e)
                 span.set_status(Status(StatusCode.ERROR, str(e)))
                 raise SignatureVerificationError(f"Invalid signature or key not found: {e}") from e

@@ -23,16 +23,16 @@ class SafeHTTPTransport(httpx.AsyncHTTPTransport):
     the connection to that specific IP while preserving SSL/SNI verification.
     """
 
-    def __init__(self, unsafe_local_dev: bool = False, **kwargs: Any) -> None:
+    def __init__(self, allow_unsafe: bool = False, **kwargs: Any) -> None:
         """
         Initialize the SafeHTTPTransport.
 
         Args:
-            unsafe_local_dev: If True, allows connections to private/loopback IPs.
+            allow_unsafe: If True, allows connections to private/loopback IPs.
             **kwargs: Arguments passed to httpx.AsyncHTTPTransport.
         """
-        self.unsafe_local_dev = unsafe_local_dev
         super().__init__(**kwargs)
+        self.allow_unsafe = allow_unsafe
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
         """
@@ -64,12 +64,9 @@ class SafeHTTPTransport(httpx.AsyncHTTPTransport):
 
         # Modify the request URL to use the IP address
         # Handle IPv6 formatting for URL (needs brackets)
-        try:
-            ip_obj = ipaddress.ip_address(ip_str)
-            host_replacement = f"[{ip_str}]" if isinstance(ip_obj, ipaddress.IPv6Address) else ip_str
-        except ValueError:
-            # Should not happen if getaddrinfo returned it
-            host_replacement = ip_str
+        # ip_str is guaranteed to be valid IP here because _validate_ip succeeded
+        ip_obj = ipaddress.ip_address(ip_str)
+        host_replacement = f"[{ip_str}]" if isinstance(ip_obj, ipaddress.IPv6Address) else ip_str
 
         # Create a new URL with the IP
         new_url = request.url.copy_with(host=host_replacement)
@@ -89,12 +86,10 @@ class SafeHTTPTransport(httpx.AsyncHTTPTransport):
 
     def _validate_ip(self, ip_str: str) -> bool:
         """
-        Validates if an IP is allowed based on the configuration.
+        Validates if an IP is allowed.
         Returns True if allowed, False otherwise.
         """
-        # If unsafe local dev is enabled, allow everything (except maybe 0.0.0.0?)
-        # The requirement says "Allow private IPs *only if* unsafe_local_dev is True"
-        if self.unsafe_local_dev:
+        if self.allow_unsafe:
             return True
 
         try:

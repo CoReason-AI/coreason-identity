@@ -21,10 +21,10 @@ from coreason_identity.exceptions import (
     SignatureVerificationError,
     TokenExpiredError,
 )
-from coreason_identity.manager import IdentityManager, IdentityManagerAsync
+from coreason_identity.manager import IdentityManager
 from coreason_identity.models import DeviceFlowResponse, TokenResponse, UserContext
 
-__version__ = "0.9.0"
+__version__ = "0.8.0"
 __author__ = "Gowtham A Rao"
 __email__ = "gowtham.rao@coreason.ai"
 
@@ -34,7 +34,6 @@ __all__ = [
     "CoreasonVerifierConfig",
     "DeviceFlowResponse",
     "IdentityManager",
-    "IdentityManagerAsync",
     "InsufficientPermissionsError",
     "InvalidAudienceError",
     "InvalidTokenError",

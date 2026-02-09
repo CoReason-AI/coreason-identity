@@ -14,7 +14,7 @@ import httpx
 import pytest
 
 from coreason_identity.config import CoreasonVerifierConfig
-from coreason_identity.manager import IdentityManagerAsync
+from coreason_identity.manager import IdentityManager
 
 
 class TestNetworkReliabilityComplex:
@@ -33,7 +33,7 @@ class TestNetworkReliabilityComplex:
         external_timeout = httpx.Timeout(10.0)
         external_client = httpx.AsyncClient(timeout=external_timeout)
 
-        async with IdentityManagerAsync(config, client=external_client) as mgr:
+        async with IdentityManager(config, client=external_client) as mgr:
             # Check internal attribute (implementation detail, but necessary for verification)
             assert mgr._client is external_client
             assert mgr._client.timeout == external_timeout
@@ -56,7 +56,7 @@ class TestNetworkReliabilityComplex:
             patch("coreason_identity.manager.IdentityMapper"),
         ):
             # Using context manager
-            async with IdentityManagerAsync(config) as mgr:
+            async with IdentityManager(config) as mgr:
                 assert mgr._client.timeout.read == 0.1
                 assert mgr._client.timeout.connect == 0.1
 
@@ -80,7 +80,7 @@ class TestNetworkReliabilityComplex:
             patch("coreason_identity.manager.TokenValidator"),
             patch("coreason_identity.manager.IdentityMapper"),
         ):
-            async with IdentityManagerAsync(config):
+            async with IdentityManager(config):
                 pass
 
             # Verify OIDC provider received the client
@@ -102,6 +102,6 @@ class TestNetworkReliabilityComplex:
             patch("coreason_identity.manager.TokenValidator"),
             patch("coreason_identity.manager.IdentityMapper"),
         ):
-            async with IdentityManagerAsync(config1) as mgr1, IdentityManagerAsync(config2) as mgr2:
+            async with IdentityManager(config1) as mgr1, IdentityManager(config2) as mgr2:
                 assert mgr1._client.timeout.read == 1.0
                 assert mgr2._client.timeout.read == 2.0

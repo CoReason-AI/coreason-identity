@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from authlib.jose import JsonWebKey, jwt
+from pydantic import SecretStr
 
 from coreason_identity.exceptions import CoreasonIdentityError
 from coreason_identity.validator import TokenValidator
@@ -47,7 +48,13 @@ class TestIssuerTrustExtended:
         issuer_config = "https://a.com"
         issuer_token = "https://a.com/"
 
-        validator = TokenValidator(oidc_provider=mock_oidc, audience="aud", issuer=issuer_config)
+        validator = TokenValidator(
+            oidc_provider=mock_oidc,
+            audience="aud",
+            issuer=issuer_config,
+            pii_salt=SecretStr("test-salt"),
+            allowed_algorithms=["RS256"],
+        )
 
         token = self.create_token(key_pair, {"sub": "u", "iss": issuer_token, "aud": "aud", "exp": 9999999999})
 
@@ -66,7 +73,13 @@ class TestIssuerTrustExtended:
         issuer_config = "https://a.com/"
         issuer_token = "https://a.com"
 
-        validator = TokenValidator(oidc_provider=mock_oidc, audience="aud", issuer=issuer_config)
+        validator = TokenValidator(
+            oidc_provider=mock_oidc,
+            audience="aud",
+            issuer=issuer_config,
+            pii_salt=SecretStr("test-salt"),
+            allowed_algorithms=["RS256"],
+        )
 
         token = self.create_token(key_pair, {"sub": "u", "iss": issuer_token, "aud": "aud", "exp": 9999999999})
 
@@ -85,7 +98,13 @@ class TestIssuerTrustExtended:
         issuer_config = "https://auth.company.com"
         issuer_token = "https://auth.company.com.attacker.com"
 
-        validator = TokenValidator(oidc_provider=mock_oidc, audience="aud", issuer=issuer_config)
+        validator = TokenValidator(
+            oidc_provider=mock_oidc,
+            audience="aud",
+            issuer=issuer_config,
+            pii_salt=SecretStr("test-salt"),
+            allowed_algorithms=["RS256"],
+        )
 
         token = self.create_token(key_pair, {"sub": "u", "iss": issuer_token, "aud": "aud", "exp": 9999999999})
 
@@ -104,7 +123,13 @@ class TestIssuerTrustExtended:
         issuer_config = "https://company.com"
         issuer_token = "https://auth.company.com"
 
-        validator = TokenValidator(oidc_provider=mock_oidc, audience="aud", issuer=issuer_config)
+        validator = TokenValidator(
+            oidc_provider=mock_oidc,
+            audience="aud",
+            issuer=issuer_config,
+            pii_salt=SecretStr("test-salt"),
+            allowed_algorithms=["RS256"],
+        )
 
         token = self.create_token(key_pair, {"sub": "u", "iss": issuer_token, "aud": "aud", "exp": 9999999999})
 
@@ -121,7 +146,13 @@ class TestIssuerTrustExtended:
         issuer_config = "https://auth.com/"
         issuer_token = "http://auth.com/"
 
-        validator = TokenValidator(oidc_provider=mock_oidc, audience="aud", issuer=issuer_config)
+        validator = TokenValidator(
+            oidc_provider=mock_oidc,
+            audience="aud",
+            issuer=issuer_config,
+            pii_salt=SecretStr("test-salt"),
+            allowed_algorithms=["RS256"],
+        )
 
         token = self.create_token(key_pair, {"sub": "u", "iss": issuer_token, "aud": "aud", "exp": 9999999999})
 

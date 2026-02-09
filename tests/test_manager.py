@@ -8,8 +8,8 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
-from collections.abc import Generator
-from typing import Any, cast
+from collections.abc import AsyncGenerator
+from typing import cast
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -33,7 +33,7 @@ def config() -> CoreasonClientConfig:
 
 
 @pytest.fixture
-def manager(config: CoreasonClientConfig) -> Generator[IdentityManager, Any, None]:
+async def manager(config: CoreasonClientConfig) -> AsyncGenerator[IdentityManager, None]:
     # Mock internal components during initialization
     with (
         patch("coreason_identity.manager.OIDCProvider"),
@@ -55,44 +55,48 @@ def test_init(config: CoreasonClientConfig) -> None:
         assert MockOIDC.call_args[0][0] == f"https://{MOCK_DOMAIN}/.well-known/openid-configuration"
 
         MockValidator.assert_called_once()
-        assert mgr._async.config == config
+        assert mgr.config == config
 
 
-def test_validate_token_success(manager: IdentityManager) -> None:
+@pytest.mark.asyncio
+async def test_validate_token_success(manager: IdentityManager) -> None:
     # Setup mocks
     mock_claims = {"sub": "user123", "email": "test@example.com"}
     mock_user_context = UserContext(user_id="user123", email="test@example.com")
 
-    # Manager.validator is in manager._async.validator
-    manager._async.validator.validate_token = AsyncMock(return_value=mock_claims)  # type: ignore[method-assign]
+    # Manager.validator is in manager.validator
+    manager.validator.validate_token = AsyncMock(return_value=mock_claims)  # type: ignore[method-assign]
 
     # Cast identity_mapper to Mock for type safety or use ignore
-    mock_mapper = cast("Mock", manager._async.identity_mapper)
+    mock_mapper = cast("Mock", manager.identity_mapper)
     mock_mapper.map_claims.return_value = mock_user_context
 
-    result = manager.validate_token(MOCK_AUTH_HEADER)
+    result = await manager.validate_token(MOCK_AUTH_HEADER)
 
-    manager._async.validator.validate_token.assert_awaited_once_with(MOCK_TOKEN)
+    manager.validator.validate_token.assert_awaited_once_with(MOCK_TOKEN)
     mock_mapper.map_claims.assert_called_once_with(mock_claims, token=MOCK_TOKEN)
     assert result == mock_user_context
 
 
-def test_validate_token_invalid_header_format(manager: IdentityManager) -> None:
+@pytest.mark.asyncio
+async def test_validate_token_invalid_header_format(manager: IdentityManager) -> None:
     with pytest.raises(InvalidTokenError, match=r"Invalid Authorization header format\. Must start with 'Bearer '"):
-        manager.validate_token("InvalidHeader")
+        await manager.validate_token("InvalidHeader")
 
     with pytest.raises(InvalidTokenError, match="Missing Authorization header"):
-        manager.validate_token("")
+        await manager.validate_token("")
 
 
-def test_validate_token_delegates_exceptions(manager: IdentityManager) -> None:
-    manager._async.validator.validate_token = AsyncMock(side_effect=InvalidTokenError("Token invalid"))  # type: ignore[method-assign]
+@pytest.mark.asyncio
+async def test_validate_token_delegates_exceptions(manager: IdentityManager) -> None:
+    manager.validator.validate_token = AsyncMock(side_effect=InvalidTokenError("Token invalid"))  # type: ignore[method-assign]
 
     with pytest.raises(InvalidTokenError):
-        manager.validate_token(MOCK_AUTH_HEADER)
+        await manager.validate_token(MOCK_AUTH_HEADER)
 
 
-def test_start_device_login_success(manager: IdentityManager) -> None:
+@pytest.mark.asyncio
+async def test_start_device_login_success(manager: IdentityManager) -> None:
     mock_response = DeviceFlowResponse(
         device_code="dcode", user_code="ucode", verification_uri="http://verify", expires_in=300
     )
@@ -102,58 +106,61 @@ def test_start_device_login_success(manager: IdentityManager) -> None:
         mock_client_instance = MockClient.return_value
         mock_client_instance.initiate_flow = AsyncMock(return_value=mock_response)
 
-        response = manager.start_device_login(scope="openid profile email")
+        response = await manager.start_device_login(scope="openid profile email")
 
         # Check call args
         MockClient.assert_called_with(
             client_id=MOCK_CLIENT_ID,
             idp_url=f"https://{MOCK_DOMAIN}",
-            client=manager._async._client,
+            client=manager._client,
             scope="openid profile email",
         )
         mock_client_instance.initiate_flow.assert_awaited_with(audience=MOCK_AUDIENCE)
         assert response == mock_response
 
 
-def test_start_device_login_custom_scope(manager: IdentityManager) -> None:
+@pytest.mark.asyncio
+async def test_start_device_login_custom_scope(manager: IdentityManager) -> None:
     with patch("coreason_identity.manager.DeviceFlowClient") as MockClient:
         mock_client_instance = MockClient.return_value
         mock_client_instance.initiate_flow = AsyncMock()
 
-        manager.start_device_login(scope="read:reports")
+        await manager.start_device_login(scope="read:reports")
 
         MockClient.assert_called_with(
             client_id=MOCK_CLIENT_ID,
             idp_url=f"https://{MOCK_DOMAIN}",
-            client=manager._async._client,
+            client=manager._client,
             scope="read:reports",
         )
 
 
-def test_start_device_login_recreation(manager: IdentityManager) -> None:
+@pytest.mark.asyncio
+async def test_start_device_login_recreation(manager: IdentityManager) -> None:
     """Test that calling start_device_login twice recreates the client."""
     with patch("coreason_identity.manager.DeviceFlowClient") as MockClient:
         mock_client_instance = MockClient.return_value
         mock_client_instance.initiate_flow = AsyncMock()
 
         # First call
-        manager.start_device_login(scope="openid profile email")
+        await manager.start_device_login(scope="openid profile email")
         assert MockClient.call_count == 1
 
         # Second call
-        manager.start_device_login(scope="read:reports")
+        await manager.start_device_login(scope="read:reports")
         assert MockClient.call_count == 2
 
         # Verify the second call used the new scope
         MockClient.assert_called_with(
             client_id=MOCK_CLIENT_ID,
             idp_url=f"https://{MOCK_DOMAIN}",
-            client=manager._async._client,
+            client=manager._client,
             scope="read:reports",
         )
 
 
-def test_start_device_login_missing_client_id() -> None:
+@pytest.mark.asyncio
+async def test_start_device_login_missing_client_id() -> None:
     # Use CoreasonVerifierConfig which does NOT have client_id
     config_no_client = CoreasonVerifierConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE)
 
@@ -165,10 +172,11 @@ def test_start_device_login_missing_client_id() -> None:
         mgr = IdentityManager(config_no_client)
 
         with pytest.raises(CoreasonIdentityError, match="Device login requires CoreasonClientConfig"):
-            mgr.start_device_login(scope="openid profile email")
+            await mgr.start_device_login(scope="openid profile email")
 
 
-def test_await_device_token_success(manager: IdentityManager) -> None:
+@pytest.mark.asyncio
+async def test_await_device_token_success(manager: IdentityManager) -> None:
     mock_flow = DeviceFlowResponse(
         device_code="dcode", user_code="ucode", verification_uri="http://verify", expires_in=300
     )
@@ -179,15 +187,16 @@ def test_await_device_token_success(manager: IdentityManager) -> None:
         mock_client_instance.poll_token = AsyncMock(return_value=mock_token_response)
 
         # Pre-set device_client to simulate state if needed, or rely on auto-creation
-        manager._async.device_client = mock_client_instance
+        manager.device_client = mock_client_instance
 
-        result = manager.await_device_token(mock_flow)
+        result = await manager.await_device_token(mock_flow)
 
         mock_client_instance.poll_token.assert_awaited_with(mock_flow)
         assert result == mock_token_response
 
 
-def test_await_device_token_stateless(manager: IdentityManager) -> None:
+@pytest.mark.asyncio
+async def test_await_device_token_stateless(manager: IdentityManager) -> None:
     """Test await_device_token without prior start_device_login."""
     mock_flow = DeviceFlowResponse(
         device_code="dcode", user_code="ucode", verification_uri="http://verify", expires_in=300
@@ -199,22 +208,23 @@ def test_await_device_token_stateless(manager: IdentityManager) -> None:
         mock_client_instance.poll_token = AsyncMock(return_value=mock_token_response)
 
         # Ensure device_client is None
-        manager._async.device_client = None
+        manager.device_client = None
 
-        result = manager.await_device_token(mock_flow)
+        result = await manager.await_device_token(mock_flow)
 
         # Should have created a new client
         MockClient.assert_called_with(
             client_id=MOCK_CLIENT_ID,
             idp_url=f"https://{MOCK_DOMAIN}",
-            client=manager._async._client,
+            client=manager._client,
             scope="",  # Scope is not used during polling
         )
         mock_client_instance.poll_token.assert_awaited_with(mock_flow)
         assert result == mock_token_response
 
 
-def test_await_device_token_missing_client_id() -> None:
+@pytest.mark.asyncio
+async def test_await_device_token_missing_client_id() -> None:
     config_no_client = CoreasonVerifierConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE)
 
     with (
@@ -228,7 +238,7 @@ def test_await_device_token_missing_client_id() -> None:
         )
 
         with pytest.raises(CoreasonIdentityError, match="Device login requires CoreasonClientConfig"):
-            mgr.await_device_token(mock_flow)
+            await mgr.await_device_token(mock_flow)
 
 
 def test_init_strict_issuer() -> None:
@@ -261,13 +271,14 @@ def test_init_missing_issuer_raises_error() -> None:
     config.issuer = None  # Force None
     config.audience = "aud"
     config.http_timeout = 5.0
-    config.unsafe_local_dev = False
+    config.allow_unsafe_connections = False
 
     with pytest.raises(CoreasonIdentityError, match="Issuer configuration is missing"):
         IdentityManager(config)
 
 
-def test_start_device_login_no_scope_raises_error(manager: IdentityManager) -> None:
+@pytest.mark.asyncio
+async def test_start_device_login_no_scope_raises_error(manager: IdentityManager) -> None:
     """Test that start_device_login raises ValueError if scope is not provided."""
     with pytest.raises(ValueError, match="Scope must be explicitly provided"):
-        manager.start_device_login()
+        await manager.start_device_login()

@@ -22,6 +22,7 @@ from authlib.jose import JsonWebKey
 
 # Helper for httpx mocks
 from httpx import Request, Response
+from pydantic import SecretStr
 
 from coreason_identity.device_flow_client import DeviceFlowClient
 from coreason_identity.exceptions import (
@@ -153,6 +154,8 @@ class TestTokenValidatorSuperEdgeCases:
             oidc_provider=mock_oidc_provider,
             audience="my-audience",
             issuer="https://valid-issuer.com/",
+            pii_salt=SecretStr("test-salt"),
+            allowed_algorithms=["RS256"],
         )
 
     @pytest.mark.asyncio
