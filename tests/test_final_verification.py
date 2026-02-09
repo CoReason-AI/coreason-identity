@@ -12,7 +12,10 @@
 Final verification tests covering complex scenarios and edge cases identified during final review.
 """
 
+import json
 import time
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -37,6 +40,53 @@ from coreason_identity.validator import TokenValidator
 def create_response(status_code: int, json_data: Any = None) -> Response:
     request = Request("GET", "https://example.com")
     return Response(status_code, json=json_data, request=request)
+
+
+class MockResponse:
+    def __init__(self, status_code: int, json_data: Any | None = None, content: bytes | None = None) -> None:
+        self.status_code = status_code
+        self._json = json_data
+        self._content = content
+        self.headers = {}
+
+        body = b""
+        if json_data is not None:
+            body = json.dumps(json_data).encode("utf-8")
+        elif content is not None:
+            body = content
+
+        self.headers["Content-Length"] = str(len(body))
+        self._body = body
+
+    async def aiter_bytes(self) -> AsyncGenerator[bytes, None]:
+        yield self._body
+
+    def json(self) -> Any:
+        if self._json is not None:
+            return self._json
+        if self._content:
+            return json.loads(self._content)
+        raise ValueError("No content")
+
+    def raise_for_status(self) -> None:
+        if self.status_code >= 400:
+            raise httpx.HTTPStatusError("Error", request=None, response=self)  # type: ignore
+
+
+def setup_stream_mock(mock_client: AsyncMock, responses: list[MockResponse] | MockResponse) -> None:
+    if not isinstance(responses, list):
+        responses = [responses]
+
+    response_iter = iter(responses)
+
+    @asynccontextmanager
+    async def mock_stream(method: str, url: str, **kwargs: Any) -> AsyncGenerator[MockResponse, None]:
+        try:
+            yield next(response_iter)
+        except StopIteration:
+            yield MockResponse(500, content=b"Unexpected End of Mock Stream")
+
+    mock_client.stream.side_effect = mock_stream
 
 
 # --- 1. TokenValidator Verification ---
@@ -194,12 +244,12 @@ async def test_device_flow_mixed_errors() -> None:
             device_code="dc", user_code="uc", verification_uri="url", expires_in=10, interval=1
         )
 
-        # Mock responses
-        mock_client.post.side_effect = [
-            create_response(400, {"error": "slow_down"}),  # Should sleep interval+5
-            create_response(400, {"error": "authorization_pending"}),  # Should sleep current interval
-            create_response(400, {"error": "expired_token"}),  # Should raise error
+        responses = [
+            MockResponse(400, {"error": "slow_down"}),  # Should sleep interval+5
+            MockResponse(400, {"error": "authorization_pending"}),  # Should sleep current interval
+            MockResponse(400, {"error": "expired_token"}),  # Should raise error
         ]
+        setup_stream_mock(mock_client, responses)
 
         with patch("anyio.sleep", new_callable=AsyncMock) as mock_sleep:
             with pytest.raises(CoreasonIdentityError, match="Device code expired"):
@@ -209,5 +259,7 @@ async def test_device_flow_mixed_errors() -> None:
             # 1. slow_down: interval 1 -> 6. Sleep(6)
             # 2. auth_pending: interval 6. Sleep(6)
             assert mock_sleep.call_count == 2
+            # Arguments to sleep might be int or float depending on implementation
+            # Check values approximately or exactly if possible
             assert mock_sleep.call_args_list[0] == ((6,),)
             assert mock_sleep.call_args_list[1] == ((6,),)

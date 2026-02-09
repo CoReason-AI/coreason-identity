@@ -12,6 +12,7 @@
 DeviceFlowClient component for handling OAuth 2.0 Device Authorization Grant.
 """
 
+import json
 import time
 from urllib.parse import urljoin
 
@@ -98,7 +99,7 @@ class DeviceFlowClient:
                 "token_endpoint": token_endpoint,
             }
             return self._endpoints
-        except (httpx.HTTPError, OversizedResponseError) as e:
+        except (httpx.HTTPError, OversizedResponseError, CoreasonIdentityError) as e:
             raise CoreasonIdentityError(f"Failed to discover OIDC endpoints: {e}") from e
 
     async def initiate_flow(self, audience: str | None = None) -> DeviceFlowResponse:
@@ -127,7 +128,7 @@ class DeviceFlowClient:
         try:
             resp_data = await safe_json_fetch(self.client, url, method="POST", data=data)
             return DeviceFlowResponse(**resp_data)
-        except (httpx.HTTPError, OversizedResponseError) as e:
+        except (httpx.HTTPError, OversizedResponseError, CoreasonIdentityError) as e:
             logger.error(f"Device flow initiation failed: {e}")
             raise CoreasonIdentityError(f"Failed to initiate device flow: {e}") from e
         except ValidationError as e:
@@ -196,43 +197,41 @@ class DeviceFlowClient:
                         if len(content) > 1_000_000:
                             raise OversizedResponseError("Response too large")
 
-                    # Parse
+                    # Parse JSON from content directly
                     try:
-                        # Depending on status code
-                        if response.status_code == 200:
-                            logger.info("Token retrieved successfully.")
-                            return TokenResponse(**anyio.to_thread.run_sync(lambda: response.json()))  # type: ignore
-                        # It's an error, but might be a "good" error (pending)
-                        # We already read the content safely
+                        # We use to_thread to avoid blocking loop if JSON is large (up to 1MB)
+                        json_data = await anyio.to_thread.run_sync(json.loads, content)
+                    except json.JSONDecodeError:
+                        # If parsing fails, and status was error, raise that status
+                        response.raise_for_status()
+                        raise CoreasonIdentityError(
+                            f"Invalid JSON response: {content.decode('utf-8', errors='ignore')}"
+                        ) from None
+
+                    if response.status_code == 200:
+                        logger.info("Token retrieved successfully.")
                         try:
-                            import json
+                            return TokenResponse(**json_data)
+                        except ValidationError as e:
+                            raise CoreasonIdentityError(f"Invalid token structure: {e}") from e
 
-                            error_resp = json.loads(content)
-                        except json.JSONDecodeError:
-                            response.raise_for_status()  # Re-raise original status if not JSON
-                            # Should be unreachable if raise_for_status raises
-                            raise CoreasonIdentityError(
-                                f"Invalid response: {content.decode('utf-8', errors='ignore')}"
-                            ) from None
+                    # Handle semantic errors (often 400 Bad Request)
+                    if not isinstance(json_data, dict):
+                        response.raise_for_status()
 
-                        if not isinstance(error_resp, dict):
-                            response.raise_for_status()
+                    error = json_data.get("error")
 
-                        error = error_resp.get("error")
-                        if error == "authorization_pending":
-                            pass
-                        elif error == "slow_down":
-                            interval += 5
-                            logger.debug("Received slow_down, increasing interval.")
-                        elif error == "expired_token":
-                            raise CoreasonIdentityError("Device code expired.")
-                        elif error == "access_denied":
-                            raise CoreasonIdentityError("User denied access.")
-                        else:
-                            response.raise_for_status()
-
-                    except ValidationError as e:
-                        raise CoreasonIdentityError(f"Invalid token response: {e}") from e
+                    if error == "authorization_pending":
+                        pass  # Continue polling
+                    elif error == "slow_down":
+                        interval += 5
+                        logger.debug("Received slow_down, increasing interval.")
+                    elif error == "expired_token":
+                        raise CoreasonIdentityError("Device code expired.")
+                    elif error == "access_denied":
+                        raise CoreasonIdentityError("User denied access.")
+                    else:
+                        response.raise_for_status()
 
             except httpx.HTTPStatusError as e:
                 # If we raised raise_for_status() above

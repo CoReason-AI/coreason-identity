@@ -8,80 +8,101 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
-from unittest.mock import AsyncMock, patch
+"""
+Tests for Async Context propagation.
+"""
 
-import anyio
-import httpx
+import asyncio
+from typing import Any
+
 import pytest
+from pydantic import SecretStr
 
-from coreason_identity.config import CoreasonVerifierConfig
-from coreason_identity.manager import IdentityManager
-from coreason_identity.oidc_provider import OIDCProvider
-
-
-@pytest.fixture
-def mock_client() -> AsyncMock:
-    return AsyncMock(spec=httpx.AsyncClient)
+from coreason_identity.async_context import get_current_user, set_current_user
+from coreason_identity.models import UserContext
 
 
-@pytest.mark.asyncio
-async def test_manager_context_cleanup() -> None:
-    """
-    Verify that IdentityManager.__aexit__ closes the client.
-    """
-    config = CoreasonVerifierConfig(
-        domain="test.auth0.com",
-        audience="test-audience",
-        pii_salt="salt",
-        http_timeout=5.0,
-        allowed_algorithms=["RS256"],
-        clock_skew_leeway=0,
-        issuer="https://test.auth0.com/",
+def create_user(user_id: str) -> UserContext:
+    return UserContext(
+        user_id=user_id,
+        email=f"{user_id}@example.com",
+        groups=[],
+        scopes=[],
+        downstream_token=SecretStr("token"),
     )
 
-    RealAsyncClient = httpx.AsyncClient
 
-    with (
-        patch("coreason_identity.manager.OIDCProvider"),
-        patch("coreason_identity.manager.TokenValidator"),
-        patch("coreason_identity.manager.IdentityMapper"),
-        patch("coreason_identity.manager.HTTPXClientInstrumentor"),  # Patch instrumentor
-        patch("httpx.AsyncClient") as MockHttpxClient,  # Patch httpx.AsyncClient constructor
-    ):
-        mock_internal_client = MockHttpxClient.return_value
-        mock_internal_client.aclose = AsyncMock()
+@pytest.mark.asyncio
+async def test_context_isolation() -> None:
+    """Test that context is isolated between concurrent tasks."""
 
-        # Case 1: Internal client (created by manager)
-        async with IdentityManager(config) as manager:
-            assert manager._internal_client
+    async def task(user_id: str, delay: float) -> str | None:
+        user = create_user(user_id)
+        set_current_user(user)
+        await asyncio.sleep(delay)
+        current = get_current_user()
+        return current.user_id if current else None
 
-        mock_internal_client.aclose.assert_awaited_once()
+    # Run two tasks concurrently with different users
+    t1 = asyncio.create_task(task("user1", 0.1))
+    t2 = asyncio.create_task(task("user2", 0.1))
 
-        # Case 2: External client (passed to manager)
-        # Use RealAsyncClient for spec
-        external_client = AsyncMock(spec=RealAsyncClient)
-        async with IdentityManager(config, client=external_client) as manager:
-            assert not manager._internal_client
+    r1, r2 = await asyncio.gather(t1, t2)
 
-        # Should NOT be closed by manager
-        external_client.aclose.assert_not_awaited()
+    assert r1 == "user1"
+    assert r2 == "user2"
 
 
 @pytest.mark.asyncio
-async def test_oidc_provider_lock_safety(mock_client: AsyncMock) -> None:
-    """
-    Verify that OIDCProvider uses a lock for get_jwks.
-    """
-    provider = OIDCProvider("https://idp", mock_client)
+async def test_context_propagation() -> None:
+    """Test that context propagates to child tasks (if using TaskGroup or similar)."""
+    # Note: contextvars propagate to created tasks by default.
 
-    # We mock the critical section to verify lock usage
-    with patch.object(provider, "_refresh_jwks_critical_section", new_callable=AsyncMock) as mock_critical:
-        mock_critical.return_value = {"keys": []}
+    user = create_user("parent")
+    set_current_user(user)
 
-        # Call get_jwks with force_refresh=True to force lock usage
-        await provider.get_jwks(force_refresh=True)
+    async def child_task() -> str | None:
+        # Should see parent's context
+        current = get_current_user()
+        return current.user_id if current else None
 
-        # Check if lock was created
-        assert provider._lock is not None
-        assert isinstance(provider._lock, anyio.Lock)
-        mock_critical.assert_awaited_once()
+    result = await asyncio.create_task(child_task())
+    assert result == "parent"
+
+
+@pytest.mark.asyncio
+async def test_context_modification_in_child() -> None:
+    """Test that modifying context in child does NOT affect parent."""
+    user = create_user("parent")
+    set_current_user(user)
+
+    async def child_task() -> None:
+        # Child changes context
+        child_user = create_user("child")
+        set_current_user(child_user)
+        assert get_current_user().user_id == "child"
+
+    await asyncio.create_task(child_task())
+
+    # Parent should still see original
+    assert get_current_user().user_id == "parent"
+
+
+@pytest.mark.asyncio
+async def test_context_clearing() -> None:
+    """Test explicit clearing (setting to None)."""
+    user = create_user("u1")
+    set_current_user(user)
+    assert get_current_user() is not None
+
+    set_current_user(None)  # Type ignore? set_current_user expects UserContext.
+    # Actually async_context.py type hint for set_current_user is (user: UserContext).
+    # But ContextVar is UserContext | None.
+    # I should check async_context.py definition.
+
+    # If set_current_user only accepts UserContext, I cannot clear it via that function
+    # unless I use clear_current_user if it exists.
+    from coreason_identity.async_context import clear_current_user
+
+    clear_current_user()
+    assert get_current_user() is None

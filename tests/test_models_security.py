@@ -23,11 +23,14 @@ def test_user_context_repr_security() -> None:
     assert secret_value not in repr_str
     assert secret_value not in str_str
 
-    # Check that non-sensitive fields are present
-    assert "user123" in repr_str
-    assert "test@example.com" in repr_str
-    assert "admin" in repr_str
-    assert "openid" in repr_str
+    # Check that PII fields are redacted
+    assert "user123" not in repr_str
+    assert "test@example.com" not in repr_str
+    assert "<REDACTED>" in repr_str
+
+    # Check that group/scope data is present (considered non-PII metadata)
+    assert "admin" in repr_str.lower() or "ADMIN" in repr_str
+    assert "openid" in repr_str.lower() or "OPENID" in repr_str
 
     # Check structure resembles class signature
     assert repr_str.startswith("UserContext(")

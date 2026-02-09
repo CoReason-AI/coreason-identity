@@ -272,6 +272,9 @@ class TokenValidator:
                 span.record_exception(e)
                 span.set_status(Status(StatusCode.ERROR, err_str))
                 raise CoreasonIdentityError(f"Unexpected ValueError during validation: {e}") from e
+            except CoreasonIdentityError:
+                # Allow CoreasonIdentityError (like TokenReplayError) to bubble up
+                raise
             except Exception as e:
                 logger.exception("Unexpected error during token validation")
                 span.record_exception(e)
