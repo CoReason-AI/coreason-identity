@@ -25,6 +25,8 @@ def test_identity_mapper_unexpected_exception() -> None:
     claims = {"sub": "user123", "email": "test@example.com"}
 
     # Mock RawIdPClaims to raise a generic RuntimeError
-    with patch("coreason_identity.identity_mapper.RawIdPClaims", side_effect=RuntimeError("Unexpected Boom")):
-        with pytest.raises(CoreasonIdentityError, match="Identity mapping error: Unexpected Boom"):
-            mapper.map_claims(claims)
+    with (
+        patch("coreason_identity.identity_mapper.RawIdPClaims", side_effect=RuntimeError("Unexpected Boom")),
+        pytest.raises(CoreasonIdentityError, match="Identity mapping error: Unexpected Boom"),
+    ):
+        mapper.map_claims(claims)
