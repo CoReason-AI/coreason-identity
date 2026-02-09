@@ -13,7 +13,7 @@ Entry point for the coreason-identity package.
 Demonstrates usage of the IdentityManager for both token validation and device flow.
 """
 
-import contextlib
+import contextlib  # pragma: no cover
 import sys  # pragma: no cover
 
 import anyio  # pragma: no cover
