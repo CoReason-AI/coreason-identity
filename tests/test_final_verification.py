@@ -20,6 +20,7 @@ import httpx
 import pytest
 from authlib.jose.errors import BadSignatureError, JoseError
 from httpx import Request, Response
+from pydantic import SecretStr
 
 from coreason_identity.device_flow_client import DeviceFlowClient
 from coreason_identity.exceptions import (
@@ -50,7 +51,13 @@ async def test_validator_retry_fails() -> None:
     mock_provider = MagicMock(spec=OIDCProvider)
     mock_provider.get_jwks = AsyncMock(return_value={"keys": []})  # Empty keys
 
-    validator = TokenValidator(mock_provider, audience="aud", issuer="https://test-issuer.com")
+    validator = TokenValidator(
+        mock_provider,
+        audience="aud",
+        issuer="https://test-issuer.com",
+        pii_salt=SecretStr("test-salt"),
+        allowed_algorithms=["RS256"],
+    )
 
     # Mock internal JWT decode
     with patch("authlib.jose.JsonWebToken.decode") as mock_decode:
@@ -82,7 +89,13 @@ async def test_validator_refresh_network_error() -> None:
         ]
     )
 
-    validator = TokenValidator(mock_provider, audience="aud", issuer="https://test-issuer.com")
+    validator = TokenValidator(
+        mock_provider,
+        audience="aud",
+        issuer="https://test-issuer.com",
+        pii_salt=SecretStr("test-salt"),
+        allowed_algorithms=["RS256"],
+    )
 
     with patch("authlib.jose.JsonWebToken.decode") as mock_decode:
         # First decode fails (triggering refresh)
@@ -99,7 +112,13 @@ async def test_validator_jose_error_generic() -> None:
     """
     mock_provider = MagicMock(spec=OIDCProvider)
     mock_provider.get_jwks = AsyncMock(return_value={"keys": []})
-    validator = TokenValidator(mock_provider, audience="aud", issuer="https://test-issuer.com")
+    validator = TokenValidator(
+        mock_provider,
+        audience="aud",
+        issuer="https://test-issuer.com",
+        pii_salt=SecretStr("test-salt"),
+        allowed_algorithms=["RS256"],
+    )
 
     with patch("authlib.jose.JsonWebToken.decode") as mock_decode:
         mock_decode.side_effect = JoseError("Some random JOSE error")

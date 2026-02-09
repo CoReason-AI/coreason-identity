@@ -116,7 +116,3 @@ def configure_logging() -> None:
     else:
         # Fallback if invalid level string
         logging.getLogger().setLevel(logging.INFO)
-
-
-# Initialize on import
-configure_logging()

@@ -10,7 +10,7 @@ from anyio import create_task_group
 from pydantic import SecretStr
 
 from coreason_identity.config import CoreasonVerifierConfig
-from coreason_identity.manager import IdentityManagerAsync
+from coreason_identity.manager import IdentityManager
 
 
 async def main() -> None:
@@ -31,12 +31,11 @@ async def main() -> None:
         pii_salt=SecretStr("super-secret-salt-for-pii-hashing"),
         http_timeout=5.0,
         allowed_algorithms=["RS256"],
-        unsafe_local_dev=True,  # Enabled for example to allow 'example.com' if needed
     )
 
     # Initialize the Manager (Async Context Manager)
     # This automatically instruments the internal httpx client with OpenTelemetry
-    async with IdentityManagerAsync(config) as manager:
+    async with IdentityManager(config) as manager:
         print(f">>> Manager Initialized. Client: {type(manager._client).__name__}")
 
         # Demonstrate concurrency using TaskGroup
