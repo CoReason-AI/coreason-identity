@@ -11,7 +11,7 @@
 import pytest
 from pydantic import SecretStr, ValidationError
 
-from coreason_identity.models import UserContext
+from coreason_identity.models import CoreasonGroup, CoreasonScope, UserContext
 
 
 def test_user_context_valid() -> None:
@@ -19,18 +19,16 @@ def test_user_context_valid() -> None:
     user = UserContext(
         user_id="user123",
         email="test@example.com",
-        groups=["admin"],
-        scopes=["openid"],
+        groups=[CoreasonGroup.ADMIN],
+        scopes=[CoreasonScope.OPENID],
         downstream_token=SecretStr("secret"),
-        claims={"custom": "value"},
     )
     assert user.user_id == "user123"
     assert user.email == "test@example.com"
-    assert user.groups == ["admin"]
-    assert user.scopes == ["openid"]
+    assert user.groups == [CoreasonGroup.ADMIN]
+    assert user.scopes == [CoreasonScope.OPENID]
     assert user.downstream_token is not None
     assert user.downstream_token.get_secret_value() == "secret"
-    assert user.claims == {"custom": "value"}
 
 
 def test_user_context_rejects_invalid_enums() -> None:
@@ -59,8 +57,8 @@ def test_user_context_serialization() -> None:
     user = UserContext(
         user_id="user123",
         email="test@example.com",
-        groups=["admin"],
-        scopes=["openid"],
+        groups=[CoreasonGroup.ADMIN],
+        scopes=[CoreasonScope.OPENID],
     )
     # Using mode='json' ensures Enums are converted to their values
     dump = user.model_dump(mode="json")
@@ -76,7 +74,6 @@ def test_user_context_defaults() -> None:
     assert user.groups == []
     assert user.scopes == []
     assert user.downstream_token is None
-    assert user.claims == {}
 
 
 def test_user_context_invalid_email() -> None:
@@ -108,4 +105,4 @@ def test_user_context_immutability() -> None:
     """
     user = UserContext(user_id="user123", email="test@example.com")
     with pytest.raises(ValidationError):
-        user.claims = {"new": "claim"}  # type: ignore
+        user.user_id = "new_id"  # type: ignore
