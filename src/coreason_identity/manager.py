@@ -42,7 +42,7 @@ class IdentityManagerAsync:
 
         Args:
             config: The configuration object.
-            client: External async client (optional).
+            client: External async client (optional). If not provided, a `SafeHTTPTransport` client is created.
         """
         self.config = config
         self._internal_client = client is None
@@ -92,6 +92,21 @@ class IdentityManagerAsync:
     async def validate_token(self, auth_header: str) -> UserContext:
         """
         Validates the Bearer token and returns the UserContext.
+
+        Delegates validation to `TokenValidator.validate_token` and mapping to `IdentityMapper`.
+
+        Args:
+            auth_header: The raw 'Authorization' header value (e.g., "Bearer <token>").
+
+        Returns:
+            UserContext: The validated user context containing identity and RBAC information.
+
+        Raises:
+            InvalidTokenError: If the header is malformed, missing, or the token is invalid.
+            TokenExpiredError: If the token has expired.
+            InvalidAudienceError: If the token audience does not match the configuration.
+            SignatureVerificationError: If the token signature is invalid.
+            CoreasonIdentityError: For underlying network or configuration errors.
         """
         if not auth_header:
             raise InvalidTokenError("Missing Authorization header.")
@@ -112,6 +127,18 @@ class IdentityManagerAsync:
     async def start_device_login(self, scope: str | None = None) -> DeviceFlowResponse:
         """
         Initiates the Device Authorization Flow.
+
+        Uses `DeviceFlowClient` to communicate with the IdP.
+
+        Args:
+            scope: The OAuth2 scopes to request (e.g., "openid profile"). Must be explicitly provided.
+
+        Returns:
+            DeviceFlowResponse: The response containing the device code, user code, and verification URI.
+
+        Raises:
+            CoreasonIdentityError: If the configuration is invalid (missing client_id) or the IdP request fails.
+            ValueError: If the scope is missing or empty.
         """
         if not isinstance(self.config, CoreasonClientConfig):
             raise CoreasonIdentityError("Device login requires CoreasonClientConfig with a valid client_id.")
@@ -143,6 +170,17 @@ class IdentityManagerAsync:
     async def await_device_token(self, flow: DeviceFlowResponse) -> TokenResponse:
         """
         Polls for the device token.
+
+        Polls the IdP token endpoint until the user authorizes the device, the code expires, or the polling times out.
+
+        Args:
+            flow: The `DeviceFlowResponse` object returned by `start_device_login`.
+
+        Returns:
+            TokenResponse: The response containing the access token and other artifacts.
+
+        Raises:
+            CoreasonIdentityError: If polling fails, the code expires, or access is denied.
         """
         if not isinstance(self.config, CoreasonClientConfig):
             raise CoreasonIdentityError("Device login requires CoreasonClientConfig with a valid client_id.")
@@ -168,6 +206,8 @@ class IdentityManager:
         """
         Initialize the IdentityManager Facade.
 
+        Blocking wrapper for `IdentityManagerAsync.__init__`.
+
         Args:
             config: The configuration object.
         """
@@ -187,17 +227,53 @@ class IdentityManager:
     def validate_token(self, auth_header: str) -> UserContext:
         """
         Validates the Bearer token and returns the UserContext.
+
+        Blocking wrapper for `IdentityManagerAsync.validate_token`. Executes via `anyio.run`.
+
+        Args:
+            auth_header: The raw 'Authorization' header value.
+
+        Returns:
+            UserContext: The validated user context.
+
+        Raises:
+            InvalidTokenError: If the token is invalid.
+            TokenExpiredError: If the token has expired.
+            CoreasonIdentityError: For other errors.
         """
         return anyio.run(self._async.validate_token, auth_header)
 
     def start_device_login(self, scope: str | None = None) -> DeviceFlowResponse:
         """
         Initiates the Device Authorization Flow.
+
+        Blocking wrapper for `IdentityManagerAsync.start_device_login`. Executes via `anyio.run`.
+
+        Args:
+            scope: The OAuth2 scopes to request.
+
+        Returns:
+            DeviceFlowResponse: The device flow response.
+
+        Raises:
+            CoreasonIdentityError: If initiation fails.
+            ValueError: If scope is invalid.
         """
         return anyio.run(self._async.start_device_login, scope)
 
     def await_device_token(self, flow: DeviceFlowResponse) -> TokenResponse:
         """
         Polls for the device token.
+
+        Blocking wrapper for `IdentityManagerAsync.await_device_token`. Executes via `anyio.run`.
+
+        Args:
+            flow: The device flow response.
+
+        Returns:
+            TokenResponse: The token response.
+
+        Raises:
+            CoreasonIdentityError: If polling fails.
         """
         return anyio.run(self._async.await_device_token, flow)
