@@ -95,16 +95,14 @@ class IdentityMapper:
             # 3. Construct UserContext
             # Note: Pydantic validation in UserContext will enforce strict Enum values for groups/scopes.
             # Any invalid value will raise ValidationError, caught below.
-            user_context = UserContext(
+            # Finding #1: Debug logging removed to prevent PII leak (raw sub).
+            return UserContext(
                 user_id=sub,
                 email=email,
                 groups=groups,
                 scopes=scopes,
                 downstream_token=SecretStr(token) if token else None,
             )
-
-            logger.debug(f"Mapped identity for user {sub}")
-            return user_context
 
         except Exception as e:
             # Catch unexpected exceptions (InvalidTokenError raised above bypasses this)
