@@ -21,13 +21,11 @@ class CoreasonScope(StrEnum):
     OPENID = "openid"
     PROFILE = "profile"
     EMAIL = "email"
-    READ_REPORTS = "read:reports"
 
 
 class CoreasonGroup(StrEnum):
     ADMIN = "admin"
     DEVELOPER = "developer"
-    PROJECT_APOLLO = "project:apollo"
 
 
 class UserContext(BaseModel):
@@ -44,8 +42,8 @@ class UserContext(BaseModel):
             "example": {
                 "user_id": "auth0|123456",
                 "email": "alice@coreason.ai",
-                "groups": ["admin", "project:apollo"],
-                "scopes": ["openid", "profile", "read:reports"],
+                "groups": ["admin"],
+                "scopes": ["openid", "profile"],
             }
         },
     )
@@ -61,7 +59,7 @@ class UserContext(BaseModel):
     groups: list[CoreasonGroup] = Field(
         default_factory=list,
         description="Security group IDs. Used for Row-Level Security (RLS).",
-        examples=[[CoreasonGroup.ADMIN, CoreasonGroup.PROJECT_APOLLO]],
+        examples=[[CoreasonGroup.ADMIN]],
     )
     scopes: list[CoreasonScope] = Field(
         default_factory=list,

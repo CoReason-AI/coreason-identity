@@ -34,12 +34,14 @@ class IdentityManager:
     Handles resources via async context manager.
     """
 
-    def __init__(self, config: CoreasonVerifierConfig, client: httpx.AsyncClient | None = None) -> None:
+    def __init__(
+        self, config: CoreasonVerifierConfig | CoreasonClientConfig, client: httpx.AsyncClient | None = None
+    ) -> None:
         """
         Initialize the IdentityManager.
 
         Args:
-            config: The configuration object.
+            config: The configuration object (Verifier or Client).
             client: External async client (optional). If not provided, a standard httpx.AsyncClient is created.
         """
         self.config = config
@@ -64,18 +66,21 @@ class IdentityManager:
 
         self.oidc_provider = OIDCProvider(discovery_url, self._client)
 
-        # Initialize TokenValidator with strict issuer from config
-        if self.config.issuer is None:
-            raise CoreasonIdentityError("Issuer configuration is missing")
+        # Initialize TokenValidator ONLY if config supports verification
+        self.validator: TokenValidator | None = None
+        if isinstance(self.config, CoreasonVerifierConfig):
+            if self.config.issuer is None:
+                raise CoreasonIdentityError("Issuer configuration is missing")
 
-        self.validator = TokenValidator(
-            oidc_provider=self.oidc_provider,
-            audience=self.config.audience,
-            pii_salt=self.config.pii_salt,
-            issuer=self.config.issuer,
-            allowed_algorithms=self.config.allowed_algorithms,
-            leeway=self.config.clock_skew_leeway,
-        )
+            self.validator = TokenValidator(
+                oidc_provider=self.oidc_provider,
+                audience=self.config.audience,
+                pii_salt=self.config.pii_salt,
+                issuer=self.config.issuer,
+                allowed_algorithms=self.config.allowed_algorithms,
+                leeway=self.config.clock_skew_leeway,
+            )
+
         self.identity_mapper = IdentityMapper()
         self.device_client: DeviceFlowClient | None = None
 
@@ -103,8 +108,13 @@ class IdentityManager:
             TokenExpiredError: If the token has expired.
             InvalidAudienceError: If the token audience does not match the configuration.
             SignatureVerificationError: If the token signature is invalid.
-            CoreasonIdentityError: For underlying network or configuration errors.
+            CoreasonIdentityError: For underlying network or configuration errors, or if validation is not configured.
         """
+        if self.validator is None:
+            raise CoreasonIdentityError(
+                "Token validation is not configured. IdentityManager initialized with Client config only."
+            )
+
         if not auth_header:
             raise InvalidTokenError("Missing Authorization header.")
 

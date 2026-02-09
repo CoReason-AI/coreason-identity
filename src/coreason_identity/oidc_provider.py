@@ -17,7 +17,6 @@ from typing import Any
 
 import anyio
 import httpx
-import stamina
 from pydantic import ValidationError
 
 from coreason_identity.exceptions import CoreasonIdentityError
@@ -59,7 +58,6 @@ class OIDCProvider:
         self._last_update: float = 0.0
         self._lock: anyio.Lock | None = None
 
-    @stamina.retry(on=httpx.HTTPError, attempts=3, wait_initial=0.1, wait_max=1.0)  # type: ignore[misc, unused-ignore, untyped-decorator]
     async def _fetch_oidc_config(self) -> OIDCConfig:
         """
         Fetches the OIDC configuration to find the jwks_uri.
@@ -74,16 +72,30 @@ class OIDCProvider:
         Raises:
             CoreasonIdentityError: If the request fails after retries or returns invalid data.
         """
-        try:
-            response = await self.client.get(self.discovery_url)
-            response.raise_for_status()
-            return OIDCConfig(**response.json())
-        except httpx.HTTPError as e:
-            raise CoreasonIdentityError(f"Failed to fetch OIDC configuration from {self.discovery_url}: {e}") from e
-        except ValidationError as e:
-            raise CoreasonIdentityError(f"Invalid OIDC configuration from {self.discovery_url}: {e}") from e
+        attempts = 3
+        wait_initial = 0.1
+        wait_max = 1.0
 
-    @stamina.retry(on=httpx.HTTPError, attempts=3, wait_initial=0.1, wait_max=1.0)  # type: ignore[misc, unused-ignore, untyped-decorator]
+        for attempt in range(attempts):
+            try:
+                response = await self.client.get(self.discovery_url)
+                response.raise_for_status()
+                return OIDCConfig(**response.json())
+            except httpx.HTTPError as e:
+                if attempt == attempts - 1:
+                    raise CoreasonIdentityError(
+                        f"Failed to fetch OIDC configuration from {self.discovery_url}: {e}"
+                    ) from e
+
+                sleep_time = min(wait_initial * (2 ** attempt), wait_max)
+                await anyio.sleep(sleep_time)
+            except ValidationError as e:
+                # Validation error is fatal, do not retry
+                raise CoreasonIdentityError(f"Invalid OIDC configuration from {self.discovery_url}: {e}") from e
+
+        # Helper for mypy mostly, unreachable given loop structure
+        raise CoreasonIdentityError(f"Failed to fetch OIDC configuration from {self.discovery_url}")  # pragma: no cover
+
     async def _fetch_jwks(self, jwks_uri: str) -> dict[str, Any]:
         """
         Fetches the JWKS from the given URI.
@@ -99,13 +111,24 @@ class OIDCProvider:
         Raises:
             CoreasonIdentityError: If the request fails after retries.
         """
-        try:
-            response = await self.client.get(jwks_uri)
-            response.raise_for_status()
-            # Explicitly validate return type or ignore strict MyPy check for Any
-            return response.json()  # type: ignore[no-any-return, unused-ignore]
-        except httpx.HTTPError as e:
-            raise CoreasonIdentityError(f"Failed to fetch JWKS from {jwks_uri}: {e}") from e
+        attempts = 3
+        wait_initial = 0.1
+        wait_max = 1.0
+
+        for attempt in range(attempts):
+            try:
+                response = await self.client.get(jwks_uri)
+                response.raise_for_status()
+                # Explicitly validate return type or ignore strict MyPy check for Any
+                return response.json()  # type: ignore[no-any-return, unused-ignore]
+            except httpx.HTTPError as e:
+                if attempt == attempts - 1:
+                    raise CoreasonIdentityError(f"Failed to fetch JWKS from {jwks_uri}: {e}") from e
+
+                sleep_time = min(wait_initial * (2 ** attempt), wait_max)
+                await anyio.sleep(sleep_time)
+
+        raise CoreasonIdentityError(f"Failed to fetch JWKS from {jwks_uri}")  # pragma: no cover
 
     async def _refresh_jwks_critical_section(self, force_refresh: bool) -> dict[str, Any]:
         """

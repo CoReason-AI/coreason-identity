@@ -40,11 +40,11 @@ class TestIdentityMapperRobustness:
         claims = {
             "sub": "u1",
             "email": "u@e.com",
-            "groups": ["admin", "project:apollo"],
+            "groups": ["admin", "developer"],
         }
         context = mapper.map_claims(claims)
         # Groups should map correctly
-        assert context.groups == [CoreasonGroup.ADMIN, CoreasonGroup.PROJECT_APOLLO]
+        assert context.groups == [CoreasonGroup.ADMIN, CoreasonGroup.DEVELOPER]
 
         claims_mixed = {
             "sub": "u1",

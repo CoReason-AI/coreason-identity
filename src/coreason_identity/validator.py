@@ -14,7 +14,7 @@ TokenValidator component for validating JWT signatures and claims.
 
 import hashlib
 import hmac
-from typing import Any
+from typing import Any, cast
 
 from authlib.jose import JsonWebToken
 from authlib.jose.errors import (
@@ -137,7 +137,9 @@ class TokenValidator:
                 claims_options = get_claims_options(self.issuer)
 
                 def _decode(jwks_data: dict[str, Any], opts: dict[str, Any]) -> Any:
-                    claims = self.jwt.decode(token, jwks_data, claims_options=opts)  # type: ignore[call-overload]
+                    # Cast self.jwt to Any to bypass MyPy overload confusion or missing stubs
+                    jwt_any = cast(Any, self.jwt)
+                    claims = jwt_any.decode(token, jwks_data, claims_options=opts)
                     claims.validate(leeway=self.leeway)
                     return claims
 
@@ -197,11 +199,20 @@ class TokenValidator:
                 # Generic JOSE error implies invalid token
                 raise InvalidTokenError(f"Token validation failed: {e}") from e
             except ValueError as e:
-                # Authlib raises ValueError for "Invalid JSON Web Key Set" or "kid" not found sometimes
-                logger.error("Validation failed: Value error (likely key missing)", exc_info=True)
+                # Authlib can raise ValueError for "Invalid JSON Web Key Set" or "kid" not found.
+                # We inspect the error message to see if it's a key/signature issue.
+                err_str = str(e)
+                if "Invalid JSON Web Key Set" in err_str or "kid" in err_str:
+                    logger.error("Validation failed: Value error (likely key missing)", exc_info=True)
+                    span.record_exception(e)
+                    span.set_status(Status(StatusCode.ERROR, err_str))
+                    raise SignatureVerificationError(f"Invalid signature or key not found: {e}") from e
+
+                # Unexpected ValueError
+                logger.error("Validation failed: Unexpected ValueError", exc_info=True)
                 span.record_exception(e)
-                span.set_status(Status(StatusCode.ERROR, str(e)))
-                raise SignatureVerificationError(f"Invalid signature or key not found: {e}") from e
+                span.set_status(Status(StatusCode.ERROR, err_str))
+                raise CoreasonIdentityError(f"Unexpected ValueError during validation: {e}") from e
             except Exception as e:
                 logger.exception("Unexpected error during token validation")
                 span.record_exception(e)
