@@ -40,7 +40,7 @@ def test_user_context_rejects_invalid_enums() -> None:
             email="test@example.com",
             groups=["hacker_group"],
         )
-    assert "Input should be 'admin', 'developer' or 'project:apollo'" in str(excinfo.value)
+    assert "Input should be 'admin' or 'developer'" in str(excinfo.value)
 
     # Invalid scope
     with pytest.raises(ValidationError) as excinfo:
@@ -49,7 +49,7 @@ def test_user_context_rejects_invalid_enums() -> None:
             email="test@example.com",
             scopes=["invalid_scope"],
         )
-    assert "Input should be 'openid', 'profile', 'email' or 'read:reports'" in str(excinfo.value)
+    assert "Input should be 'openid', 'profile' or 'email'" in str(excinfo.value)
 
 
 def test_user_context_serialization() -> None:

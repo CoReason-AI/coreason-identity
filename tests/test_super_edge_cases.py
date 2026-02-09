@@ -148,17 +148,11 @@ class TestTokenValidatorSuperEdgeCases:
     async def test_malformed_json_payload_after_signature_check(self, validator: TokenValidator) -> None:
         """
         Simulate a scenario where JWT signature is valid (hypothetically) but payload is not valid JSON.
-        In reality, JWT signature covers the payload, so you can't have valid signature on invalid payload
-        unless the signer signed garbage.
-        Authlib decode() handles base64 decoding and JSON parsing.
-        If JSON parsing fails, it usually raises generic decode error.
         We can mock the jwt.decode to raise ValueError to simulate this internal failure.
+        The validator should catch this unexpected ValueError and wrap it in CoreasonIdentityError.
         """
         with (
             patch.object(validator.jwt, "decode", side_effect=ValueError("Invalid payload JSON")),
-            pytest.raises(CoreasonIdentityError, match="Invalid signature or key not found"),
+            pytest.raises(CoreasonIdentityError, match="Unexpected ValueError during validation"),
         ):
-            # Wait, validator catches ValueError and raises SignatureVerificationError
-            # with "Invalid signature or key not found: ..."
-            # Let's verify exact mapping.
             await validator.validate_token("some.token.here")

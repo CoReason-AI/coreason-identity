@@ -27,6 +27,7 @@ def mock_client() -> AsyncMock:
 
 @pytest.fixture
 def provider(mock_client: AsyncMock) -> OIDCProvider:
+    # Use shorter retry cooldown/wait for tests
     return OIDCProvider("https://idp/.well-known/openid-configuration", mock_client)
 
 
@@ -85,9 +86,14 @@ async def test_get_jwks_expired_cache(provider: OIDCProvider, mock_client: Async
 
 @pytest.mark.asyncio
 async def test_fetch_oidc_config_error(provider: OIDCProvider, mock_client: AsyncMock) -> None:
+    # Side effect as exception instance raises it every time
     mock_client.get.side_effect = httpx.HTTPError("Network error")
 
-    with pytest.raises(CoreasonIdentityError, match="Failed to fetch OIDC configuration"):
+    # Patch sleep to avoid waiting during retries
+    with (
+        patch("anyio.sleep", new_callable=AsyncMock),
+        pytest.raises(CoreasonIdentityError, match="Failed to fetch OIDC configuration"),
+    ):
         await provider.get_jwks()
 
 
@@ -101,12 +107,18 @@ async def test_missing_jwks_uri(provider: OIDCProvider, mock_client: AsyncMock) 
 
 @pytest.mark.asyncio
 async def test_fetch_jwks_error(provider: OIDCProvider, mock_client: AsyncMock) -> None:
+    # 1 success (config), then 3 failures (jwks retries)
     mock_client.get.side_effect = [
         Mock(status_code=200, json=lambda: {"jwks_uri": "https://idp/jwks", "issuer": "https://idp"}),
-        httpx.HTTPError("Network error"),
+        httpx.HTTPError("Network error 1"),
+        httpx.HTTPError("Network error 2"),
+        httpx.HTTPError("Network error 3"),
     ]
 
-    with pytest.raises(CoreasonIdentityError, match="Failed to fetch JWKS"):
+    with (
+        patch("anyio.sleep", new_callable=AsyncMock),
+        pytest.raises(CoreasonIdentityError, match="Failed to fetch JWKS"),
+    ):
         await provider.get_jwks()
 
 

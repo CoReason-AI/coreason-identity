@@ -41,11 +41,11 @@ def test_map_claims_basic(mapper: IdentityMapper) -> None:
 def test_map_claims_group_sources(mapper: IdentityMapper) -> None:
     """Test that groups are resolved from standard 'groups' claim."""
     # 1. Standard 'groups'
-    claims1: dict[str, Any] = {"sub": "u1", "email": "u1@e.com", "groups": ["project:apollo"]}
+    claims1: dict[str, Any] = {"sub": "u1", "email": "u1@e.com", "groups": ["admin"]}
     ctx = mapper.map_claims(claims1)
 
     # Assert that strings are converted to Enums
-    assert ctx.groups == [CoreasonGroup.PROJECT_APOLLO]
+    assert ctx.groups == [CoreasonGroup.ADMIN]
 
 
 def test_map_claims_scopes(mapper: IdentityMapper) -> None:
