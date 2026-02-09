@@ -56,7 +56,8 @@ def test_sync_facade_methods() -> None:
         # Test start_device_login
         res_flow = mgr.start_device_login(scope="scope")
         assert res_flow == mock_flow
-        mock_instance.start_device_login.assert_called_with("scope")
+        # Since we use **kwargs delegation, it is called with keyword argument
+        mock_instance.start_device_login.assert_called_with(scope="scope")
 
         # Test await_device_token
         flow_input = DeviceFlowResponse(device_code="d", user_code="u", verification_uri="v", expires_in=1, interval=1)
