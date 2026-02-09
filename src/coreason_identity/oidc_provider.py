@@ -59,7 +59,7 @@ class OIDCProvider:
         self._last_update: float = 0.0
         self._lock: anyio.Lock | None = None
 
-    @stamina.retry(on=httpx.HTTPError, attempts=3, wait_initial=0.1, wait_max=1.0)  # type: ignore[misc, unused-ignore]
+    @stamina.retry(on=httpx.HTTPError, attempts=3, wait_initial=0.1, wait_max=1.0)  # type: ignore[misc, unused-ignore, untyped-decorator]
     async def _fetch_oidc_config(self) -> OIDCConfig:
         """
         Fetches the OIDC configuration to find the jwks_uri.
@@ -80,7 +80,7 @@ class OIDCProvider:
         except ValidationError as e:
             raise CoreasonIdentityError(f"Invalid OIDC configuration from {self.discovery_url}: {e}") from e
 
-    @stamina.retry(on=httpx.HTTPError, attempts=3, wait_initial=0.1, wait_max=1.0)  # type: ignore[misc, unused-ignore]
+    @stamina.retry(on=httpx.HTTPError, attempts=3, wait_initial=0.1, wait_max=1.0)  # type: ignore[misc, unused-ignore, untyped-decorator]
     async def _fetch_jwks(self, jwks_uri: str) -> dict[str, Any]:
         """
         Fetches the JWKS from the given URI.
@@ -98,7 +98,7 @@ class OIDCProvider:
             response = await self.client.get(jwks_uri)
             response.raise_for_status()
             # Explicitly validate return type or ignore strict MyPy check for Any
-            return response.json()  # type: ignore[no-any-return]
+            return response.json()  # type: ignore[no-any-return, unused-ignore]
         except httpx.HTTPError as e:
             raise CoreasonIdentityError(f"Failed to fetch JWKS from {jwks_uri}: {e}") from e
 
@@ -135,7 +135,7 @@ class OIDCProvider:
         self._oidc_config_cache = oidc_config
         self._last_update = current_time
 
-        return jwks
+        return jwks  # type: ignore[no-any-return, unused-ignore]
 
     async def get_jwks(self, force_refresh: bool = False) -> dict[str, Any]:
         """
