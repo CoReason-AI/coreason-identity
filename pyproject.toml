@@ -1,6 +1,6 @@
 [project]
 name = "coreason_identity"
-version = "0.8.0"
+version = "0.9.0"
 description = "Decoupled authentication middleware, abstracting OIDC and OAuth2 protocols from the main application."
 readme = "README.md"
 requires-python = ">=3.12, <3.15"
@@ -24,6 +24,8 @@ dependencies = [
     "anyio>=4.12.1,<5.0.0",
     "aiofiles>=25.1.0,<26.0.0",
     "types-aiofiles>=25.1.0,<26.0.0",
+    "stamina (>=25.2.0,<26.0.0)",
+    "opentelemetry-instrumentation-httpx (>=0.60b1,<0.61)",
 ]
 
 [project.urls]

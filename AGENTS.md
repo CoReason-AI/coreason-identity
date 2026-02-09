@@ -119,4 +119,4 @@ logger.configure(handlers=[{"sink": sys.stdout, "serialize": True}])
 * You need to change the hashing algorithm for PII obfuscation.
 * You encounter a scenario where "Bypass Mode" (ignoring signatures) seems necessary for development.
 * You are tempted to add a "God Mode" or "Admin Override" that bypasses the Bouncer logic.
-* You need to add a dependency that is not `authlib`, `httpx`, `pydantic`, or `loguru`.
+* You need to add a dependency that is not `authlib`, `httpx`, `pydantic`, `loguru`, `stamina`, or `opentelemetry*`.
