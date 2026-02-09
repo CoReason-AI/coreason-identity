@@ -13,16 +13,19 @@ Entry point for the coreason-identity package.
 Demonstrates usage of the IdentityManager for both token validation and device flow.
 """
 
+import contextlib
 import sys  # pragma: no cover
+
+import anyio  # pragma: no cover
 
 from coreason_identity.config import CoreasonClientConfig  # pragma: no cover
 from coreason_identity.exceptions import CoreasonIdentityError  # pragma: no cover
 from coreason_identity.manager import IdentityManager  # pragma: no cover
 
 
-def main() -> None:  # pragma: no cover
+async def main_async() -> None:  # pragma: no cover
     """
-    Main entry point for manual verification and demonstration.
+    Main async entry point for manual verification and demonstration.
     """
     print("Coreason Identity - The Bouncer")
     print("-------------------------------")
@@ -41,53 +44,59 @@ def main() -> None:  # pragma: no cover
         print("Please set COREASON_AUTH_DOMAIN and COREASON_AUTH_AUDIENCE env vars.")
         sys.exit(1)
 
-    identity = IdentityManager(config)
-    print(f"Initialized IdentityManager for domain: {config.domain}")
+    # Use async context manager
+    async with IdentityManager(config) as identity:
+        print(f"Initialized IdentityManager for domain: {config.domain}")
 
-    if len(sys.argv) > 1:
-        command = sys.argv[1]
+        if len(sys.argv) > 1:
+            command = sys.argv[1]
 
-        if command == "validate":
-            if len(sys.argv) < 3:
-                print("Usage: python -m coreason_identity.main validate <token>")
-                sys.exit(1)
-            token = sys.argv[2]
-            print(f"\nValidating token: {token[:10]}...")
-            try:
-                # Expecting raw token or "Bearer <token>"
-                header = token if token.startswith("Bearer ") else f"Bearer {token}"
-                user = identity.validate_token(header)
-                print("\nSUCCESS: Token Validated")
-                print(f"User ID: {user.user_id}")
-                print(f"Email:   {user.email}")
-                print(f"Groups:  {user.groups}")
-                print(f"Scopes:  {user.scopes}")
-                print(f"Claims:  {user.claims}")
-            except CoreasonIdentityError as e:
-                print(f"\nFAILURE: Validation Failed - {e}")
+            if command == "validate":
+                if len(sys.argv) < 3:
+                    print("Usage: python -m coreason_identity.main validate <token>")
+                    sys.exit(1)
+                token = sys.argv[2]
+                print(f"\nValidating token: {token[:10]}...")
+                try:
+                    # Expecting raw token or "Bearer <token>"
+                    header = token if token.startswith("Bearer ") else f"Bearer {token}"
+                    user = await identity.validate_token(header)
+                    print("\nSUCCESS: Token Validated")
+                    print(f"User ID: {user.user_id}")
+                    print(f"Email:   {user.email}")
+                    print(f"Groups:  {user.groups}")
+                    print(f"Scopes:  {user.scopes}")
+                    print(f"Claims:  {user.claims}")
+                except CoreasonIdentityError as e:
+                    print(f"\nFAILURE: Validation Failed - {e}")
 
-        elif command == "login":
-            print("\nInitiating Device Flow Login...")
-            try:
-                flow = identity.start_device_login()
-                print(f"\nPlease visit: {flow.verification_uri}")
-                print(f"And enter code: {flow.user_code}")
-                print("\nWaiting for approval...")
-                tokens = identity.await_device_token(flow)
-                print("\nSUCCESS: Login Complete")
-                print(f"Access Token:  {tokens.access_token[:20]}...")
-                print(f"Refresh Token: {tokens.refresh_token[:20] if tokens.refresh_token else 'N/A'}...")
-            except CoreasonIdentityError as e:
-                print(f"\nFAILURE: Login Failed - {e}")
+            elif command == "login":
+                print("\nInitiating Device Flow Login...")
+                try:
+                    flow = await identity.start_device_login(scope="openid profile email")
+                    print(f"\nPlease visit: {flow.verification_uri}")
+                    print(f"And enter code: {flow.user_code}")
+                    print("\nWaiting for approval...")
+                    tokens = await identity.await_device_token(flow)
+                    print("\nSUCCESS: Login Complete")
+                    print(f"Access Token:  {tokens.access_token[:20]}...")
+                    print(f"Refresh Token: {tokens.refresh_token[:20] if tokens.refresh_token else 'N/A'}...")
+                except CoreasonIdentityError as e:
+                    print(f"\nFAILURE: Login Failed - {e}")
 
+            else:
+                print(f"Unknown command: {command}")
+                print("Available commands: validate, login")
         else:
-            print(f"Unknown command: {command}")
-            print("Available commands: validate, login")
-    else:
-        print("\nNo command provided.")
-        print("Usage:")
-        print("  python -m coreason_identity.main validate <token>")
-        print("  python -m coreason_identity.main login")
+            print("\nNo command provided.")
+            print("Usage:")
+            print("  python -m coreason_identity.main validate <token>")
+            print("  python -m coreason_identity.main login")
+
+
+def main() -> None:  # pragma: no cover
+    with contextlib.suppress(KeyboardInterrupt):
+        anyio.run(main_async)
 
 
 if __name__ == "__main__":  # pragma: no cover
