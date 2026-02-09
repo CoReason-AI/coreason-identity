@@ -18,6 +18,7 @@ from urllib.parse import urljoin
 
 import anyio
 import httpx
+from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 
 from coreason_identity.config import CoreasonClientConfig, CoreasonVerifierConfig
 from coreason_identity.device_flow_client import DeviceFlowClient
@@ -52,6 +53,9 @@ class IdentityManagerAsync:
             # Use SafeHTTPTransport to prevent SSRF and DNS Rebinding
             transport = SafeHTTPTransport(unsafe_local_dev=self.config.unsafe_local_dev)
             self._client = httpx.AsyncClient(transport=transport, timeout=self.config.http_timeout)
+
+        # Instrument the client for distributed tracing
+        HTTPXClientInstrumentor().instrument_client(self._client)
 
         # Domain is already normalized by Config validator to be just the hostname (e.g. auth.coreason.com)
         self.domain = self.config.domain
