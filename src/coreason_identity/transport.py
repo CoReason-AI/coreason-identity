@@ -29,9 +29,7 @@ class SafeAsyncTransport(httpx.AsyncHTTPTransport):
     and validating the IP address against a blocklist before connection.
     """
 
-    async def handle_async_request(
-        self, request: httpx.Request
-    ) -> httpx.Response:
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
         """
         Overrides the request handling to enforce IP validation.
         """
@@ -43,9 +41,7 @@ class SafeAsyncTransport(httpx.AsyncHTTPTransport):
         try:
             # socket.getaddrinfo returns list of (family, type, proto, canonname, sockaddr)
             # sockaddr is (ip, port) for IPv4/IPv6
-            addr_info = await anyio.to_thread.run_sync(
-                socket.getaddrinfo, hostname, port
-            )
+            addr_info = await anyio.to_thread.run_sync(socket.getaddrinfo, hostname, port)
             # Use the first resolved address
             if not addr_info:
                 raise CoreasonIdentityError(f"No IP address resolved for {hostname}")
@@ -58,7 +54,7 @@ class SafeAsyncTransport(httpx.AsyncHTTPTransport):
         try:
             ip_obj = ipaddress.ip_address(ip_str)
         except ValueError as e:
-             raise CoreasonIdentityError(f"Invalid IP address resolved for {hostname}: {ip_str}") from e
+            raise CoreasonIdentityError(f"Invalid IP address resolved for {hostname}: {ip_str}") from e
 
         if (
             ip_obj.is_loopback
@@ -66,7 +62,7 @@ class SafeAsyncTransport(httpx.AsyncHTTPTransport):
             or ip_obj.is_link_local
             or (ip_obj.is_reserved and str(ip_obj) != "0.0.0.0")
         ):
-             raise CoreasonIdentityError(f"SSRF Protection: Blocked connection to restricted IP {ip_str} for {hostname}")
+            raise CoreasonIdentityError(f"SSRF Protection: Blocked connection to restricted IP {ip_str} for {hostname}")
 
         # 3. Rewrite URL to use IP
         # We replace the hostname in the URL with the IP address.
@@ -86,9 +82,7 @@ class SafeAsyncTransport(httpx.AsyncHTTPTransport):
         return await super().handle_async_request(request)
 
 
-async def safe_json_fetch(
-    client: httpx.AsyncClient, url: str, max_bytes: int = 1_000_000
-) -> Any:
+async def safe_json_fetch(client: httpx.AsyncClient, url: str, max_bytes: int = 1_000_000) -> Any:
     """
     Fetches a JSON response with strict DoS protection (bounded read).
 
@@ -113,9 +107,11 @@ async def safe_json_fetch(
             if content_length:
                 try:
                     if int(content_length) > max_bytes:
-                         raise OversizedResponseError(f"Content-Length {content_length} exceeds limit of {max_bytes} bytes")
+                        raise OversizedResponseError(
+                            f"Content-Length {content_length} exceeds limit of {max_bytes} bytes"
+                        )
                 except ValueError:
-                    pass # Invalid header, ignore and rely on stream check
+                    pass  # Invalid header, ignore and rely on stream check
 
             content = bytearray()
             async for chunk in response.aiter_bytes():
@@ -127,10 +123,10 @@ async def safe_json_fetch(
             return json.loads(content)
 
     except httpx.HTTPError as e:
-         raise CoreasonIdentityError(f"HTTP error fetching {url}: {e}") from e
+        raise CoreasonIdentityError(f"HTTP error fetching {url}: {e}") from e
     except json.JSONDecodeError as e:
         raise CoreasonIdentityError(f"Invalid JSON response from {url}: {e}") from e
     except Exception as e:
-         if isinstance(e, (OversizedResponseError, CoreasonIdentityError)):
-             raise
-         raise CoreasonIdentityError(f"Failed to fetch {url}: {e}") from e
+        if isinstance(e, (OversizedResponseError, CoreasonIdentityError)):
+            raise
+        raise CoreasonIdentityError(f"Failed to fetch {url}: {e}") from e

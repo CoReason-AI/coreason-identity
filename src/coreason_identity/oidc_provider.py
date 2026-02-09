@@ -78,9 +78,7 @@ class OIDCProvider:
         wait_max = 1.0
 
         # Use a transient safe client to ensure SSRF protection and avoid resource leaks
-        async with httpx.AsyncClient(
-            transport=SafeAsyncTransport(), timeout=self.client.timeout
-        ) as safe_client:
+        async with httpx.AsyncClient(transport=SafeAsyncTransport(), timeout=self.client.timeout) as safe_client:
             for attempt in range(attempts):
                 try:
                     data = await safe_json_fetch(safe_client, self.discovery_url)
@@ -96,7 +94,7 @@ class OIDCProvider:
                             f"Failed to fetch OIDC configuration from {self.discovery_url}: {e}"
                         ) from e
 
-                    sleep_time = min(wait_initial * (2 ** attempt), wait_max)
+                    sleep_time = min(wait_initial * (2**attempt), wait_max)
                     await anyio.sleep(sleep_time)
                 except ValidationError as e:
                     # Validation error is fatal, do not retry
@@ -125,9 +123,7 @@ class OIDCProvider:
         wait_max = 1.0
 
         # Use a transient safe client to ensure SSRF protection and avoid resource leaks
-        async with httpx.AsyncClient(
-            transport=SafeAsyncTransport(), timeout=self.client.timeout
-        ) as safe_client:
+        async with httpx.AsyncClient(transport=SafeAsyncTransport(), timeout=self.client.timeout) as safe_client:
             for attempt in range(attempts):
                 try:
                     return await safe_json_fetch(safe_client, jwks_uri)  # type: ignore[no-any-return]
@@ -139,7 +135,7 @@ class OIDCProvider:
                     if attempt == attempts - 1:
                         raise CoreasonIdentityError(f"Failed to fetch JWKS from {jwks_uri}: {e}") from e
 
-                    sleep_time = min(wait_initial * (2 ** attempt), wait_max)
+                    sleep_time = min(wait_initial * (2**attempt), wait_max)
                     await anyio.sleep(sleep_time)
 
         raise CoreasonIdentityError(f"Failed to fetch JWKS from {jwks_uri}")  # pragma: no cover

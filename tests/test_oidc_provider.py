@@ -10,7 +10,7 @@
 
 import asyncio
 import time
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
@@ -25,8 +25,11 @@ def mock_client() -> AsyncMock:
     return AsyncMock(spec=httpx.AsyncClient)
 
 
+from collections.abc import Generator
+
+
 @pytest.fixture
-def mock_fetch():
+def mock_fetch() -> Generator[AsyncMock, None, None]:
     with patch("coreason_identity.oidc_provider.safe_json_fetch", new_callable=AsyncMock) as m:
         yield m
 

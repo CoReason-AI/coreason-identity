@@ -13,16 +13,15 @@ Async Context Management for request-scoped UserContext.
 """
 
 from contextvars import ContextVar
-from typing import Optional
 
 from coreason_identity.models import UserContext
 
 # ContextVar to store the current user context.
 # Default is None.
-_current_user: ContextVar[Optional[UserContext]] = ContextVar("current_user", default=None)
+_current_user: ContextVar[UserContext | None] = ContextVar("current_user", default=None)
 
 
-def get_current_user() -> Optional[UserContext]:
+def get_current_user() -> UserContext | None:
     """
     Retrieve the current user context from the async context.
 

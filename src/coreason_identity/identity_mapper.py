@@ -19,7 +19,6 @@ from pydantic import BaseModel, EmailStr, Field, SecretStr, ValidationError, fie
 from coreason_identity.exceptions import (
     CoreasonIdentityError,
     IdentityMappingError,
-    InvalidTokenError,
 )
 from coreason_identity.models import UserContext
 from coreason_identity.utils.logger import logger
@@ -113,9 +112,7 @@ class IdentityMapper:
                 # Sanitize error: extract 'loc' and 'msg', exclude 'input' and 'ctx' (PII)
                 sanitized_errors = []
                 for err in e.errors():
-                    sanitized_errors.append(
-                        {"loc": err.get("loc"), "msg": err.get("msg"), "type": err.get("type")}
-                    )
+                    sanitized_errors.append({"loc": err.get("loc"), "msg": err.get("msg"), "type": err.get("type")})
 
                 error_msg = f"UserContext validation failed: {sanitized_errors}"
                 # Log sanitized message only

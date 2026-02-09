@@ -208,12 +208,11 @@ class TokenValidator:
                 # JTI is required for replay protection.
                 # However, some tokens might not have it.
                 # SOTA requires JTI.
-                if jti and exp:
-                    if self.cache.is_jti_used(jti, exp):
-                        msg = f"Replay detected: Token with JTI {jti} has already been used."
-                        logger.warning(msg)
-                        span.set_status(Status(StatusCode.ERROR, msg))
-                        raise TokenReplayError(msg)
+                if jti and exp and self.cache.is_jti_used(jti, exp):
+                    msg = f"Replay detected: Token with JTI {jti} has already been used."
+                    logger.warning(msg)
+                    span.set_status(Status(StatusCode.ERROR, msg))
+                    raise TokenReplayError(msg)
 
                 # Log success
                 user_sub = payload.get("sub", "unknown")
