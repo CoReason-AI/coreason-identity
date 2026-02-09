@@ -6,11 +6,11 @@ Using real JWT signing/decoding to verify Authlib integration.
 
 import asyncio
 from typing import Any
-from pydantic import SecretStr
 from unittest.mock import AsyncMock
 
 import pytest
 from authlib.jose import JsonWebKey, jwt
+from pydantic import SecretStr
 
 from coreason_identity.exceptions import CoreasonIdentityError
 from coreason_identity.validator import TokenValidator
@@ -64,7 +64,13 @@ class TestIssuerTrustComplex:
         expected_issuer = "https://valid.com/"
         malicious_issuer = "https://evil.com/"
 
-        validator = TokenValidator(oidc_provider=mock_oidc, audience="aud", issuer=expected_issuer, pii_salt=SecretStr("test-salt"), allowed_algorithms=["RS256"])
+        validator = TokenValidator(
+            oidc_provider=mock_oidc,
+            audience="aud",
+            issuer=expected_issuer,
+            pii_salt=SecretStr("test-salt"),
+            allowed_algorithms=["RS256"],
+        )
 
         # Setup mock behavior
         async def get_jwks_side_effect(force_refresh: bool = False) -> dict[str, Any]:
@@ -96,7 +102,13 @@ class TestIssuerTrustComplex:
         """
         mock_oidc.get_jwks.return_value = jwks
         expected_issuer = "https://valid.com/"
-        validator = TokenValidator(oidc_provider=mock_oidc, audience="aud", issuer=expected_issuer, pii_salt=SecretStr("test-salt"), allowed_algorithms=["RS256"])
+        validator = TokenValidator(
+            oidc_provider=mock_oidc,
+            audience="aud",
+            issuer=expected_issuer,
+            pii_salt=SecretStr("test-salt"),
+            allowed_algorithms=["RS256"],
+        )
 
         token_valid = self.create_token(
             key_pair, {"sub": "valid_user", "iss": expected_issuer, "aud": "aud", "exp": 9999999999}

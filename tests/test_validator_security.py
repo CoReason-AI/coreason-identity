@@ -10,11 +10,11 @@
 
 import time
 from typing import Any
-from pydantic import SecretStr
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 from authlib.jose import JsonWebKey, jwt
+from pydantic import SecretStr
 
 from coreason_identity.exceptions import (
     InvalidTokenError,
@@ -69,7 +69,9 @@ class TestValidatorSecurity:
             audience="my-audience",
             issuer="https://valid-issuer.com",
             allowed_algorithms=["RS256"],
-            leeway=0, pii_salt=SecretStr("test-salt"))
+            leeway=0,
+            pii_salt=SecretStr("test-salt"),
+        )
 
         now = int(time.time())
         claims = {
@@ -102,7 +104,8 @@ class TestValidatorSecurity:
             issuer="https://valid-issuer.com",
             allowed_algorithms=["RS256"],
             leeway=0,  # Zero tolerance
-        pii_salt=SecretStr("test-salt"))
+            pii_salt=SecretStr("test-salt"),
+        )
 
         now = int(time.time())
         claims = {
@@ -132,7 +135,8 @@ class TestValidatorSecurity:
             issuer="https://valid-issuer.com",
             allowed_algorithms=["RS256"],
             leeway=10,  # 10 seconds leeway
-        pii_salt=SecretStr("test-salt"))
+            pii_salt=SecretStr("test-salt"),
+        )
 
         now = int(time.time())
         claims = {
@@ -162,7 +166,9 @@ class TestValidatorSecurity:
             audience="my-audience",
             issuer="https://valid-issuer.com",
             allowed_algorithms=["RS256"],
-            leeway=0, pii_salt=SecretStr("test-salt"))
+            leeway=0,
+            pii_salt=SecretStr("test-salt"),
+        )
 
         now = int(time.time())
         claims = {
@@ -193,7 +199,9 @@ class TestValidatorSecurity:
             audience="my-audience",
             issuer="https://valid-issuer.com",
             allowed_algorithms=["RS256"],
-            leeway=10, pii_salt=SecretStr("test-salt"))
+            leeway=10,
+            pii_salt=SecretStr("test-salt"),
+        )
 
         now = int(time.time())
         claims = {
@@ -227,7 +235,9 @@ class TestValidatorSecurity:
             audience="my-audience",
             issuer="https://valid-issuer.com",
             allowed_algorithms=["RS256"],
-            leeway=0, pii_salt=SecretStr("test-salt"))
+            leeway=0,
+            pii_salt=SecretStr("test-salt"),
+        )
 
         now = int(time.time())
         # To strictly guarantee expiration failure, we check 1 second in the past

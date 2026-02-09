@@ -12,7 +12,6 @@ import hashlib
 import hmac
 import time
 from typing import Any
-from pydantic import SecretStr
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -21,6 +20,7 @@ from opentelemetry.sdk.trace import Tracer, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import StatusCode
+from pydantic import SecretStr
 
 from coreason_identity.exceptions import TokenExpiredError
 from coreason_identity.oidc_provider import OIDCProvider
@@ -66,10 +66,18 @@ async def test_validate_token_success_telemetry(
 
     # Patch the module-level tracer
     with patch("coreason_identity.validator.tracer", tracer):
-        validator = TokenValidator(mock_oidc_provider, audience, issuer="https://test-issuer.com", pii_salt=SecretStr("test-salt"), allowed_algorithms=["RS256"])
+        validator = TokenValidator(
+            mock_oidc_provider,
+            audience,
+            issuer="https://test-issuer.com",
+            pii_salt=SecretStr("test-salt"),
+            allowed_algorithms=["RS256"],
+        )
 
         # Mock JWT decode to succeed
-        claims = MockClaims({"iss": "https://test-issuer.com", "sub": "user123", "aud": audience, "exp": time.time() + 3600})
+        claims = MockClaims(
+            {"iss": "https://test-issuer.com", "sub": "user123", "aud": audience, "exp": time.time() + 3600}
+        )
 
         with patch("authlib.jose.JsonWebToken.decode") as mock_decode:
             mock_decode.return_value = claims
@@ -96,7 +104,13 @@ async def test_validate_token_failure_telemetry(
     audience = "test-audience"
 
     with patch("coreason_identity.validator.tracer", tracer):
-        validator = TokenValidator(mock_oidc_provider, audience, issuer="https://test-issuer.com", pii_salt=SecretStr("test-salt"), allowed_algorithms=["RS256"])
+        validator = TokenValidator(
+            mock_oidc_provider,
+            audience,
+            issuer="https://test-issuer.com",
+            pii_salt=SecretStr("test-salt"),
+            allowed_algorithms=["RS256"],
+        )
 
         # Mock JWT decode to raise ExpiredTokenError
         with patch("authlib.jose.JsonWebToken.decode") as mock_decode:
@@ -128,7 +142,13 @@ async def test_logging_strictness(mock_oidc_provider: MagicMock) -> None:
     logger.add(logs.append, level="INFO", format="{message}")
 
     audience = "test-audience"
-    validator = TokenValidator(mock_oidc_provider, audience, issuer="https://test-issuer.com", pii_salt=SecretStr("test-salt"), allowed_algorithms=["RS256"])
+    validator = TokenValidator(
+        mock_oidc_provider,
+        audience,
+        issuer="https://test-issuer.com",
+        pii_salt=SecretStr("test-salt"),
+        allowed_algorithms=["RS256"],
+    )
     user_id = "sensitive-user-id"
 
     # Mock JWT decode to succeed

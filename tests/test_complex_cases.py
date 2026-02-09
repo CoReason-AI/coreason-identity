@@ -13,12 +13,12 @@ Complex and edge case tests for coreason-identity.
 """
 
 from typing import Any
-from pydantic import SecretStr
 from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
 import pytest
 from authlib.jose import JsonWebKey, jwt
+from pydantic import SecretStr
 
 from coreason_identity.device_flow_client import DeviceFlowClient
 from coreason_identity.exceptions import (
@@ -51,7 +51,10 @@ class TestTokenValidatorComplex:
         return TokenValidator(
             oidc_provider=mock_oidc_provider,
             audience="my-audience",
-            issuer="https://valid-issuer.com/", pii_salt=SecretStr("test-salt"), allowed_algorithms=["RS256"])
+            issuer="https://valid-issuer.com/",
+            pii_salt=SecretStr("test-salt"),
+            allowed_algorithms=["RS256"],
+        )
 
     def create_token(
         self,

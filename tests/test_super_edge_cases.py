@@ -14,7 +14,6 @@ Testing missing claims, empty strings, and malformed responses.
 """
 
 from typing import Any
-from pydantic import SecretStr
 from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
@@ -23,6 +22,7 @@ from authlib.jose import JsonWebKey
 
 # Helper for httpx mocks
 from httpx import Request, Response
+from pydantic import SecretStr
 
 from coreason_identity.device_flow_client import DeviceFlowClient
 from coreason_identity.exceptions import (
@@ -153,7 +153,10 @@ class TestTokenValidatorSuperEdgeCases:
         return TokenValidator(
             oidc_provider=mock_oidc_provider,
             audience="my-audience",
-            issuer="https://valid-issuer.com/", pii_salt=SecretStr("test-salt"), allowed_algorithms=["RS256"])
+            issuer="https://valid-issuer.com/",
+            pii_salt=SecretStr("test-salt"),
+            allowed_algorithms=["RS256"],
+        )
 
     @pytest.mark.asyncio
     async def test_malformed_json_payload_after_signature_check(self, validator: TokenValidator) -> None:

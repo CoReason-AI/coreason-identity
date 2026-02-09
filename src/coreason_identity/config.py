@@ -52,7 +52,7 @@ class CoreasonVerifierConfig(BaseSettings):
 
     @field_validator("issuer", mode="after")
     @classmethod
-    def validate_https(cls, v: str | None, info: ValidationInfo) -> str | None:
+    def validate_https(cls, v: str | None, _info: ValidationInfo) -> str | None:
         """
         Ensures that issuer uses HTTPS.
         """

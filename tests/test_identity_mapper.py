@@ -13,15 +13,18 @@ Tests for IdentityMapper.
 """
 
 from typing import Any
+
 import pytest
+from pydantic import SecretStr
+
 from coreason_identity.exceptions import InvalidTokenError
 from coreason_identity.identity_mapper import IdentityMapper
-from coreason_identity.models import UserContext
-from pydantic import SecretStr
+
 
 @pytest.fixture
 def mapper() -> IdentityMapper:
     return IdentityMapper()
+
 
 def test_map_claims_basic(mapper: IdentityMapper) -> None:
     claims: dict[str, Any] = {"sub": "user123", "email": "test@example.com"}
@@ -33,6 +36,7 @@ def test_map_claims_basic(mapper: IdentityMapper) -> None:
     assert ctx.groups == []
     assert ctx.scopes == []
 
+
 def test_map_claims_group_sources(mapper: IdentityMapper) -> None:
     """Test that groups are resolved from standard 'groups' claim."""
     # 1. Standard 'groups'
@@ -41,6 +45,7 @@ def test_map_claims_group_sources(mapper: IdentityMapper) -> None:
     # The extended claims should contain project_context derived from groups
     assert ctx.claims["project_context"] == "apollo"
     assert ctx.groups == ["project:apollo"]
+
 
 def test_map_claims_scopes(mapper: IdentityMapper) -> None:
     """Test scope parsing from 'scope' string."""
@@ -56,9 +61,11 @@ def test_map_claims_scopes(mapper: IdentityMapper) -> None:
     claims3: dict[str, Any] = {"sub": "u3", "email": "u@e.com"}
     assert mapper.map_claims(claims3).scopes == []
 
+
 def test_map_claims_missing_required(mapper: IdentityMapper) -> None:
     with pytest.raises(InvalidTokenError):
         mapper.map_claims({"sub": "no-email"})
+
 
 def test_map_claims_project_id_extraction(mapper: IdentityMapper) -> None:
     # Explicit project_id claim
@@ -76,8 +83,7 @@ def test_map_claims_project_id_extraction(mapper: IdentityMapper) -> None:
         "sub": "u",
         "email": "e@e.com",
         "https://coreason.com/project_id": "explicit",
-        "groups": ["project:apollo"]
+        "groups": ["project:apollo"],
     }
     ctx3 = mapper.map_claims(claims3)
     assert ctx3.claims["project_context"] == "explicit"
-

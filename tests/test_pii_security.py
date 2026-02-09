@@ -52,7 +52,13 @@ class TestPiiSecurity:
         - Assert that the result is NOT the plain SHA-256 hash.
         """
         salt = "test-salt"
-        validator = TokenValidator(oidc_provider=mock_oidc_provider, audience="aud", pii_salt=SecretStr(salt), issuer="https://valid-issuer.com", allowed_algorithms=["RS256"])
+        validator = TokenValidator(
+            oidc_provider=mock_oidc_provider,
+            audience="aud",
+            pii_salt=SecretStr(salt),
+            issuer="https://valid-issuer.com",
+            allowed_algorithms=["RS256"],
+        )
 
         user_id = "user123"
         anonymized = validator._anonymize(user_id)
@@ -75,7 +81,13 @@ class TestPiiSecurity:
         - Assert that the span attribute "user.id" contains the hashed value, not the raw ID.
         """
         salt = "test-salt"
-        validator = TokenValidator(oidc_provider=mock_oidc_provider, audience="aud", pii_salt=SecretStr(salt), issuer="https://valid-issuer.com", allowed_algorithms=["RS256"])
+        validator = TokenValidator(
+            oidc_provider=mock_oidc_provider,
+            audience="aud",
+            pii_salt=SecretStr(salt),
+            issuer="https://valid-issuer.com",
+            allowed_algorithms=["RS256"],
+        )
         mock_oidc_provider.get_jwks.return_value = jwks
 
         now = int(time.time())

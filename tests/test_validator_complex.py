@@ -10,11 +10,11 @@
 
 import time
 from typing import Any
-from pydantic import SecretStr
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 from authlib.jose import JsonWebKey, jwt
+from pydantic import SecretStr
 
 from coreason_identity.exceptions import (
     CoreasonIdentityError,
@@ -51,8 +51,12 @@ class TestTokenValidatorComplex:
     @pytest.fixture
     def validator(self, mock_oidc_provider: Mock) -> TokenValidator:
         return TokenValidator(
-            oidc_provider=mock_oidc_provider, audience="my-audience", issuer="https://valid-issuer.com"
-        , pii_salt=SecretStr("test-salt"), allowed_algorithms=["RS256"])
+            oidc_provider=mock_oidc_provider,
+            audience="my-audience",
+            issuer="https://valid-issuer.com",
+            pii_salt=SecretStr("test-salt"),
+            allowed_algorithms=["RS256"],
+        )
 
     def create_token(self, key: Any, claims: dict[str, Any], headers: dict[str, Any] | None = None) -> bytes:
         if headers is None:

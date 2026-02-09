@@ -8,8 +8,7 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_identity
 
-from collections.abc import AsyncGenerator, Generator
-from typing import Any
+from collections.abc import AsyncGenerator
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest

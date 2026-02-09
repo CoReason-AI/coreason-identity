@@ -34,8 +34,20 @@ class TestPiiAnonymizationComplexScenarios:
         salt_a = "salt-v1"
         salt_b = "salt-v2"
 
-        validator_a = TokenValidator(oidc_provider=mock_oidc_provider, audience="aud", pii_salt=SecretStr(salt_a), issuer="https://default-issuer.com", allowed_algorithms=["RS256"])
-        validator_b = TokenValidator(oidc_provider=mock_oidc_provider, audience="aud", pii_salt=SecretStr(salt_b), issuer="https://default-issuer.com", allowed_algorithms=["RS256"])
+        validator_a = TokenValidator(
+            oidc_provider=mock_oidc_provider,
+            audience="aud",
+            pii_salt=SecretStr(salt_a),
+            issuer="https://default-issuer.com",
+            allowed_algorithms=["RS256"],
+        )
+        validator_b = TokenValidator(
+            oidc_provider=mock_oidc_provider,
+            audience="aud",
+            pii_salt=SecretStr(salt_b),
+            issuer="https://default-issuer.com",
+            allowed_algorithms=["RS256"],
+        )
 
         user_id = "user123"
         hash_a = validator_a._anonymize(user_id)
@@ -53,7 +65,13 @@ class TestPiiAnonymizationComplexScenarios:
         Verify that the same User ID + same Salt always produces the same hash across multiple calls.
         """
         salt = "stable-salt"
-        validator = TokenValidator(oidc_provider=mock_oidc_provider, audience="aud", pii_salt=SecretStr(salt), issuer="https://default-issuer.com", allowed_algorithms=["RS256"])
+        validator = TokenValidator(
+            oidc_provider=mock_oidc_provider,
+            audience="aud",
+            pii_salt=SecretStr(salt),
+            issuer="https://default-issuer.com",
+            allowed_algorithms=["RS256"],
+        )
 
         user_id = "user123"
 

@@ -13,12 +13,16 @@ Tests for IdentityMapper edge cases.
 """
 
 from typing import Any
+
 import pytest
+
 from coreason_identity.identity_mapper import IdentityMapper
+
 
 @pytest.fixture
 def mapper() -> IdentityMapper:
     return IdentityMapper()
+
 
 def test_mapper_scopes_parsing_variations(mapper: IdentityMapper) -> None:
     """Test standard scope claim parsing."""
