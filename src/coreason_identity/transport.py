@@ -82,7 +82,9 @@ class SafeAsyncTransport(httpx.AsyncHTTPTransport):
         return await super().handle_async_request(request)
 
 
-async def safe_json_fetch(client: httpx.AsyncClient, url: str, max_bytes: int = 1_000_000) -> Any:
+async def safe_json_fetch(
+    client: httpx.AsyncClient, url: str, max_bytes: int = 1_000_000, method: str = "GET", **kwargs: Any
+) -> Any:
     """
     Fetches a JSON response with strict DoS protection (bounded read).
 
@@ -90,6 +92,8 @@ async def safe_json_fetch(client: httpx.AsyncClient, url: str, max_bytes: int = 
         client: The httpx client to use.
         url: The URL to fetch.
         max_bytes: The maximum allowed size in bytes. Defaults to 1MB.
+        method: HTTP method to use. Defaults to "GET".
+        **kwargs: Additional arguments passed to client.stream().
 
     Returns:
         Any: The parsed JSON data.
@@ -99,7 +103,7 @@ async def safe_json_fetch(client: httpx.AsyncClient, url: str, max_bytes: int = 
         CoreasonIdentityError: For other HTTP or parsing errors.
     """
     try:
-        async with client.stream("GET", url, follow_redirects=True) as response:
+        async with client.stream(method, url, follow_redirects=True, **kwargs) as response:
             response.raise_for_status()
 
             # Check Content-Length header first
