@@ -103,7 +103,7 @@ class IdentityMapper:
                 downstream_token=SecretStr(token) if token else None,
             )
 
-            logger.debug(f"Mapped identity for user {sub}")
+            # logger.debug(f"Mapped identity for user {sub}")  # Finding #1: Removed to prevent PII leak (raw sub).
             return user_context
 
         except Exception as e:
