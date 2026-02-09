@@ -108,3 +108,23 @@ async def test_safe_transport_invalid_ip_string() -> None:
         # Should be blocked because _validate_ip returns False for invalid IPs
         with pytest.raises(httpx.ConnectError, match=r"All resolved IPs .* are blocked"):
             await transport.handle_async_request(request)
+
+
+@pytest.mark.asyncio
+async def test_safe_transport_allow_unsafe_bypass() -> None:
+    """Test that allow_unsafe=True bypasses IP validation."""
+    private_ip = "192.168.1.1"
+    # Even if IP is private, it should be allowed
+    mock_addr_info = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (private_ip, 443))]
+
+    transport = SafeHTTPTransport(allow_unsafe=True)
+
+    with patch("httpx.AsyncHTTPTransport.handle_async_request", new_callable=AsyncMock) as mock_super:
+        mock_super.return_value = httpx.Response(200)
+
+        with patch("socket.getaddrinfo", return_value=mock_addr_info):
+            request = httpx.Request("GET", "https://private.local/foo")
+            await transport.handle_async_request(request)
+
+            # Should proceed to super call without ConnectError
+            assert mock_super.called

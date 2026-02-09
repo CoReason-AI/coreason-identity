@@ -31,6 +31,7 @@ class CoreasonVerifierConfig(BaseSettings):
             to prevent algorithm confusion attacks.
         clock_skew_leeway (int): Acceptable clock skew in seconds. Defaults to 0 for strict security.
         issuer (str | None): The expected issuer URL. Defaults to https://{domain}/.
+        allow_unsafe_connections (bool): WARNING: Allows connection to private IPs/localhost. DEV ONLY.
     """
 
     model_config = SettingsConfigDict(
@@ -49,14 +50,17 @@ class CoreasonVerifierConfig(BaseSettings):
         0, description="Acceptable clock skew in seconds. Defaults to 0 for strict security."
     )
     issuer: str | None = None
+    allow_unsafe_connections: bool = Field(
+        False, description="WARNING: Allows connection to private IPs/localhost. DEV ONLY."
+    )
 
     @field_validator("issuer", mode="after")
     @classmethod
-    def validate_https(cls, v: str | None, _info: ValidationInfo) -> str | None:
+    def validate_https(cls, v: str | None, info: ValidationInfo) -> str | None:
         """
-        Ensures that issuer uses HTTPS.
+        Ensures that issuer uses HTTPS, unless strictly opted out for local dev.
         """
-        if v and v.startswith("http://"):
+        if v and v.startswith("http://") and not info.data.get("allow_unsafe_connections", False):
             raise ValueError("HTTPS is required for production.")
         return v
 

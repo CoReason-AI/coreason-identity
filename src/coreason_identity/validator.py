@@ -166,12 +166,13 @@ class TokenValidator:
                 return payload
 
             except ExpiredTokenError as e:
-                logger.warning(f"Validation failed: Token expired - {e}")
+                # Token expired is safe to log, but we use exception formatting just in case
+                logger.warning("Validation failed: Token expired", exc_info=True)
                 span.record_exception(e)
                 span.set_status(Status(StatusCode.ERROR, str(e)))
                 raise TokenExpiredError(f"Token has expired: {e}") from e
             except InvalidClaimError as e:
-                logger.warning(f"Validation failed: Invalid claim - {e}")
+                logger.warning("Validation failed: Invalid claim", exc_info=True)
                 span.record_exception(e)
                 span.set_status(Status(StatusCode.ERROR, str(e)))
                 if "aud" in str(e):
@@ -179,25 +180,25 @@ class TokenValidator:
                 # Wrap generic invalid claims as InvalidTokenError, not base error
                 raise InvalidTokenError(f"Invalid claim: {e}") from e
             except MissingClaimError as e:
-                logger.warning(f"Validation failed: Missing claim - {e}")
+                logger.warning("Validation failed: Missing claim", exc_info=True)
                 span.record_exception(e)
                 span.set_status(Status(StatusCode.ERROR, str(e)))
                 # Wrap missing claims as InvalidTokenError
                 raise InvalidTokenError(f"Missing claim: {e}") from e
             except BadSignatureError as e:
-                logger.error(f"Validation failed: Bad signature - {e}")
+                logger.error("Validation failed: Bad signature", exc_info=True)
                 span.record_exception(e)
                 span.set_status(Status(StatusCode.ERROR, str(e)))
                 raise SignatureVerificationError(f"Invalid signature: {e}") from e
             except JoseError as e:
-                logger.error(f"Validation failed: JOSE error - {e}")
+                logger.error("Validation failed: JOSE error", exc_info=True)
                 span.record_exception(e)
                 span.set_status(Status(StatusCode.ERROR, str(e)))
                 # Generic JOSE error implies invalid token
                 raise InvalidTokenError(f"Token validation failed: {e}") from e
             except ValueError as e:
                 # Authlib raises ValueError for "Invalid JSON Web Key Set" or "kid" not found sometimes
-                logger.error(f"Validation failed: Value error (likely key missing) - {e}")
+                logger.error("Validation failed: Value error (likely key missing)", exc_info=True)
                 span.record_exception(e)
                 span.set_status(Status(StatusCode.ERROR, str(e)))
                 raise SignatureVerificationError(f"Invalid signature or key not found: {e}") from e

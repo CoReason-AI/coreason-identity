@@ -50,13 +50,31 @@ def test_identity_mapper_list_normalization() -> None:
     assert raw3.groups == ["g1", "g2"]
 
     # 4. Invalid type -> []
-    # Passing an integer or dict should result in empty list if not handled by standard Pydantic coercion?
-    # Pydantic might try to coerce int to list? No.
-    # The validator says `mode="before"`.
-    # `ensure_list_of_strings` receives `123`.
-    # `isinstance(123, str)` -> False.
-    # `isinstance(123, list|tuple)` -> False.
-    # Returns `[]`.
     raw4 = RawIdPClaims(sub="u", email="e@e.com", groups=123, permissions={"a": 1})
     assert raw4.groups == []
     assert raw4.permissions == []
+
+
+@pytest.mark.asyncio
+async def test_manager_auth_header_too_long() -> None:
+    """Test rejection of overly long auth header."""
+    from unittest.mock import patch
+
+    from coreason_identity.config import CoreasonVerifierConfig
+    from coreason_identity.exceptions import InvalidTokenError
+    from coreason_identity.manager import IdentityManager
+
+    config = CoreasonVerifierConfig(
+        domain="d", audience="a", issuer="https://i", pii_salt="s", allowed_algorithms=["HS256"]
+    )
+
+    with (
+        patch("coreason_identity.manager.OIDCProvider"),
+        patch("coreason_identity.manager.TokenValidator"),
+        patch("coreason_identity.manager.IdentityMapper"),
+    ):
+        manager = IdentityManager(config)
+        long_header = "Bearer " + "a" * 5000
+
+        with pytest.raises(InvalidTokenError, match="Authorization header is too long"):
+            await manager.validate_token(long_header)

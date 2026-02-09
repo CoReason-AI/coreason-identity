@@ -50,7 +50,7 @@ class IdentityManager:
             self._client = client
         else:
             # Use SafeHTTPTransport to prevent SSRF and DNS Rebinding
-            transport = SafeHTTPTransport()
+            transport = SafeHTTPTransport(allow_unsafe=self.config.allow_unsafe_connections)
             self._client = httpx.AsyncClient(transport=transport, timeout=self.config.http_timeout)
 
         # Instrument the client for distributed tracing
@@ -111,6 +111,9 @@ class IdentityManager:
         """
         if not auth_header:
             raise InvalidTokenError("Missing Authorization header.")
+
+        if len(auth_header) > 4096:
+            raise InvalidTokenError("Authorization header is too long.")
 
         # Strict regex validation to avoid raw string splitting
         # Disallow spaces/garbage in the token part

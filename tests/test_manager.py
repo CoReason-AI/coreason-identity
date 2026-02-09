@@ -271,7 +271,7 @@ def test_init_missing_issuer_raises_error() -> None:
     config.issuer = None  # Force None
     config.audience = "aud"
     config.http_timeout = 5.0
-    config.unsafe_local_dev = False
+    config.allow_unsafe_connections = False
 
     with pytest.raises(CoreasonIdentityError, match="Issuer configuration is missing"):
         IdentityManager(config)
