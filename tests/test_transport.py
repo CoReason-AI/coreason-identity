@@ -12,7 +12,6 @@
 Tests for the SafeAsyncTransport component.
 """
 
-import json
 import socket
 from collections.abc import AsyncGenerator, Generator
 from contextlib import asynccontextmanager

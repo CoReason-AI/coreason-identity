@@ -468,7 +468,7 @@ async def test_poll_token_generic_exception_retry(client: DeviceFlowClient, mock
 
 
 @pytest.mark.asyncio
-async def test_get_endpoints_invalid_schema(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
+async def test_get_endpoints_invalid_schema(client: DeviceFlowClient) -> None:
     """Test OIDC config validation failure."""
     # We mock safe_json_fetch directly to return data, and OIDCConfig to raise ValidationError
     with patch("coreason_identity.device_flow_client.safe_json_fetch", new_callable=AsyncMock) as mock_fetch:
