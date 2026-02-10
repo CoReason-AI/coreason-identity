@@ -238,9 +238,11 @@ class DeviceFlowClient:
                 logger.error(f"Polling failed with status {e.response.status_code}: {e}")
                 raise CoreasonIdentityError(f"Polling failed: {e}") from e
 
+            except CoreasonIdentityError:
+                logger.debug("Re-raising CoreasonIdentityError during polling.")
+                raise
+
             except Exception as e:
-                if isinstance(e, CoreasonIdentityError):
-                    raise
                 logger.warning(f"Polling attempt failed: {e}")
                 # Continue polling unless it's a critical error
 
