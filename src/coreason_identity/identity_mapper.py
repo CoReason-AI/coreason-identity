@@ -16,7 +16,10 @@ from typing import Any
 
 from pydantic import BaseModel, EmailStr, Field, SecretStr, ValidationError, field_validator
 
-from coreason_identity.exceptions import CoreasonIdentityError, InvalidTokenError
+from coreason_identity.exceptions import (
+    CoreasonIdentityError,
+    IdentityMappingError,
+)
 from coreason_identity.models import UserContext
 from coreason_identity.utils.logger import logger
 
@@ -77,12 +80,8 @@ class IdentityMapper:
         """
         try:
             # 1. Parse and Normalize Inputs using Pydantic
-            try:
-                raw_claims = RawIdPClaims(**claims)
-            except ValidationError as e:
-                # Map missing required fields (sub, email) to InvalidTokenError
-                # because it means the token payload is insufficient for the app.
-                raise InvalidTokenError(f"UserContext validation failed: {e}") from e
+            # Note: ValidationError is caught in the outer block to ensure safe logging
+            raw_claims = RawIdPClaims(**claims)
 
             # 2. Extract Basic Identity
             sub = raw_claims.sub
@@ -95,7 +94,8 @@ class IdentityMapper:
             # 3. Construct UserContext
             # Note: Pydantic validation in UserContext will enforce strict Enum values for groups/scopes.
             # Any invalid value will raise ValidationError, caught below.
-            user_context = UserContext(
+            # Finding #1: Debug logging removed to prevent PII leak (raw sub).
+            return UserContext(
                 user_id=sub,
                 email=email,
                 groups=groups,
@@ -103,18 +103,21 @@ class IdentityMapper:
                 downstream_token=SecretStr(token) if token else None,
             )
 
-            logger.debug(f"Mapped identity for user {sub}")
-            return user_context
-
         except Exception as e:
             # Catch unexpected exceptions (InvalidTokenError raised above bypasses this)
             if isinstance(e, CoreasonIdentityError):
                 raise
-            # Specifically catch ValidationError from UserContext instantiation
+            # Specifically catch ValidationError from RawIdPClaims or UserContext instantiation
             if isinstance(e, ValidationError):
-                # This happens if groups or scopes contain invalid values not in Enums
-                logger.error(f"UserContext validation failed due to invalid claims: {e}")
-                raise CoreasonIdentityError(f"UserContext validation failed: {e}") from e
+                # Sanitize error: extract 'loc' and 'msg', exclude 'input' and 'ctx' (PII)
+                sanitized_errors = []
+                for err in e.errors():
+                    sanitized_errors.append({"loc": err.get("loc"), "msg": err.get("msg"), "type": err.get("type")})
+
+                error_msg = f"UserContext validation failed: {sanitized_errors}"
+                # Log sanitized message only
+                logger.error(error_msg)
+                raise IdentityMappingError(error_msg) from e
 
             logger.exception("Unexpected error during identity mapping")
             raise CoreasonIdentityError(f"Identity mapping error: {e}") from e

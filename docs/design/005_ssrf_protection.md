@@ -2,30 +2,37 @@
 
 ## 1. Overview
 
-`coreason-identity` enforces strict **runtime** Server-Side Request Forgery (SSRF) protection. This prevents the application from connecting to internal infrastructure (e.g., `localhost`, AWS Metadata Service, private subnets) via malicious OIDC Discovery URLs, even in the face of sophisticated attacks like DNS Rebinding.
+**CRITICAL NOTICE:** The strict runtime Server-Side Request Forgery (SSRF) protection described in previous versions of this design document (specifically `SafeHTTPTransport`) has been **REMOVED** from the `coreason-identity` library.
 
-## 2. Mechanism: SafeHTTPTransport
+The library now relies on **infrastructure-level security controls** to prevent SSRF attacks.
 
-The library uses a custom `httpx` transport layer, `SafeHTTPTransport`, which is active for all OIDC operations.
+## 2. Mechanism: Infrastructure Delegation
 
-### Key Features:
-1.  **DNS Pinning:** The hostname is resolved to an IP address immediately before the connection is established.
-2.  **Runtime IP Validation:** The resolved IP is checked against prohibited ranges (RFC 1918 Private, Loopback, Link-Local, Multicast, Reserved).
-3.  **Connection Forcing:** The HTTP client is forced to connect to the *validated IP address*, ensuring that the destination cannot change between check and use (TOCTOU).
-4.  **SNI/SSL Integrity:** The original hostname is preserved for SNI (Server Name Indication) and SSL certificate verification, ensuring secure HTTPS connections even when connecting by IP.
+`IdentityManager` initializes a standard `httpx.AsyncClient` with basic timeout configurations. It does **NOT** enforce IP filtering, DNS pinning, or private network blocking at the application level.
 
-## 3. Security Guarantee
+```python
+# src/coreason_identity/manager.py
+self._client = httpx.AsyncClient(timeout=self.config.http_timeout)
+```
 
-This mechanism provides a stronger guarantee than previous configuration-time checks:
+### Required Infrastructure Controls
 
-*   **Prevents TOCTOU:** By pinning the IP at the transport layer, we eliminate the time window for DNS Rebinding attacks.
-*   **Fail Safe:** The transport fails closed. If a domain resolves to a blocked IP, the connection is never attempted.
+Since the library does not protect against SSRF, consumers **MUST** deploy this library in an environment with robust egress filtering. Recommended controls include:
 
-## 4. Development Bypass
+1.  **Service Mesh (e.g., Istio, Linkerd):** Configure `ServiceEntry` and `EgressGateway` to whitelist only authorized OIDC provider domains (e.g., `*.auth0.com`, `cognito-idp.*.amazonaws.com`).
+2.  **Network Policies (Kubernetes):** Restrict pod egress traffic to known external IPs or specific FQDNs.
+3.  **Firewall / Security Groups:** Block outbound traffic to:
+    *   Metadata services (e.g., `169.254.169.254`).
+    *   Internal subnets (RFC 1918).
+    *   Loopback (`127.0.0.0/8`).
 
-For local development or testing in isolated environments where internal OIDC providers (like Keycloak on `localhost`) are necessary, the protection can be strictly bypassed.
+## 3. Residual Risk
 
-*   **Config:** `unsafe_local_dev=True`
-*   **Env:** `COREASON_AUTH_UNSAFE_LOCAL_DEV=True`
+If deployed without these infrastructure controls, the library is vulnerable to SSRF attacks where a malicious user could configure a custom OIDC domain (if allowed by the application) to scan internal ports or access cloud metadata.
 
-**Warning:** This should **NEVER** be enabled in production environments.
+*   **Protocol Restriction:** The library strictly enforces `https://` for OIDC discovery, which mitigates some attacks against non-TLS internal services.
+*   **Domain Validation:** `CoreasonVerifierConfig` enforces that the configured domain is a valid hostname and not a URL, preventing some injection attacks.
+
+## 4. History
+
+The `SafeHTTPTransport` mechanism was removed to simplify the library and delegate network security to the platform layer, consistent with modern "Zero Trust" networking principles where the network infrastructure enforces boundaries.

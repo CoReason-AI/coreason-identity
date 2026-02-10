@@ -18,7 +18,10 @@ import sys  # pragma: no cover
 
 import anyio  # pragma: no cover
 
-from coreason_identity.config import CoreasonClientConfig  # pragma: no cover
+from coreason_identity.config import (  # pragma: no cover
+    CoreasonClientConfig,
+    CoreasonVerifierConfig,
+)
 from coreason_identity.exceptions import CoreasonIdentityError  # pragma: no cover
 from coreason_identity.manager import IdentityManager  # pragma: no cover
 
@@ -30,18 +33,32 @@ async def main_async() -> None:  # pragma: no cover
     print("Coreason Identity - The Bouncer")
     print("-------------------------------")
 
-    # 1. Configuration (Mock or Env)
+    # 1. Determine command
+    command = "help"
+    if len(sys.argv) > 1:
+        command = sys.argv[1]
+
+    # 2. Configuration (Mock or Env)
     # In a real app, these would come from env vars.
     # For this demo/check, we use placeholders or expect env vars to be set.
     try:
-        config = CoreasonClientConfig(
-            domain="auth.example.com",  # Replace with real domain for live test
-            audience="api://coreason",
-            client_id="demo-client-id",
-            pii_salt="salt",
-            http_timeout=30.0,
-            allowed_algorithms=["RS256"],
-        )
+        config: CoreasonVerifierConfig | CoreasonClientConfig
+        if command == "validate":
+            config = CoreasonVerifierConfig(
+                domain="auth.example.com",  # Replace with real domain for live test
+                audience="api://coreason",
+                pii_salt="salt",
+                http_timeout=30.0,
+                allowed_algorithms=["RS256"],
+            )
+        else:
+            # Default to client config for login or other commands
+            config = CoreasonClientConfig(
+                domain="auth.example.com",  # Replace with real domain for live test
+                audience="api://coreason",
+                client_id="demo-client-id",
+                http_timeout=30.0,
+            )
     except Exception as e:
         print(f"Configuration Error: {e}")
         print("Please set COREASON_AUTH_DOMAIN and COREASON_AUTH_AUDIENCE env vars.")
@@ -51,46 +68,41 @@ async def main_async() -> None:  # pragma: no cover
     async with IdentityManager(config) as identity:
         print(f"Initialized IdentityManager for domain: {config.domain}")
 
-        if len(sys.argv) > 1:
-            command = sys.argv[1]
+        if command == "validate":
+            if len(sys.argv) < 3:
+                print("Usage: python -m coreason_identity.main validate <token>")
+                sys.exit(1)
+            token = sys.argv[2]
+            print(f"\nValidating token: {token[:10]}...")
+            try:
+                # Expecting raw token or "Bearer <token>"
+                header = token if token.startswith("Bearer ") else f"Bearer {token}"
+                user = await identity.validate_token(header)
+                print("\nSUCCESS: Token Validated")
+                print(f"User ID: {user.user_id}")
+                print(f"Email:   {user.email}")
+                print(f"Groups:  {user.groups}")
+                print(f"Scopes:  {user.scopes}")
+            except CoreasonIdentityError as e:
+                print(f"\nFAILURE: Validation Failed - {e}")
 
-            if command == "validate":
-                if len(sys.argv) < 3:
-                    print("Usage: python -m coreason_identity.main validate <token>")
-                    sys.exit(1)
-                token = sys.argv[2]
-                print(f"\nValidating token: {token[:10]}...")
-                try:
-                    # Expecting raw token or "Bearer <token>"
-                    header = token if token.startswith("Bearer ") else f"Bearer {token}"
-                    user = await identity.validate_token(header)
-                    print("\nSUCCESS: Token Validated")
-                    print(f"User ID: {user.user_id}")
-                    print(f"Email:   {user.email}")
-                    print(f"Groups:  {user.groups}")
-                    print(f"Scopes:  {user.scopes}")
-                except CoreasonIdentityError as e:
-                    print(f"\nFAILURE: Validation Failed - {e}")
+        elif command == "login":
+            print("\nInitiating Device Flow Login...")
+            try:
+                flow = await identity.start_device_login(scope="openid profile email")
+                print(f"\nPlease visit: {flow.verification_uri}")
+                print(f"And enter code: {flow.user_code}")
+                print("\nWaiting for approval...")
+                tokens = await identity.await_device_token(flow)
+                print("\nSUCCESS: Login Complete")
+                print(f"Access Token:  {tokens.access_token[:20]}...")
+                print(f"Refresh Token: {tokens.refresh_token[:20] if tokens.refresh_token else 'N/A'}...")
+            except CoreasonIdentityError as e:
+                print(f"\nFAILURE: Login Failed - {e}")
 
-            elif command == "login":
-                print("\nInitiating Device Flow Login...")
-                try:
-                    flow = await identity.start_device_login(scope="openid profile email")
-                    print(f"\nPlease visit: {flow.verification_uri}")
-                    print(f"And enter code: {flow.user_code}")
-                    print("\nWaiting for approval...")
-                    tokens = await identity.await_device_token(flow)
-                    print("\nSUCCESS: Login Complete")
-                    print(f"Access Token:  {tokens.access_token[:20]}...")
-                    print(f"Refresh Token: {tokens.refresh_token[:20] if tokens.refresh_token else 'N/A'}...")
-                except CoreasonIdentityError as e:
-                    print(f"\nFAILURE: Login Failed - {e}")
-
-            else:
-                print(f"Unknown command: {command}")
-                print("Available commands: validate, login")
         else:
-            print("\nNo command provided.")
+            if command != "help":
+                print(f"Unknown command: {command}")
             print("Usage:")
             print("  python -m coreason_identity.main validate <token>")
             print("  python -m coreason_identity.main login")

@@ -16,10 +16,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from authlib.jose.errors import ExpiredTokenError
-from opentelemetry.sdk.trace import Tracer, TracerProvider
+from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-from opentelemetry.trace import StatusCode
+from opentelemetry.trace import StatusCode, Tracer
 from pydantic import SecretStr
 
 from coreason_identity.exceptions import TokenExpiredError
@@ -43,7 +43,7 @@ def telemetry_setup() -> tuple[InMemorySpanExporter, Tracer]:
     processor = SimpleSpanProcessor(exporter)
     provider.add_span_processor(processor)
     tracer = provider.get_tracer("test_tracer")
-    return exporter, tracer  # type: ignore[return-value]
+    return exporter, tracer
 
 
 @pytest.fixture

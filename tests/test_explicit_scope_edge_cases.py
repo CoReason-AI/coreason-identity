@@ -11,7 +11,6 @@
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from pydantic import SecretStr
 
 from coreason_identity.config import CoreasonClientConfig
 from coreason_identity.device_flow_client import DeviceFlowClient
@@ -31,10 +30,7 @@ class TestComplexScopeScenarios:
             domain=MOCK_DOMAIN,
             audience=MOCK_AUDIENCE,
             client_id=MOCK_CLIENT_ID,
-            pii_salt=SecretStr("**********"),
             http_timeout=5.0,
-            allowed_algorithms=["RS256"],
-            clock_skew_leeway=0,
             issuer=f"https://{MOCK_DOMAIN}/",
         )
 
@@ -45,6 +41,7 @@ class TestComplexScopeScenarios:
         """
         with (
             patch("coreason_identity.manager.OIDCProvider"),
+            # Validator is not initialized for client config, so patch is optional/ignored
             patch("coreason_identity.manager.TokenValidator"),
             patch("coreason_identity.manager.IdentityMapper"),
         ):
