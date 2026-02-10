@@ -36,7 +36,7 @@ def test_json_configuration(capture_logs: pytest.CaptureFixture[str]) -> None:
         out, err = capture_logs.readouterr()
         # Loguru logs to stdout when JSON is enabled in our config
 
-        # VERIFY FIX: Ensure no logs in stderr (no duplicates)
+        # Ensure no logs in stderr to avoid duplicates with stdout JSON logs
         assert not err, f"Stderr should be empty when JSON enabled, but got: {err}"
 
         assert out
