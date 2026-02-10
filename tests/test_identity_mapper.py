@@ -13,10 +13,9 @@ Tests for IdentityMapper.
 """
 
 from typing import Any
-from unittest.mock import MagicMock, patch
 
 import pytest
-from pydantic import SecretStr, ValidationError
+from pydantic import SecretStr
 
 from coreason_identity.exceptions import IdentityMappingError
 from coreason_identity.identity_mapper import IdentityMapper
