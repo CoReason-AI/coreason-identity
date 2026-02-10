@@ -323,7 +323,32 @@ async def test_poll_token_timeout(client: DeviceFlowClient, mock_client: AsyncMo
     with patch("time.time") as mock_time, patch("anyio.sleep", new_callable=AsyncMock):
         mock_time.side_effect = [0, 0, 2, 2, 2, 2, 2]  # Force timeout check
 
-        with pytest.raises(CoreasonIdentityError, match="Polling timed out"):
+        # Match exact string to differentiate from safety limit error
+        with pytest.raises(CoreasonIdentityError, match=r"^Polling timed out\.$"):
+            await client.poll_token(device_resp)
+
+
+@pytest.mark.asyncio
+async def test_poll_token_safety_timeout(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
+    """Test that safety limit timeout is enforced."""
+    responses = [MockResponse(200, {**OIDC_CONFIG_BASE, "token_endpoint": "url"})]
+    # Pending responses
+    responses.extend([MockResponse(400, {"error": "authorization_pending"})] * 10)
+    setup_stream_mock(mock_client, responses)
+
+    # Set long expires_in, but force time forward past max_poll_duration
+    device_resp = DeviceFlowResponse(
+        device_code="dc", user_code="uc", verification_uri="url", expires_in=3600, interval=1
+    )
+    client.max_poll_duration = 100  # Shorten for test
+
+    with patch("time.time") as mock_time, patch("anyio.sleep", new_callable=AsyncMock):
+        # start=0.
+        # Loop check: time < min(3600, 100).
+        # We need time to jump past 100.
+        mock_time.side_effect = [0, 0, 101, 101, 101]
+
+        with pytest.raises(CoreasonIdentityError, match="safety limit reached"):
             await client.poll_token(device_resp)
 
 
