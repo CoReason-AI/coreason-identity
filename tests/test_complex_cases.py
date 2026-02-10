@@ -12,6 +12,9 @@
 Complex and edge case tests for coreason-identity.
 """
 
+import json
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from typing import Any
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -69,28 +72,19 @@ class TestTokenValidatorComplex:
 
     @pytest.mark.asyncio
     async def test_alg_none_attack(self, validator: TokenValidator) -> None:
-        """
-        Security Test: Verify 'alg': 'none' is rejected.
-        Even if the signature is empty/valid for none, we enforce RS256.
-        """
         claims = {
             "sub": "user123",
             "aud": "my-audience",
             "iss": "https://valid-issuer.com/",
             "exp": 9999999999,
         }
-        # Manually construct token with alg: none to bypass authlib strictness during creation
         import base64
-        import json
 
         def base64url_encode(data: bytes) -> str:
             return base64.urlsafe_b64encode(data).rstrip(b"=").decode("utf-8")
 
         header = {"alg": "none", "typ": "JWT"}
-        # Claims JSON
         payload = json.dumps(claims).encode("utf-8")
-
-        # Signature is empty for none alg
         token = f"{base64url_encode(json.dumps(header).encode('utf-8'))}.{base64url_encode(payload)}."
 
         with pytest.raises(CoreasonIdentityError, match="Token validation failed"):
@@ -102,10 +96,6 @@ class TestTokenValidatorComplex:
         validator: TokenValidator,
         key_pair: Any,
     ) -> None:
-        """
-        Verify that validation passes if the token has a list of audiences
-        and one of them matches the configured audience.
-        """
         claims = {
             "sub": "user123",
             "aud": ["other-audience", "my-audience"],
@@ -113,8 +103,6 @@ class TestTokenValidatorComplex:
             "exp": 9999999999,
         }
         token = self.create_token(key_pair, claims)
-
-        # Should pass
         validated = await validator.validate_token(token)
         assert validated["sub"] == "user123"
 
@@ -125,59 +113,37 @@ class TestTokenValidatorComplex:
         key_pair: Any,
         mock_oidc_provider: Mock,
     ) -> None:
-        """
-        Verify that if the first validation fails (old key), it fetches fresh keys and retries.
-        """
-        # 1. Setup: Provider returns OLD keys initially
         old_key = JsonWebKey.generate_key("RSA", 2048, is_private=True)
-        new_key = key_pair  # The one signing the token
-
-        # Initial cached JWKS has only old_key
-        # We need to simulate side effect for AsyncMock
+        new_key = key_pair
         mock_oidc_provider.get_jwks.side_effect = [
-            {"keys": [old_key.as_dict(private=False)]},  # First call (cache)
-            {"keys": [new_key.as_dict(private=False)]},  # Second call (fresh)
+            {"keys": [old_key.as_dict(private=False)]},
+            {"keys": [new_key.as_dict(private=False)]},
         ]
-
         claims = {
             "sub": "user123",
             "aud": "my-audience",
             "iss": "https://valid-issuer.com/",
             "exp": 9999999999,
         }
-        # Token signed with NEW key
         token = self.create_token(new_key, claims)
-
-        # 2. Execute
         validated = await validator.validate_token(token)
-
-        # 3. Verify
         assert validated["sub"] == "user123"
-        # Verify get_jwks was called twice: once default, once with force_refresh=True
         assert mock_oidc_provider.get_jwks.call_count == 2
         mock_oidc_provider.get_jwks.assert_called_with(force_refresh=True)
 
 
 class TestIdentityMapperComplex:
     def test_mapper_groups_explicit_none(self) -> None:
-        """
-        Test resilience against 'groups': None in payload.
-        Pydantic normalization should handle this.
-        """
         mapper = IdentityMapper()
         claims = {
             "sub": "u1",
             "email": "u@e.com",
-            "groups": None,  # Explicit None
+            "groups": None,
         }
         context = mapper.map_claims(claims)
         assert context.groups == []
-        # Removed assertions for 'permissions' and 'project_context'
 
     def test_mapper_admin_group_case_insensitive(self) -> None:
-        """
-        Test 'AdMiN' is rejected due to strict enum validation.
-        """
         mapper = IdentityMapper()
         claims = {
             "sub": "u1",
@@ -186,8 +152,6 @@ class TestIdentityMapperComplex:
         }
         with pytest.raises(CoreasonIdentityError, match="UserContext validation failed"):
             mapper.map_claims(claims)
-
-    # Removed test_mapper_mixed_source_precedence as project_id logic is gone
 
 
 class TestDeviceFlowClientComplex:
@@ -204,28 +168,48 @@ class TestDeviceFlowClientComplex:
         Verify that the client increases polling interval when receiving 'slow_down'.
         """
         client = DeviceFlowClient("client-id", "https://idp.com", client=mock_client, scope="openid profile email")
-        # Setup endpoints
         client._endpoints = {
             "device_authorization_endpoint": "https://idp.com/device",
             "token_endpoint": "https://idp.com/token",
         }
 
-        # Mock responses:
-        # 1. slow_down
-        # 2. authorization_pending
-        # 3. Success
-        mock_client.post.side_effect = [
-            Mock(status_code=400, json=lambda: {"error": "slow_down"}),
-            Mock(status_code=400, json=lambda: {"error": "authorization_pending"}),
-            Mock(
-                status_code=200,
-                json=lambda: {
+        # Helper to simulate a response yielded by client.stream
+        class FakeStreamResponse:
+            def __init__(self, status_code: int, json_data: dict[str, Any]):
+                self.status_code = status_code
+                self._json = json_data
+                self.headers = {"Content-Length": str(len(json.dumps(json_data)))}
+
+            async def aiter_bytes(self) -> AsyncGenerator[bytes, None]:
+                yield json.dumps(self._json).encode("utf-8")
+
+            def raise_for_status(self) -> None:
+                if self.status_code >= 400:
+                    raise httpx.HTTPStatusError("Error", request=None, response=self)  # type: ignore
+
+        # The sequence of responses:
+        responses = [
+            FakeStreamResponse(400, {"error": "slow_down"}),
+            FakeStreamResponse(400, {"error": "authorization_pending"}),
+            FakeStreamResponse(
+                200,
+                {
                     "access_token": "at",
                     "token_type": "Bearer",
                     "expires_in": 3600,
                 },
             ),
         ]
+
+        @asynccontextmanager
+        async def mock_stream(*args: Any, **kwargs: Any) -> AsyncGenerator[FakeStreamResponse, None]:
+            # Consume unused args to satisfy linter
+            _ = args
+            _ = kwargs
+            yield responses.pop(0)
+
+        # Mock the stream method to return our context manager
+        mock_client.stream.side_effect = mock_stream
 
         flow_response = DeviceFlowResponse(
             device_code="dc",
@@ -235,18 +219,15 @@ class TestDeviceFlowClientComplex:
             interval=5,
         )
 
-        # Execute
         with patch("anyio.sleep", new_callable=AsyncMock) as mock_sleep:
             token = await client.poll_token(flow_response)
 
-            # Verify
             assert isinstance(token, TokenResponse)
             assert token.access_token == "at"
 
-            # Check sleep calls
             assert mock_sleep.call_count == 2
             args_list = mock_sleep.call_args_list
-            # First sleep: after slow_down. interval was 5, became 10.
+            # 5 + 5 = 10
             assert args_list[0][0][0] == 10
-            # Second sleep: after auth_pending. interval is 10.
+            # remains 10
             assert args_list[1][0][0] == 10

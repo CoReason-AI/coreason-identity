@@ -16,7 +16,7 @@ from coreason_identity.config import CoreasonVerifierConfig
 
 def test_config_strict_domain_validation() -> None:
     """
-    Test that the domain validator rejects URLs.
+    Test that the domain validator rejects URLs and invalid formats.
     """
     # Valid domain
     config = CoreasonVerifierConfig(
@@ -54,6 +54,17 @@ def test_config_strict_domain_validation() -> None:
     with pytest.raises(ValidationError, match="Domain must be a hostname"):
         CoreasonVerifierConfig(
             domain="auth.coreason.com/",
+            audience="aud",
+            pii_salt="salt",
+            http_timeout=5.0,
+            allowed_algorithms=["RS256"],
+        )
+
+    # Invalid: Contains invalid characters (caught by Pydantic native validation)
+    # Using a space which is definitely invalid in a hostname
+    with pytest.raises(ValidationError, match="Invalid domain format"):
+        CoreasonVerifierConfig(
+            domain="exa mple.com",
             audience="aud",
             pii_salt="salt",
             http_timeout=5.0,

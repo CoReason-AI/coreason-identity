@@ -40,7 +40,7 @@ def test_user_context_rejects_invalid_enums() -> None:
             email="test@example.com",
             groups=["hacker_group"],
         )
-    assert "Input should be 'admin', 'developer' or 'project:apollo'" in str(excinfo.value)
+    assert "Input should be 'admin' or 'developer'" in str(excinfo.value)
 
     # Invalid scope
     with pytest.raises(ValidationError) as excinfo:
@@ -49,7 +49,7 @@ def test_user_context_rejects_invalid_enums() -> None:
             email="test@example.com",
             scopes=["invalid_scope"],
         )
-    assert "Input should be 'openid', 'profile', 'email' or 'read:reports'" in str(excinfo.value)
+    assert "Input should be 'openid', 'profile' or 'email'" in str(excinfo.value)
 
 
 def test_user_context_serialization() -> None:
@@ -106,3 +106,27 @@ def test_user_context_immutability() -> None:
     user = UserContext(user_id="user123", email="test@example.com")
     with pytest.raises(ValidationError):
         user.user_id = "new_id"  # type: ignore
+
+
+def test_user_context_repr_redaction() -> None:
+    """
+    Test that __repr__ and __str__ redact PII.
+    """
+    sensitive_id = "user123_SECRET"
+    sensitive_email = "test_SECRET@example.com"
+    user = UserContext(
+        user_id=sensitive_id,
+        email=sensitive_email,
+        groups=[CoreasonGroup.ADMIN],
+    )
+
+    repr_str = repr(user)
+    str_str = str(user)
+
+    assert sensitive_id not in repr_str
+    assert sensitive_email not in repr_str
+    assert "<REDACTED>" in repr_str
+
+    assert sensitive_id not in str_str
+    assert sensitive_email not in str_str
+    assert "<REDACTED>" in str_str
