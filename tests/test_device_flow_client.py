@@ -517,15 +517,10 @@ async def test_poll_token_oversized_body(client: DeviceFlowClient, mock_client: 
     async def mock_stream_large(method: str, url: str, **kwargs: Any) -> AsyncGenerator[MockResponse, None]:
         if url == "url":
             # This is the poll request
-            resp = MockResponse(200)
+            resp = MockResponse(200, content=b"a" * 1000001)
             # Remove content length to force stream check
             if "Content-Length" in resp.headers:
                 del resp.headers["Content-Length"]
-
-            async def large_gen() -> AsyncGenerator[bytes, None]:
-                yield b"a" * 1000001
-
-            resp.aiter_bytes = large_gen
             yield resp
         else:
             # Delegate to original setup for discovery
