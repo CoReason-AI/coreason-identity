@@ -13,7 +13,6 @@ Tests for Async Context propagation.
 """
 
 import asyncio
-from typing import Any
 
 import pytest
 from pydantic import SecretStr
@@ -80,12 +79,16 @@ async def test_context_modification_in_child() -> None:
         # Child changes context
         child_user = create_user("child")
         set_current_user(child_user)
-        assert get_current_user().user_id == "child"
+        current = get_current_user()
+        assert current is not None
+        assert current.user_id == "child"
 
     await asyncio.create_task(child_task())
 
     # Parent should still see original
-    assert get_current_user().user_id == "parent"
+    current = get_current_user()
+    assert current is not None
+    assert current.user_id == "parent"
 
 
 @pytest.mark.asyncio
