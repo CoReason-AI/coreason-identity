@@ -172,7 +172,7 @@ async def test_safe_json_fetch_chunked_limit_exceeded() -> None:
     async def content_stream() -> AsyncGenerator[bytes, None]:
         yield b"12345"
         yield b"67890"  # Total 10 (still OK)
-        yield b"1"      # Total 11 (Fail)
+        yield b"1"  # Total 11 (Fail)
 
     mock_response.aiter_bytes = content_stream
 
