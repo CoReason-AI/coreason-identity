@@ -81,6 +81,7 @@ class TestComplexScopeScenarios:
                     client_id=MOCK_CLIENT_ID,
                     idp_url=f"https://{MOCK_DOMAIN}",
                     client=manager._client,
+                    oidc_provider=manager.oidc_provider,
                     scope=target_scope,
                 )
 
@@ -113,6 +114,7 @@ class TestComplexScopeScenarios:
                     client_id=MOCK_CLIENT_ID,
                     idp_url=f"https://{MOCK_DOMAIN}",
                     client=manager._client,
+                    oidc_provider=manager.oidc_provider,
                     scope="scope:A",
                 )
 

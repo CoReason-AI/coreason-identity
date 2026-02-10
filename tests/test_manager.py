@@ -162,6 +162,7 @@ async def test_start_device_login_success(client_manager: IdentityManager) -> No
             client_id=MOCK_CLIENT_ID,
             idp_url=f"https://{MOCK_DOMAIN}",
             client=client_manager._client,
+            oidc_provider=client_manager.oidc_provider,
             scope="openid profile email",
         )
         mock_client_instance.initiate_flow.assert_awaited_with(audience=MOCK_AUDIENCE)
@@ -180,6 +181,7 @@ async def test_start_device_login_custom_scope(client_manager: IdentityManager) 
             client_id=MOCK_CLIENT_ID,
             idp_url=f"https://{MOCK_DOMAIN}",
             client=client_manager._client,
+            oidc_provider=client_manager.oidc_provider,
             scope="read:reports",
         )
 
@@ -250,6 +252,7 @@ async def test_await_device_token_stateless(client_manager: IdentityManager) -> 
             client_id=MOCK_CLIENT_ID,
             idp_url=f"https://{MOCK_DOMAIN}",
             client=client_manager._client,
+            oidc_provider=client_manager.oidc_provider,
             scope="",  # Scope is not used during polling
         )
         mock_client_instance.poll_token.assert_awaited_with(mock_flow)

@@ -167,6 +167,7 @@ class IdentityManager:
                 client_id=self.config.client_id,
                 idp_url=f"https://{self.config.domain}",
                 client=self._client,
+                oidc_provider=self.oidc_provider,
                 scope=scope,
             )
 
@@ -199,6 +200,7 @@ class IdentityManager:
                 client_id=self.config.client_id,
                 idp_url=f"https://{self.domain}",
                 client=self._client,
+                oidc_provider=self.oidc_provider,
                 scope="",  # Scope is not used during polling
             )
 

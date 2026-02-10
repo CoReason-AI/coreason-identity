@@ -22,7 +22,7 @@ from pydantic import ValidationError
 
 from coreason_identity.exceptions import CoreasonIdentityError, OversizedResponseError
 from coreason_identity.models import DeviceFlowResponse, TokenResponse
-from coreason_identity.models_internal import OIDCConfig
+from coreason_identity.oidc_provider import OIDCProvider
 from coreason_identity.transport import safe_json_fetch
 from coreason_identity.utils.logger import logger
 
@@ -42,6 +42,7 @@ class DeviceFlowClient:
         client_id: str,
         idp_url: str,
         client: httpx.AsyncClient,
+        oidc_provider: OIDCProvider,
         scope: str,
         min_poll_interval: float = 5.0,
         max_poll_duration: float = 900.0,
@@ -53,6 +54,7 @@ class DeviceFlowClient:
             client_id: The OIDC Client ID.
             idp_url: The base URL of the Identity Provider (e.g., https://my-tenant.auth0.com).
             client: The async HTTP client to use for requests.
+            oidc_provider: The OIDC Provider instance for fetching configuration.
             scope: The scopes to request.
             min_poll_interval: Minimum seconds to wait between requests (default: 5.0).
             max_poll_duration: Maximum seconds to poll before giving up (default: 900.0).
@@ -60,6 +62,7 @@ class DeviceFlowClient:
         self.client_id = client_id
         self.idp_url = idp_url.rstrip("/")
         self.client = client
+        self.oidc_provider = oidc_provider
         self.scope = scope
         self.min_poll_interval = min_poll_interval
         self.max_poll_duration = max_poll_duration
@@ -78,17 +81,8 @@ class DeviceFlowClient:
         if self._endpoints:
             return self._endpoints
 
-        discovery_url = f"{self.idp_url}/.well-known/openid-configuration"
-
         try:
-            data = await safe_json_fetch(self.client, discovery_url)
-            try:
-                # Use strict Pydantic model but allow flexible fallback for optional fields
-                # We interpret the response as OIDCConfig. If it fails validation (e.g. missing issuer),
-                # we wrap it.
-                config = OIDCConfig(**data)
-            except (ValueError, ValidationError) as e:
-                raise CoreasonIdentityError(f"Invalid JSON response from OIDC discovery: {e}") from e
+            config = await self.oidc_provider.get_oidc_config()
 
             # Fallback to standard Auth0 paths if not in config
             device_endpoint = config.device_authorization_endpoint or urljoin(f"{self.idp_url}/", "oauth/device/code")
@@ -99,7 +93,7 @@ class DeviceFlowClient:
                 "token_endpoint": token_endpoint,
             }
             return self._endpoints
-        except (httpx.HTTPError, OversizedResponseError, CoreasonIdentityError) as e:
+        except CoreasonIdentityError as e:
             raise CoreasonIdentityError(f"Failed to discover OIDC endpoints: {e}") from e
 
     async def initiate_flow(self, audience: str | None = None) -> DeviceFlowResponse:

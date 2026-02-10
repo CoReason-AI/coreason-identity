@@ -16,11 +16,12 @@ from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
-from pydantic import ValidationError
 
 from coreason_identity.device_flow_client import DeviceFlowClient
 from coreason_identity.exceptions import CoreasonIdentityError
 from coreason_identity.models import DeviceFlowResponse, TokenResponse
+from coreason_identity.models_internal import OIDCConfig
+from coreason_identity.oidc_provider import OIDCProvider
 
 
 # Helper for stream mocking
@@ -61,11 +62,17 @@ def mock_client() -> AsyncMock:
 
 
 @pytest.fixture
-def client(mock_client: AsyncMock) -> DeviceFlowClient:
+def mock_oidc_provider() -> AsyncMock:
+    return AsyncMock(spec=OIDCProvider)
+
+
+@pytest.fixture
+def client(mock_client: AsyncMock, mock_oidc_provider: AsyncMock) -> DeviceFlowClient:
     return DeviceFlowClient(
         client_id="test-client",
         idp_url="https://test.auth0.com",
         client=mock_client,
+        oidc_provider=mock_oidc_provider,
         min_poll_interval=1.0,
         scope="openid profile email",
     )
@@ -98,36 +105,32 @@ def setup_stream_mock(mock_client: AsyncMock, responses: list[MockResponse] | Mo
 
 
 @pytest.mark.asyncio
-async def test_get_endpoints_success(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
-    resp = MockResponse(
-        200,
-        {
-            **OIDC_CONFIG_BASE,
-            "device_authorization_endpoint": "https://test.auth0.com/oauth/device/code",
-            "token_endpoint": "https://test.auth0.com/oauth/token",
-        },
-    )
-    setup_stream_mock(mock_client, resp)
+async def test_get_endpoints_success(client: DeviceFlowClient, mock_oidc_provider: AsyncMock) -> None:
+    config_data = {
+        **OIDC_CONFIG_BASE,
+        "device_authorization_endpoint": "https://test.auth0.com/oauth/device/code",
+        "token_endpoint": "https://test.auth0.com/oauth/token",
+    }
+    mock_oidc_provider.get_oidc_config.return_value = OIDCConfig(**config_data)
 
     endpoints = await client._get_endpoints()
     assert endpoints["device_authorization_endpoint"] == "https://test.auth0.com/oauth/device/code"
     assert endpoints["token_endpoint"] == "https://test.auth0.com/oauth/token"
 
-    # Verify stream called with correct URL
-    args, _ = mock_client.stream.call_args
-    assert args[1] == "https://test.auth0.com/.well-known/openid-configuration"
+    mock_oidc_provider.get_oidc_config.assert_called_once()
 
     # Test Caching
     endpoints2 = await client._get_endpoints()
     assert endpoints2 is endpoints
-    assert mock_client.stream.call_count == 1
+    # get_oidc_config might be called again internally if _get_endpoints calls it,
+    # but _get_endpoints checks self._endpoints first.
+    assert mock_oidc_provider.get_oidc_config.call_count == 1
 
 
 @pytest.mark.asyncio
-async def test_get_endpoints_fallback(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
+async def test_get_endpoints_fallback(client: DeviceFlowClient, mock_oidc_provider: AsyncMock) -> None:
     """Test fallback when specific keys are missing in config."""
-    resp = MockResponse(200, OIDC_CONFIG_BASE)
-    setup_stream_mock(mock_client, resp)
+    mock_oidc_provider.get_oidc_config.return_value = OIDCConfig(**OIDC_CONFIG_BASE)
 
     endpoints = await client._get_endpoints()
     assert endpoints["device_authorization_endpoint"] == "https://test.auth0.com/oauth/device/code"
@@ -135,26 +138,28 @@ async def test_get_endpoints_fallback(client: DeviceFlowClient, mock_client: Asy
 
 
 @pytest.mark.asyncio
-async def test_get_endpoints_failure(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
-    resp = MockResponse(500, content=b"Internal Server Error")
-    setup_stream_mock(mock_client, resp)
+async def test_get_endpoints_failure(client: DeviceFlowClient, mock_oidc_provider: AsyncMock) -> None:
+    mock_oidc_provider.get_oidc_config.side_effect = CoreasonIdentityError("Fetch failed")
 
     with pytest.raises(CoreasonIdentityError, match="Failed to discover OIDC endpoints"):
         await client._get_endpoints()
 
 
 @pytest.mark.asyncio
-async def test_initiate_flow_success(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
-    # 1. Discovery, 2. Initiation
+async def test_initiate_flow_success(
+    client: DeviceFlowClient, mock_client: AsyncMock, mock_oidc_provider: AsyncMock
+) -> None:
+    # Setup Config
+    mock_oidc_provider.get_oidc_config.return_value = OIDCConfig(
+        **{
+            **OIDC_CONFIG_BASE,
+            "device_authorization_endpoint": "https://test.auth0.com/device",
+            "token_endpoint": "https://test.auth0.com/token",
+        }
+    )
+
+    # Setup Response for initiate (only 1 call now, no discovery)
     responses = [
-        MockResponse(
-            200,
-            {
-                **OIDC_CONFIG_BASE,
-                "device_authorization_endpoint": "https://test.auth0.com/device",
-                "token_endpoint": "https://test.auth0.com/token",
-            },
-        ),
         MockResponse(
             200,
             {
@@ -175,8 +180,7 @@ async def test_initiate_flow_success(client: DeviceFlowClient, mock_client: Asyn
     assert resp.user_code == "uc_123"
 
     # Verify calls
-    assert mock_client.stream.call_count == 2
-    # Check initiation call (last call)
+    assert mock_client.stream.call_count == 1
     args, kwargs = mock_client.stream.call_args
     assert args[0] == "POST"
     assert args[1] == "https://test.auth0.com/device"
@@ -184,9 +188,11 @@ async def test_initiate_flow_success(client: DeviceFlowClient, mock_client: Asyn
 
 
 @pytest.mark.asyncio
-async def test_initiate_flow_http_error(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
+async def test_initiate_flow_http_error(
+    client: DeviceFlowClient, mock_client: AsyncMock, mock_oidc_provider: AsyncMock
+) -> None:
+    mock_oidc_provider.get_oidc_config.return_value = OIDCConfig(**OIDC_CONFIG_BASE)
     responses = [
-        MockResponse(200, OIDC_CONFIG_BASE),
         MockResponse(500, content=b"Error"),
     ]
     setup_stream_mock(mock_client, responses)
@@ -196,9 +202,11 @@ async def test_initiate_flow_http_error(client: DeviceFlowClient, mock_client: A
 
 
 @pytest.mark.asyncio
-async def test_initiate_flow_validation_error(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
+async def test_initiate_flow_validation_error(
+    client: DeviceFlowClient, mock_client: AsyncMock, mock_oidc_provider: AsyncMock
+) -> None:
+    mock_oidc_provider.get_oidc_config.return_value = OIDCConfig(**OIDC_CONFIG_BASE)
     responses = [
-        MockResponse(200, OIDC_CONFIG_BASE),
         MockResponse(200, {}),  # Missing fields
     ]
     setup_stream_mock(mock_client, responses)
@@ -208,16 +216,17 @@ async def test_initiate_flow_validation_error(client: DeviceFlowClient, mock_cli
 
 
 @pytest.mark.asyncio
-async def test_poll_token_success(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
+async def test_poll_token_success(
+    client: DeviceFlowClient, mock_client: AsyncMock, mock_oidc_provider: AsyncMock
+) -> None:
+    mock_oidc_provider.get_oidc_config.return_value = OIDCConfig(
+        **{
+            **OIDC_CONFIG_BASE,
+            "token_endpoint": "https://test.auth0.com/token",
+        }
+    )
+
     responses = [
-        # Discovery
-        MockResponse(
-            200,
-            {
-                **OIDC_CONFIG_BASE,
-                "token_endpoint": "https://test.auth0.com/token",
-            },
-        ),
         # Polling: pending -> success
         MockResponse(400, {"error": "authorization_pending"}),
         MockResponse(200, {"access_token": "at_123", "token_type": "Bearer", "expires_in": 3600}),
@@ -233,14 +242,16 @@ async def test_poll_token_success(client: DeviceFlowClient, mock_client: AsyncMo
 
     assert isinstance(token_resp, TokenResponse)
     assert token_resp.access_token == "at_123"
-    assert mock_client.stream.call_count == 3
+    assert mock_client.stream.call_count == 2
     mock_sleep.assert_called_once_with(1)
 
 
 @pytest.mark.asyncio
-async def test_poll_token_slow_down(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
+async def test_poll_token_slow_down(
+    client: DeviceFlowClient, mock_client: AsyncMock, mock_oidc_provider: AsyncMock
+) -> None:
+    mock_oidc_provider.get_oidc_config.return_value = OIDCConfig(**{**OIDC_CONFIG_BASE, "token_endpoint": "url"})
     responses = [
-        MockResponse(200, {**OIDC_CONFIG_BASE, "token_endpoint": "url"}),
         MockResponse(400, {"error": "slow_down"}),
         MockResponse(200, {"access_token": "at", "token_type": "Bearer", "expires_in": 3600}),
     ]
@@ -256,9 +267,11 @@ async def test_poll_token_slow_down(client: DeviceFlowClient, mock_client: Async
 
 
 @pytest.mark.asyncio
-async def test_poll_token_access_denied(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
+async def test_poll_token_access_denied(
+    client: DeviceFlowClient, mock_client: AsyncMock, mock_oidc_provider: AsyncMock
+) -> None:
+    mock_oidc_provider.get_oidc_config.return_value = OIDCConfig(**{**OIDC_CONFIG_BASE, "token_endpoint": "url"})
     responses = [
-        MockResponse(200, {**OIDC_CONFIG_BASE, "token_endpoint": "url"}),
         MockResponse(400, {"error": "access_denied"}),
     ]
     setup_stream_mock(mock_client, responses)
@@ -275,9 +288,11 @@ async def test_poll_token_access_denied(client: DeviceFlowClient, mock_client: A
 
 
 @pytest.mark.asyncio
-async def test_poll_token_expired_token(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
+async def test_poll_token_expired_token(
+    client: DeviceFlowClient, mock_client: AsyncMock, mock_oidc_provider: AsyncMock
+) -> None:
+    mock_oidc_provider.get_oidc_config.return_value = OIDCConfig(**{**OIDC_CONFIG_BASE, "token_endpoint": "url"})
     responses = [
-        MockResponse(200, {**OIDC_CONFIG_BASE, "token_endpoint": "url"}),
         MockResponse(400, {"error": "expired_token"}),
     ]
     setup_stream_mock(mock_client, responses)
@@ -294,27 +309,12 @@ async def test_poll_token_expired_token(client: DeviceFlowClient, mock_client: A
 
 
 @pytest.mark.asyncio
-async def test_poll_token_timeout(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
-    # Setup infinite pending responses
-    class InfinitePending:
-        def __init__(self) -> None:
-            self.resp = MockResponse(400, {"error": "authorization_pending"})
+async def test_poll_token_timeout(
+    client: DeviceFlowClient, mock_client: AsyncMock, mock_oidc_provider: AsyncMock
+) -> None:
+    mock_oidc_provider.get_oidc_config.return_value = OIDCConfig(**{**OIDC_CONFIG_BASE, "token_endpoint": "url"})
 
-        def __iter__(self) -> "InfinitePending":
-            return self
-
-        def __next__(self) -> MockResponse:
-            return self.resp
-
-    # Need discovery first
-    responses = [MockResponse(200, {**OIDC_CONFIG_BASE, "token_endpoint": "url"})]
-
-    # We can't strictly use list for infinite, but we can make the generator handle it
-    # Modified setup_stream_mock handles iterables.
-
-    # For timeout test, we rely on time.time mocking mostly, so a few pending responses are enough
-    responses.extend([MockResponse(400, {"error": "authorization_pending"})] * 10)
-
+    responses = [MockResponse(400, {"error": "authorization_pending"})] * 10
     setup_stream_mock(mock_client, responses)
 
     # Set expires_in to 1 second
@@ -323,17 +323,16 @@ async def test_poll_token_timeout(client: DeviceFlowClient, mock_client: AsyncMo
     with patch("time.time") as mock_time, patch("anyio.sleep", new_callable=AsyncMock):
         mock_time.side_effect = [0, 0, 2, 2, 2, 2, 2]  # Force timeout check
 
-        # Match exact string to differentiate from safety limit error
         with pytest.raises(CoreasonIdentityError, match=r"^Polling timed out\.$"):
             await client.poll_token(device_resp)
 
 
 @pytest.mark.asyncio
-async def test_poll_token_safety_timeout(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
-    """Test that safety limit timeout is enforced."""
-    responses = [MockResponse(200, {**OIDC_CONFIG_BASE, "token_endpoint": "url"})]
-    # Pending responses
-    responses.extend([MockResponse(400, {"error": "authorization_pending"})] * 10)
+async def test_poll_token_safety_timeout(
+    client: DeviceFlowClient, mock_client: AsyncMock, mock_oidc_provider: AsyncMock
+) -> None:
+    mock_oidc_provider.get_oidc_config.return_value = OIDCConfig(**{**OIDC_CONFIG_BASE, "token_endpoint": "url"})
+    responses = [MockResponse(400, {"error": "authorization_pending"})] * 10
     setup_stream_mock(mock_client, responses)
 
     # Set long expires_in, but force time forward past max_poll_duration
@@ -353,10 +352,11 @@ async def test_poll_token_safety_timeout(client: DeviceFlowClient, mock_client: 
 
 
 @pytest.mark.asyncio
-async def test_poll_token_unexpected_error(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
-    """Test when polling receives a 500 error."""
+async def test_poll_token_unexpected_error(
+    client: DeviceFlowClient, mock_client: AsyncMock, mock_oidc_provider: AsyncMock
+) -> None:
+    mock_oidc_provider.get_oidc_config.return_value = OIDCConfig(**{**OIDC_CONFIG_BASE, "token_endpoint": "url"})
     responses = [
-        MockResponse(200, {**OIDC_CONFIG_BASE, "token_endpoint": "url"}),
         MockResponse(500, {"error": "server_error"}),
     ]
     setup_stream_mock(mock_client, responses)
@@ -370,10 +370,11 @@ async def test_poll_token_unexpected_error(client: DeviceFlowClient, mock_client
 
 
 @pytest.mark.asyncio
-async def test_poll_token_invalid_json_type(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
-    """Test when polling receives a valid JSON that isn't a dict (e.g. list)."""
+async def test_poll_token_invalid_json_type(
+    client: DeviceFlowClient, mock_client: AsyncMock, mock_oidc_provider: AsyncMock
+) -> None:
+    mock_oidc_provider.get_oidc_config.return_value = OIDCConfig(**{**OIDC_CONFIG_BASE, "token_endpoint": "url"})
     responses = [
-        MockResponse(200, {**OIDC_CONFIG_BASE, "token_endpoint": "url"}),
         MockResponse(400, ["error"]),  # Not a dict
     ]
     setup_stream_mock(mock_client, responses)
@@ -383,7 +384,6 @@ async def test_poll_token_invalid_json_type(client: DeviceFlowClient, mock_clien
     )
 
     with (
-        # It triggers raise_for_status -> HTTPStatusError -> Polling failed
         pytest.raises(CoreasonIdentityError, match="Polling failed"),
         patch("anyio.sleep", new_callable=AsyncMock),
     ):
@@ -391,10 +391,11 @@ async def test_poll_token_invalid_json_type(client: DeviceFlowClient, mock_clien
 
 
 @pytest.mark.asyncio
-async def test_poll_token_non_json_500(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
-    """Test when polling receives non-JSON content with 500 error."""
+async def test_poll_token_non_json_500(
+    client: DeviceFlowClient, mock_client: AsyncMock, mock_oidc_provider: AsyncMock
+) -> None:
+    mock_oidc_provider.get_oidc_config.return_value = OIDCConfig(**{**OIDC_CONFIG_BASE, "token_endpoint": "url"})
     responses = [
-        MockResponse(200, {**OIDC_CONFIG_BASE, "token_endpoint": "url"}),
         MockResponse(500, content=b"Server Error"),
     ]
     setup_stream_mock(mock_client, responses)
@@ -408,10 +409,11 @@ async def test_poll_token_non_json_500(client: DeviceFlowClient, mock_client: As
 
 
 @pytest.mark.asyncio
-async def test_poll_token_non_json_200(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
-    """Test when polling receives non-JSON content with 200 OK (Unexpected)."""
+async def test_poll_token_non_json_200(
+    client: DeviceFlowClient, mock_client: AsyncMock, mock_oidc_provider: AsyncMock
+) -> None:
+    mock_oidc_provider.get_oidc_config.return_value = OIDCConfig(**{**OIDC_CONFIG_BASE, "token_endpoint": "url"})
     responses = [
-        MockResponse(200, {**OIDC_CONFIG_BASE, "token_endpoint": "url"}),
         MockResponse(200, content=b"Not JSON"),
     ]
     setup_stream_mock(mock_client, responses)
@@ -428,10 +430,11 @@ async def test_poll_token_non_json_200(client: DeviceFlowClient, mock_client: As
 
 
 @pytest.mark.asyncio
-async def test_poll_token_204_empty(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
-    """Test when polling receives 204 No Content (should trigger generic error)."""
+async def test_poll_token_204_empty(
+    client: DeviceFlowClient, mock_client: AsyncMock, mock_oidc_provider: AsyncMock
+) -> None:
+    mock_oidc_provider.get_oidc_config.return_value = OIDCConfig(**{**OIDC_CONFIG_BASE, "token_endpoint": "url"})
     responses = [
-        MockResponse(200, {**OIDC_CONFIG_BASE, "token_endpoint": "url"}),
         MockResponse(204),
     ]
     setup_stream_mock(mock_client, responses)
@@ -441,9 +444,6 @@ async def test_poll_token_204_empty(client: DeviceFlowClient, mock_client: Async
     )
 
     with (
-        # raise_for_status won't raise for 204, but json load fails?
-        # Wait, if 204, content is empty. json.loads(b"") raises JSONDecodeError.
-        # So it raises Invalid JSON response.
         pytest.raises(CoreasonIdentityError, match="Invalid JSON response"),
         patch("anyio.sleep", new_callable=AsyncMock),
     ):
@@ -451,15 +451,13 @@ async def test_poll_token_204_empty(client: DeviceFlowClient, mock_client: Async
 
 
 @pytest.mark.asyncio
-async def test_poll_token_generic_exception_retry(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
-    """Test retry logic on generic exception."""
-    # This one is tricky because mock_stream is a context manager.
-    # We need side_effect to raise Exception for one call, then yield response.
+async def test_poll_token_generic_exception_retry(
+    client: DeviceFlowClient, mock_client: AsyncMock, mock_oidc_provider: AsyncMock
+) -> None:
+    mock_oidc_provider.get_oidc_config.return_value = OIDCConfig(**{**OIDC_CONFIG_BASE, "token_endpoint": "url"})
 
-    # Custom side effect for this test
     responses = iter(
         [
-            MockResponse(200, {**OIDC_CONFIG_BASE, "token_endpoint": "url"}),
             MockResponse(200, {"access_token": "at_123", "token_type": "Bearer", "expires_in": 3600}),
         ]
     )
@@ -467,13 +465,10 @@ async def test_poll_token_generic_exception_retry(client: DeviceFlowClient, mock
     call_count = 0
 
     @asynccontextmanager
-    async def mock_stream_retry(method: str, url: str, **kwargs: Any) -> AsyncGenerator[MockResponse, None]:
-        _ = method
-        _ = url
-        _ = kwargs
+    async def mock_stream_retry(_method: str, _url: str, **_kwargs: Any) -> AsyncGenerator[MockResponse, None]:
         nonlocal call_count
         call_count += 1
-        if call_count == 2:  # First poll attempt
+        if call_count == 1:  # First poll attempt (after endpoints discovery)
             raise Exception("Network Error")
         yield next(responses)
 
@@ -488,32 +483,19 @@ async def test_poll_token_generic_exception_retry(client: DeviceFlowClient, mock
 
     assert isinstance(token_resp, TokenResponse)
     assert token_resp.access_token == "at_123"
-    assert mock_client.stream.call_count == 3  # Discovery, Fail, Success
+    assert call_count == 2
     mock_sleep.assert_called_once_with(1)
 
 
 @pytest.mark.asyncio
-async def test_get_endpoints_invalid_schema(client: DeviceFlowClient) -> None:
-    """Test OIDC config validation failure."""
-    # We mock safe_json_fetch directly to return data, and OIDCConfig to raise ValidationError
-    with patch("coreason_identity.device_flow_client.safe_json_fetch", new_callable=AsyncMock) as mock_fetch:
-        mock_fetch.return_value = {}
-        with patch("coreason_identity.device_flow_client.OIDCConfig") as mock_config:
-            mock_config.side_effect = ValidationError.from_exception_data("msg", [])
-
-            with pytest.raises(CoreasonIdentityError, match="Invalid JSON response from OIDC discovery"):
-                await client._get_endpoints()
-
-
-@pytest.mark.asyncio
-async def test_poll_token_oversized_content_length(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
-    """Test oversized Content-Length in polling response."""
+async def test_poll_token_oversized_content_length(
+    client: DeviceFlowClient, mock_client: AsyncMock, mock_oidc_provider: AsyncMock
+) -> None:
+    mock_oidc_provider.get_oidc_config.return_value = OIDCConfig(**{**OIDC_CONFIG_BASE, "token_endpoint": "url"})
     responses = [
-        MockResponse(200, {**OIDC_CONFIG_BASE, "token_endpoint": "url"}),
         MockResponse(200, {"access_token": "at"}, content=b""),
     ]
-    # Manually set Content-Length on the polling response
-    responses[1].headers["Content-Length"] = "2000000"
+    responses[0].headers["Content-Length"] = "2000000"
 
     setup_stream_mock(mock_client, responses)
     device_resp = DeviceFlowResponse(
@@ -528,29 +510,17 @@ async def test_poll_token_oversized_content_length(client: DeviceFlowClient, moc
 
 
 @pytest.mark.asyncio
-async def test_poll_token_oversized_body(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
-    """Test oversized body in polling response."""
-    responses = [
-        MockResponse(200, {**OIDC_CONFIG_BASE, "token_endpoint": "url"}),
-    ]
-    setup_stream_mock(mock_client, responses)
-
-    # Custom stream for the polling part to yield large data
-    original_stream = mock_client.stream.side_effect
+async def test_poll_token_oversized_body(
+    client: DeviceFlowClient, mock_client: AsyncMock, mock_oidc_provider: AsyncMock
+) -> None:
+    mock_oidc_provider.get_oidc_config.return_value = OIDCConfig(**{**OIDC_CONFIG_BASE, "token_endpoint": "url"})
 
     @asynccontextmanager
-    async def mock_stream_large(method: str, url: str, **kwargs: Any) -> AsyncGenerator[MockResponse, None]:
-        if url == "url":
-            # This is the poll request
-            resp = MockResponse(200, content=b"a" * 1000001)
-            # Remove content length to force stream check
-            if "Content-Length" in resp.headers:
-                del resp.headers["Content-Length"]
-            yield resp
-        else:
-            # Delegate to original setup for discovery
-            async with original_stream(method, url, **kwargs) as r:
-                yield r
+    async def mock_stream_large(_method: str, _url: str, **_kwargs: Any) -> AsyncGenerator[MockResponse, None]:
+        resp = MockResponse(200, content=b"a" * 1000001)
+        if "Content-Length" in resp.headers:
+            del resp.headers["Content-Length"]
+        yield resp
 
     mock_client.stream.side_effect = mock_stream_large
 
@@ -566,19 +536,17 @@ async def test_poll_token_oversized_body(client: DeviceFlowClient, mock_client: 
 
 
 @pytest.mark.asyncio
-async def test_poll_token_enforces_min_interval(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
-    """Test that min_poll_interval is enforced and logged."""
+async def test_poll_token_enforces_min_interval(
+    client: DeviceFlowClient, mock_client: AsyncMock, mock_oidc_provider: AsyncMock
+) -> None:
+    mock_oidc_provider.get_oidc_config.return_value = OIDCConfig(**{**OIDC_CONFIG_BASE, "token_endpoint": "url"})
     responses = [
-        MockResponse(200, {**OIDC_CONFIG_BASE, "token_endpoint": "url"}),
         MockResponse(400, {"error": "authorization_pending"}),
         MockResponse(200, {"access_token": "at", "token_type": "Bearer", "expires_in": 3600}),
     ]
     setup_stream_mock(mock_client, responses)
 
-    # Increase client min interval to force check
     client.min_poll_interval = 5.0
-
-    # Device response asks for 1 (valid int, but less than 5.0)
     device_resp = DeviceFlowResponse(
         device_code="dc", user_code="uc", verification_uri="url", expires_in=10, interval=1
     )
@@ -588,18 +556,16 @@ async def test_poll_token_enforces_min_interval(client: DeviceFlowClient, mock_c
         patch("coreason_identity.device_flow_client.logger") as mock_logger,
     ):
         await client.poll_token(device_resp)
-
-        # Should verify logger.warning was called
         assert any("unsafe polling interval" in str(c) for c in mock_logger.warning.call_args_list)
-        # Sleep should be called with 5.0 (min), not 1
         mock_sleep.assert_called_with(5.0)
 
 
 @pytest.mark.asyncio
-async def test_poll_token_invalid_response_schema(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
-    """Test invalid token response structure."""
+async def test_poll_token_invalid_response_schema(
+    client: DeviceFlowClient, mock_client: AsyncMock, mock_oidc_provider: AsyncMock
+) -> None:
+    mock_oidc_provider.get_oidc_config.return_value = OIDCConfig(**{**OIDC_CONFIG_BASE, "token_endpoint": "url"})
     responses = [
-        MockResponse(200, {**OIDC_CONFIG_BASE, "token_endpoint": "url"}),
         MockResponse(200, {"access_token": "at"}),  # Missing token_type, expires_in
     ]
     setup_stream_mock(mock_client, responses)
@@ -616,14 +582,14 @@ async def test_poll_token_invalid_response_schema(client: DeviceFlowClient, mock
 
 
 @pytest.mark.asyncio
-async def test_poll_token_invalid_content_length(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
-    """Test invalid Content-Length header is ignored."""
+async def test_poll_token_invalid_content_length(
+    client: DeviceFlowClient, mock_client: AsyncMock, mock_oidc_provider: AsyncMock
+) -> None:
+    mock_oidc_provider.get_oidc_config.return_value = OIDCConfig(**{**OIDC_CONFIG_BASE, "token_endpoint": "url"})
     responses = [
-        MockResponse(200, {**OIDC_CONFIG_BASE, "token_endpoint": "url"}),
         MockResponse(200, {"access_token": "at", "token_type": "Bearer", "expires_in": 3600}),
     ]
-    # Set invalid Content-Length
-    responses[1].headers["Content-Length"] = "invalid"
+    responses[0].headers["Content-Length"] = "invalid"
 
     setup_stream_mock(mock_client, responses)
     device_resp = DeviceFlowResponse(

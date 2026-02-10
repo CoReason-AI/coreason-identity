@@ -59,6 +59,34 @@ class OIDCProvider:
         self._last_update: float = 0.0
         self._lock: anyio.Lock | None = None
 
+    async def get_oidc_config(self, force_refresh: bool = False) -> OIDCConfig:
+        """
+        Returns the OIDC configuration, using the cache if valid.
+
+        Args:
+            force_refresh: If True, bypasses the cache and fetches fresh config.
+
+        Returns:
+            OIDCConfig: The OIDC configuration object.
+
+        Raises:
+            CoreasonIdentityError: If fetching fails.
+        """
+        current_time = time.time()
+        if (
+            not force_refresh
+            and self._oidc_config_cache is not None
+            and (current_time - self._last_update) < self.cache_ttl
+        ):
+            return self._oidc_config_cache
+
+        # Note: We do not update _last_update here as it governs JWKS cache validity too.
+        # This means subsequent calls might still see the config as "stale" based on _last_update
+        # if JWKS hasn't been refreshed, but that's acceptable for now.
+        config = await self._fetch_oidc_config()
+        self._oidc_config_cache = config
+        return config
+
     async def _fetch_oidc_config(self) -> OIDCConfig:
         """
         Fetches the OIDC configuration to find the jwks_uri.

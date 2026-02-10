@@ -34,6 +34,7 @@ from coreason_identity.exceptions import (
 )
 from coreason_identity.identity_mapper import IdentityMapper
 from coreason_identity.models import DeviceFlowResponse
+from coreason_identity.models_internal import OIDCConfig
 from coreason_identity.oidc_provider import OIDCProvider
 from coreason_identity.validator import TokenValidator
 
@@ -143,19 +144,23 @@ class TestDeviceFlowSuperEdgeCases:
         Verify behavior when IdP returns 200 OK but the JSON is missing 'access_token'.
         This should fail Pydantic validation of TokenResponse.
         """
-        client = DeviceFlowClient("cid", "https://idp.com", client=mock_client, scope="openid profile email")
+        mock_oidc_provider = AsyncMock(spec=OIDCProvider)
+        mock_oidc_provider.get_oidc_config.return_value = OIDCConfig(
+            device_authorization_endpoint="https://idp.com/device",
+            token_endpoint="https://idp.com/token",
+            issuer="https://idp",
+            jwks_uri="https://idp/jwks",
+        )
+
+        client = DeviceFlowClient(
+            "cid",
+            "https://idp.com",
+            client=mock_client,
+            oidc_provider=mock_oidc_provider,
+            scope="openid profile email",
+        )
 
         responses = [
-            # Discovery
-            MockResponse(
-                200,
-                {
-                    "device_authorization_endpoint": "https://idp.com/device",
-                    "token_endpoint": "https://idp.com/token",
-                    "issuer": "https://idp",
-                    "jwks_uri": "https://idp/jwks",
-                },
-            ),
             # Polling response: 200 OK but missing access_token
             MockResponse(200, {"token_type": "Bearer", "expires_in": 3600}),
         ]

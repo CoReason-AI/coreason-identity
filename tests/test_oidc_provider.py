@@ -272,3 +272,29 @@ async def test_get_jwks_refresh_cooldown(provider: OIDCProvider, mock_fetch: Asy
         mock_fetch.assert_not_called()
         # Should warn
         assert any("cooldown active" in str(c) for c in mock_logger.warning.call_args_list)
+
+
+@pytest.mark.asyncio
+async def test_get_oidc_config_success(provider: OIDCProvider, mock_fetch: AsyncMock) -> None:
+    """Test fetching OIDC config independently."""
+    # 1. Fetch
+    mock_fetch.return_value = {"jwks_uri": "https://idp/jwks", "issuer": "https://idp"}
+    config = await provider.get_oidc_config()
+    assert config.issuer == "https://idp"
+    assert mock_fetch.call_count == 1
+
+    # 2. Cache hit
+    # We must simulate that the cache is fresh.
+    # Since get_oidc_config does not update _last_update (to avoid validating stale JWKS),
+    # we manually update it here to test the cache hit logic.
+    provider._last_update = time.time()
+
+    config2 = await provider.get_oidc_config()
+    assert config2 is config
+    assert mock_fetch.call_count == 1
+
+    # 3. Force refresh
+    mock_fetch.return_value = {"jwks_uri": "https://idp/jwks", "issuer": "https://idp2"}
+    config3 = await provider.get_oidc_config(force_refresh=True)
+    assert config3.issuer == "https://idp2"
+    assert mock_fetch.call_count == 2

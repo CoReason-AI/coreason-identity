@@ -167,7 +167,14 @@ class TestDeviceFlowClientComplex:
         """
         Verify that the client increases polling interval when receiving 'slow_down'.
         """
-        client = DeviceFlowClient("client-id", "https://idp.com", client=mock_client, scope="openid profile email")
+        mock_oidc_provider = AsyncMock(spec=OIDCProvider)
+        client = DeviceFlowClient(
+            "client-id",
+            "https://idp.com",
+            client=mock_client,
+            oidc_provider=mock_oidc_provider,
+            scope="openid profile email",
+        )
         client._endpoints = {
             "device_authorization_endpoint": "https://idp.com/device",
             "token_endpoint": "https://idp.com/token",

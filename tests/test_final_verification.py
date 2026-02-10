@@ -236,7 +236,14 @@ async def test_device_flow_mixed_errors() -> None:
     """
     # Need mock client for async
     mock_client = AsyncMock(spec=httpx.AsyncClient)
-    client = DeviceFlowClient("id", "http://idp", client=mock_client, scope="openid profile email")
+    mock_oidc_provider = AsyncMock(spec=OIDCProvider)
+    client = DeviceFlowClient(
+        "id",
+        "http://idp",
+        client=mock_client,
+        oidc_provider=mock_oidc_provider,
+        scope="openid profile email",
+    )
 
     # Mock endpoints discovery
     with patch.object(client, "_get_endpoints", return_value={"token_endpoint": "url"}):
