@@ -155,7 +155,7 @@ async def test_safe_json_fetch_exact_limit() -> None:
     mock_response.raise_for_status = MagicMock()
 
     @asynccontextmanager
-    async def mock_stream(*args: Any, **kwargs: Any) -> AsyncGenerator[MagicMock, None]:
+    async def mock_stream(*_args: Any, **_kwargs: Any) -> AsyncGenerator[MagicMock, None]:
         yield mock_response
 
     with patch.object(client, "stream", side_effect=mock_stream):
@@ -181,7 +181,7 @@ async def test_safe_json_fetch_chunked_limit_exceeded() -> None:
     mock_response.aiter_bytes = content_stream
 
     @asynccontextmanager
-    async def mock_stream(*args: Any, **kwargs: Any) -> AsyncGenerator[MagicMock, None]:
+    async def mock_stream(*_args: Any, **_kwargs: Any) -> AsyncGenerator[MagicMock, None]:
         yield mock_response
 
     with (
