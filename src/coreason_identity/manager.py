@@ -25,6 +25,7 @@ from coreason_identity.exceptions import CoreasonIdentityError, InvalidTokenErro
 from coreason_identity.identity_mapper import IdentityMapper
 from coreason_identity.models import DeviceFlowResponse, TokenResponse, UserContext
 from coreason_identity.oidc_provider import OIDCProvider
+from coreason_identity.transport import SafeAsyncTransport
 from coreason_identity.validator import TokenValidator
 
 
@@ -50,8 +51,8 @@ class IdentityManager:
         if client:
             self._client = client
         else:
-            # Standard client. Infrastructure handles SSRF/Security boundaries.
-            self._client = httpx.AsyncClient(timeout=self.config.http_timeout)
+            # Standard client with strict SSRF protection at the application level
+            self._client = httpx.AsyncClient(transport=SafeAsyncTransport(), timeout=self.config.http_timeout)
 
         # Instrument the client for distributed tracing
         HTTPXClientInstrumentor().instrument_client(self._client)

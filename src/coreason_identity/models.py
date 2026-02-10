@@ -71,9 +71,10 @@ class UserContext(BaseModel):
     )
 
     def __repr__(self) -> str:
+        # PII fields MUST be redacted in __repr__
         return (
-            f"UserContext(user_id={self.user_id!r}, "
-            f"email={self.email!r}, "
+            f"UserContext(user_id='<REDACTED>', "
+            f"email='<REDACTED>', "
             f"groups={self.groups!r}, "
             f"scopes={self.scopes!r}, "
             f"downstream_token={self.downstream_token!r})"

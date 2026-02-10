@@ -32,9 +32,7 @@ MOCK_PII_SALT = "test-salt"
 
 @pytest.fixture
 def client_config() -> CoreasonClientConfig:
-    return CoreasonClientConfig(
-        domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id=MOCK_CLIENT_ID, http_timeout=5.0
-    )
+    return CoreasonClientConfig(domain=MOCK_DOMAIN, audience=MOCK_AUDIENCE, client_id=MOCK_CLIENT_ID, http_timeout=5.0)
 
 
 @pytest.fixture
