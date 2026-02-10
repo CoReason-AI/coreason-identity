@@ -70,6 +70,7 @@ def create_token(
 async def test_replay_attack_jti_cache(validator: TokenValidator, key_pair: Any) -> None:
     """Test that reusing a JTI raises TokenReplayError."""
     # Ensure cache is empty
+    assert isinstance(validator.cache, MemoryTokenCache)
     assert len(validator.cache._cache) == 0
 
     claims = {
@@ -95,6 +96,7 @@ async def test_replay_attack_jti_cache(validator: TokenValidator, key_pair: Any)
 @pytest.mark.asyncio
 async def test_replay_cache_concurrency(validator: TokenValidator, key_pair: Any) -> None:
     """Test concurrent validation of the SAME token (Race Condition Check)."""
+    assert isinstance(validator.cache, MemoryTokenCache)
     assert len(validator.cache._cache) == 0
 
     claims = {
@@ -143,16 +145,6 @@ async def test_missing_jti_allowed(validator: TokenValidator, key_pair: Any) -> 
 @pytest.mark.asyncio
 async def test_replay_cleanup(validator: TokenValidator) -> None:
     """Test that expired tokens are cleaned up from cache."""
-    # This relies on MemoryTokenCache._cleanup implementation detail
-    # We can manually trigger cleanup if exposed, or wait (not ideal for unit tests).
-    # MemoryTokenCache typically cleans up on insertion or via periodic task.
-    # Let's inspect MemoryTokenCache:
-    # It has a _cleanup() method called in is_jti_used potentially?
-
-    # Mock time for strict control?
-    # Since we can't easily mock time inside the class without dependency injection,
-    # we verify basic behavior: cleanup happens.
-
     cache = validator.cache
     assert isinstance(cache, MemoryTokenCache)
 
@@ -165,8 +157,8 @@ async def test_replay_cleanup(validator: TokenValidator) -> None:
     now = int(time.time())
 
     # Manually seed cache
-    cache._cache[expired_jti] = now - 10
-    cache._cache[future_jti] = now + 100
+    cache._cache[expired_jti] = float(now - 10)
+    cache._cache[future_jti] = float(now + 100)
 
     # Trigger cleanup (it's called in is_jti_used)
     cache.is_jti_used("new-jti", now + 300)

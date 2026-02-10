@@ -95,13 +95,6 @@ async def test_context_clearing() -> None:
     set_current_user(user)
     assert get_current_user() is not None
 
-    set_current_user(None)  # Type ignore? set_current_user expects UserContext.
-    # Actually async_context.py type hint for set_current_user is (user: UserContext).
-    # But ContextVar is UserContext | None.
-    # I should check async_context.py definition.
-
-    # If set_current_user only accepts UserContext, I cannot clear it via that function
-    # unless I use clear_current_user if it exists.
     from coreason_identity.async_context import clear_current_user
 
     clear_current_user()
