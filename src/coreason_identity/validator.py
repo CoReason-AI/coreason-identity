@@ -149,7 +149,14 @@ class TokenValidator:
                     span.add_event("refreshing_jwks")
                     jwks = await self.oidc_provider.get_jwks(force_refresh=True)
 
-                    claims = _decode(jwks, claims_options)
+                    try:
+                        claims = _decode(jwks, claims_options)
+                    except (ValueError, BadSignatureError) as e:
+                        # If it still fails after refresh, it's a genuine signature/key error
+                        logger.error("Validation failed even after JWKS refresh", exc_info=True)
+                        if isinstance(e, BadSignatureError):
+                            raise SignatureVerificationError(f"Invalid signature: {e}") from e
+                        raise SignatureVerificationError(f"Invalid signature or key not found: {e}") from e
 
                 payload = dict(claims)
 
@@ -203,6 +210,8 @@ class TokenValidator:
                 span.set_status(Status(StatusCode.ERROR, str(e)))
                 raise SignatureVerificationError(f"Invalid signature or key not found: {e}") from e
             except Exception as e:
+                if isinstance(e, CoreasonIdentityError):
+                    raise
                 logger.exception("Unexpected error during token validation")
                 span.record_exception(e)
                 span.set_status(Status(StatusCode.ERROR, str(e)))
