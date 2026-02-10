@@ -27,6 +27,9 @@ from coreason_identity.models import DeviceFlowResponse, TokenResponse, UserCont
 from coreason_identity.oidc_provider import OIDCProvider
 from coreason_identity.validator import TokenValidator
 
+# Pre-compile regex for performance in hot paths
+_BEARER_TOKEN_RE = re.compile(r"^Bearer\s+(\S+)$")
+
 
 class IdentityManager:
     """
@@ -113,7 +116,7 @@ class IdentityManager:
 
         # Strict regex validation to avoid raw string splitting
         # Disallow spaces/garbage in the token part
-        match = re.match(r"^Bearer\s+(\S+)$", auth_header)
+        match = _BEARER_TOKEN_RE.match(auth_header)
         if not match:
             raise InvalidTokenError("Invalid Authorization header format. Must start with 'Bearer '.")
 
