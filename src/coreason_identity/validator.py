@@ -142,6 +142,13 @@ class TokenValidator:
             hashlib.sha256,
         ).hexdigest()
 
+    def _decode_token(self, token: str, jwks_data: dict[str, Any], opts: dict[str, Any]) -> Any:
+        # Cast self.jwt to Any to bypass MyPy overload confusion or missing stubs
+        jwt_any = cast("Any", self.jwt)
+        claims = jwt_any.decode(token, jwks_data, claims_options=opts)
+        claims.validate(leeway=self.leeway)
+        return claims
+
     async def validate_token(self, token: str) -> dict[str, Any]:
         """
         Validates the JWT signature and claims.
@@ -171,33 +178,22 @@ class TokenValidator:
                 # This ensures OIDC config is also fetched/cached
                 jwks = await self.oidc_provider.get_jwks()
 
-                # Define claim options factory
-                def get_claims_options(iss: str) -> dict[str, Any]:
-                    return {
-                        "exp": {"essential": True, "leeway": self.leeway},
-                        "nbf": {"essential": False, "leeway": self.leeway},
-                        "aud": {"essential": True, "value": self.audience},
-                        "iss": {"essential": True, "value": iss},
-                    }
-
-                claims_options = get_claims_options(self.issuer)
-
-                def _decode(jwks_data: dict[str, Any], opts: dict[str, Any]) -> Any:
-                    # Cast self.jwt to Any to bypass MyPy overload confusion or missing stubs
-                    jwt_any = cast("Any", self.jwt)
-                    claims = jwt_any.decode(token, jwks_data, claims_options=opts)
-                    claims.validate(leeway=self.leeway)
-                    return claims
+                claims_options = {
+                    "exp": {"essential": True, "leeway": self.leeway},
+                    "nbf": {"essential": False, "leeway": self.leeway},
+                    "aud": {"essential": True, "value": self.audience},
+                    "iss": {"essential": True, "value": self.issuer},
+                }
 
                 try:
-                    claims = _decode(jwks, claims_options)
+                    claims = self._decode_token(token, jwks, claims_options)
                 except (ValueError, BadSignatureError):
                     # If key is missing or signature is bad (potential key rotation), try refreshing keys
                     logger.info("Validation failed with cached keys, refreshing JWKS and retrying...")
                     span.add_event("refreshing_jwks")
                     jwks = await self.oidc_provider.get_jwks(force_refresh=True)
 
-                    claims = _decode(jwks, claims_options)
+                    claims = self._decode_token(token, jwks, claims_options)
 
                 payload = dict(claims)
 
