@@ -151,12 +151,15 @@ class TokenValidator:
 
                     try:
                         claims = _decode(jwks, claims_options)
-                    except (ValueError, BadSignatureError) as e:
-                        # If it still fails after refresh, it's a genuine signature/key error
-                        logger.error("Validation failed even after JWKS refresh", exc_info=True)
-                        if isinstance(e, BadSignatureError):
-                            raise SignatureVerificationError(f"Invalid signature: {e}") from e
-                        raise SignatureVerificationError(f"Invalid signature or key not found: {e}") from e
+                    except BadSignatureError as e:
+                        # If it still fails after refresh, it's a genuine signature error
+                        logger.error("Validation failed even after JWKS refresh: Bad signature", exc_info=True)
+                        raise SignatureVerificationError(f"Invalid signature: {e}") from e
+                    except ValueError as e:
+                        # Authlib raises ValueError for malformed JSON or missing keys.
+                        # Existing tests expect specific wrapping for unexpected ValueErrors during validation.
+                        logger.error("Validation failed even after JWKS refresh: Value error", exc_info=True)
+                        raise CoreasonIdentityError(f"Unexpected ValueError during validation: {e}") from e
 
                 payload = dict(claims)
 
