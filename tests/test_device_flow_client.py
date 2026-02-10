@@ -16,6 +16,7 @@ from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
+from pydantic import ValidationError
 
 from coreason_identity.device_flow_client import DeviceFlowClient
 from coreason_identity.exceptions import CoreasonIdentityError
@@ -464,3 +465,152 @@ async def test_poll_token_generic_exception_retry(client: DeviceFlowClient, mock
     assert token_resp.access_token == "at_123"
     assert mock_client.stream.call_count == 3  # Discovery, Fail, Success
     mock_sleep.assert_called_once_with(1)
+
+
+@pytest.mark.asyncio
+async def test_get_endpoints_invalid_schema(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
+    """Test OIDC config validation failure."""
+    # We mock safe_json_fetch directly to return data, and OIDCConfig to raise ValidationError
+    with patch("coreason_identity.device_flow_client.safe_json_fetch", new_callable=AsyncMock) as mock_fetch:
+        mock_fetch.return_value = {}
+        with patch("coreason_identity.device_flow_client.OIDCConfig") as mock_config:
+            mock_config.side_effect = ValidationError.from_exception_data("msg", [])
+
+            with pytest.raises(CoreasonIdentityError, match="Invalid JSON response from OIDC discovery"):
+                await client._get_endpoints()
+
+
+@pytest.mark.asyncio
+async def test_poll_token_oversized_content_length(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
+    """Test oversized Content-Length in polling response."""
+    responses = [
+        MockResponse(200, {**OIDC_CONFIG_BASE, "token_endpoint": "url"}),
+        MockResponse(200, {"access_token": "at"}, content=b""),
+    ]
+    # Manually set Content-Length on the polling response
+    responses[1].headers["Content-Length"] = "2000000"
+
+    setup_stream_mock(mock_client, responses)
+    device_resp = DeviceFlowResponse(
+        device_code="dc", user_code="uc", verification_uri="url", expires_in=10, interval=1
+    )
+
+    with (
+        patch("anyio.sleep", new_callable=AsyncMock),
+        pytest.raises(CoreasonIdentityError, match="Response too large"),
+    ):
+        await client.poll_token(device_resp)
+
+
+@pytest.mark.asyncio
+async def test_poll_token_oversized_body(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
+    """Test oversized body in polling response."""
+    responses = [
+        MockResponse(200, {**OIDC_CONFIG_BASE, "token_endpoint": "url"}),
+    ]
+    setup_stream_mock(mock_client, responses)
+
+    # Custom stream for the polling part to yield large data
+    original_stream = mock_client.stream.side_effect
+
+    @asynccontextmanager
+    async def mock_stream_large(method: str, url: str, **kwargs: Any) -> AsyncGenerator[MockResponse, None]:
+        if url == "url":
+            # This is the poll request
+            resp = MockResponse(200)
+            # Remove content length to force stream check
+            if "Content-Length" in resp.headers:
+                del resp.headers["Content-Length"]
+
+            async def large_gen() -> AsyncGenerator[bytes, None]:
+                yield b"a" * 1000001
+
+            resp.aiter_bytes = large_gen
+            yield resp
+        else:
+            # Delegate to original setup for discovery
+            async with original_stream(method, url, **kwargs) as r:
+                yield r
+
+    mock_client.stream.side_effect = mock_stream_large
+
+    device_resp = DeviceFlowResponse(
+        device_code="dc", user_code="uc", verification_uri="url", expires_in=10, interval=1
+    )
+
+    with (
+        patch("anyio.sleep", new_callable=AsyncMock),
+        pytest.raises(CoreasonIdentityError, match="Response too large"),
+    ):
+        await client.poll_token(device_resp)
+
+
+@pytest.mark.asyncio
+async def test_poll_token_enforces_min_interval(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
+    """Test that min_poll_interval is enforced and logged."""
+    responses = [
+        MockResponse(200, {**OIDC_CONFIG_BASE, "token_endpoint": "url"}),
+        MockResponse(400, {"error": "authorization_pending"}),
+        MockResponse(200, {"access_token": "at", "token_type": "Bearer", "expires_in": 3600}),
+    ]
+    setup_stream_mock(mock_client, responses)
+
+    # Increase client min interval to force check
+    client.min_poll_interval = 5.0
+
+    # Device response asks for 1 (valid int, but less than 5.0)
+    device_resp = DeviceFlowResponse(
+        device_code="dc", user_code="uc", verification_uri="url", expires_in=10, interval=1
+    )
+
+    with (
+        patch("anyio.sleep", new_callable=AsyncMock) as mock_sleep,
+        patch("coreason_identity.device_flow_client.logger") as mock_logger,
+    ):
+        await client.poll_token(device_resp)
+
+        # Should verify logger.warning was called
+        assert any("unsafe polling interval" in str(c) for c in mock_logger.warning.call_args_list)
+        # Sleep should be called with 5.0 (min), not 1
+        mock_sleep.assert_called_with(5.0)
+
+
+@pytest.mark.asyncio
+async def test_poll_token_invalid_response_schema(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
+    """Test invalid token response structure."""
+    responses = [
+        MockResponse(200, {**OIDC_CONFIG_BASE, "token_endpoint": "url"}),
+        MockResponse(200, {"access_token": "at"}),  # Missing token_type, expires_in
+    ]
+    setup_stream_mock(mock_client, responses)
+
+    device_resp = DeviceFlowResponse(
+        device_code="dc", user_code="uc", verification_uri="url", expires_in=10, interval=1
+    )
+
+    with (
+        patch("anyio.sleep", new_callable=AsyncMock),
+        pytest.raises(CoreasonIdentityError, match="Invalid token structure"),
+    ):
+        await client.poll_token(device_resp)
+
+
+@pytest.mark.asyncio
+async def test_poll_token_invalid_content_length(client: DeviceFlowClient, mock_client: AsyncMock) -> None:
+    """Test invalid Content-Length header is ignored."""
+    responses = [
+        MockResponse(200, {**OIDC_CONFIG_BASE, "token_endpoint": "url"}),
+        MockResponse(200, {"access_token": "at", "token_type": "Bearer", "expires_in": 3600}),
+    ]
+    # Set invalid Content-Length
+    responses[1].headers["Content-Length"] = "invalid"
+
+    setup_stream_mock(mock_client, responses)
+    device_resp = DeviceFlowResponse(
+        device_code="dc", user_code="uc", verification_uri="url", expires_in=10, interval=1
+    )
+
+    with patch("anyio.sleep", new_callable=AsyncMock):
+        token_resp = await client.poll_token(device_resp)
+
+    assert token_resp.access_token == "at"

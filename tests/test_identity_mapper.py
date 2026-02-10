@@ -13,11 +13,12 @@ Tests for IdentityMapper.
 """
 
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 from pydantic import SecretStr
 
-from coreason_identity.exceptions import IdentityMappingError
+from coreason_identity.exceptions import CoreasonIdentityError, IdentityMappingError
 from coreason_identity.identity_mapper import IdentityMapper
 from coreason_identity.models import CoreasonGroup, CoreasonScope
 
@@ -128,3 +129,13 @@ def test_map_claims_massive_error_list(mapper: IdentityMapper) -> None:
         assert g not in error_msg
     # Ensure it didn't crash
     assert "groups" in error_msg
+
+
+def test_map_claims_re_raises_coreason_identity_error(mapper: IdentityMapper) -> None:
+    """Test that CoreasonIdentityError is re-raised as-is."""
+    # We mock RawIdPClaims to raise CoreasonIdentityError
+    with patch("coreason_identity.identity_mapper.RawIdPClaims") as mock_cls:
+        mock_cls.side_effect = CoreasonIdentityError("Existing error")
+
+        with pytest.raises(CoreasonIdentityError, match="Existing error"):
+            mapper.map_claims({"sub": "u1", "email": "e@m.com"})

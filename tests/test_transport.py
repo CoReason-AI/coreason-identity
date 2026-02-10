@@ -12,6 +12,7 @@
 Tests for the SafeAsyncTransport component.
 """
 
+import json
 import socket
 from collections.abc import AsyncGenerator, Generator
 from contextlib import asynccontextmanager
@@ -185,3 +186,144 @@ async def test_safe_json_fetch_chunked_limit_exceeded() -> None:
         pytest.raises(OversizedResponseError, match="Response size exceeds limit"),
     ):
         await safe_json_fetch(client, "http://test.com", max_bytes=limit)
+
+
+@pytest.mark.asyncio
+async def test_safe_transport_dns_empty(mock_getaddrinfo: MagicMock) -> None:
+    """Test that empty DNS resolution raises CoreasonIdentityError."""
+    mock_getaddrinfo.return_value = []
+    transport = SafeAsyncTransport()
+    request = httpx.Request("GET", "https://example.com")
+
+    with pytest.raises(CoreasonIdentityError, match="No IP address resolved"):
+        await transport.handle_async_request(request)
+
+
+@pytest.mark.asyncio
+async def test_safe_transport_dns_error(mock_getaddrinfo: MagicMock) -> None:
+    """Test that DNS resolution error is wrapped in CoreasonIdentityError."""
+    mock_getaddrinfo.side_effect = socket.gaierror("Name or service not known")
+    transport = SafeAsyncTransport()
+    request = httpx.Request("GET", "https://example.com")
+
+    with pytest.raises(CoreasonIdentityError, match="DNS resolution failed"):
+        await transport.handle_async_request(request)
+
+
+@pytest.mark.asyncio
+async def test_safe_transport_invalid_ip(mock_getaddrinfo: MagicMock) -> None:
+    """Test that invalid IP returned by DNS raises CoreasonIdentityError."""
+    # getaddrinfo returns a tuple where index 4 is sockaddr, and index 0 of that is IP
+    mock_getaddrinfo.return_value = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("invalid_ip", 443))]
+    transport = SafeAsyncTransport()
+    request = httpx.Request("GET", "https://example.com")
+
+    with pytest.raises(CoreasonIdentityError, match="Invalid IP address resolved"):
+        await transport.handle_async_request(request)
+
+
+@pytest.mark.asyncio
+async def test_safe_json_fetch_invalid_content_length() -> None:
+    """Test that invalid Content-Length is ignored and stream limit is used."""
+    client = httpx.AsyncClient()
+    mock_response = MagicMock()
+    mock_response.headers = {"Content-Length": "not-an-integer"}
+    mock_response.raise_for_status = MagicMock()
+
+    async def content_stream() -> AsyncGenerator[bytes, None]:
+        yield b'{"a": 1}'
+
+    mock_response.aiter_bytes = content_stream
+
+    @asynccontextmanager
+    async def mock_stream(*_: Any, **__: Any) -> AsyncGenerator[MagicMock, None]:
+        yield mock_response
+
+    with patch.object(client, "stream", side_effect=mock_stream):
+        # Should succeed because actual content is small, and invalid header is ignored
+        result = await safe_json_fetch(client, "http://test.com")
+        assert result == {"a": 1}
+
+
+@pytest.mark.asyncio
+async def test_safe_json_fetch_invalid_json() -> None:
+    """Test that invalid JSON response raises CoreasonIdentityError."""
+    client = httpx.AsyncClient()
+    mock_response = MagicMock()
+    mock_response.headers = {}
+    mock_response.raise_for_status = MagicMock()
+
+    async def content_stream() -> AsyncGenerator[bytes, None]:
+        yield b"not valid json"
+
+    mock_response.aiter_bytes = content_stream
+
+    @asynccontextmanager
+    async def mock_stream(*_: Any, **__: Any) -> AsyncGenerator[MagicMock, None]:
+        yield mock_response
+
+    with (
+        patch.object(client, "stream", side_effect=mock_stream),
+        pytest.raises(CoreasonIdentityError, match="Invalid JSON response"),
+    ):
+        await safe_json_fetch(client, "http://test.com")
+
+
+@pytest.mark.asyncio
+async def test_safe_json_fetch_generic_error() -> None:
+    """Test that generic exceptions are wrapped in CoreasonIdentityError."""
+    client = httpx.AsyncClient()
+
+    @asynccontextmanager
+    async def mock_stream(*_: Any, **__: Any) -> AsyncGenerator[MagicMock, None]:
+        raise ValueError("Something unexpected")
+        yield MagicMock()  # Unreachable but needed for typing if not analyzing flow
+
+    with (
+        patch.object(client, "stream", side_effect=mock_stream),
+        pytest.raises(CoreasonIdentityError, match="Failed to fetch"),
+    ):
+        await safe_json_fetch(client, "http://test.com")
+
+
+@pytest.mark.asyncio
+async def test_safe_transport_adds_host_header(mock_getaddrinfo: MagicMock) -> None:
+    """Test that Host header is added if missing."""
+    mock_getaddrinfo.return_value = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("8.8.8.8", 443))]
+    transport = SafeAsyncTransport()
+
+    # Mock super().handle_async_request
+    with patch("httpx.AsyncHTTPTransport.handle_async_request", new_callable=AsyncMock) as mock_super:
+        mock_super.return_value = httpx.Response(200)
+
+        # Case 1: Header missing
+        request = httpx.Request("GET", "https://example.com")
+        # Ensure it's not set by httpx default logic for this test (though request object has it implicitly usually)
+        if "host" in request.headers:
+            del request.headers["host"]
+
+        await transport.handle_async_request(request)
+        assert request.headers["host"] == "example.com"
+
+        # Case 2: Header present
+        request = httpx.Request("GET", "https://example.com")
+        request.headers["host"] = "custom.host"
+        await transport.handle_async_request(request)
+        assert request.headers["host"] == "custom.host"
+
+
+@pytest.mark.asyncio
+async def test_safe_json_fetch_http_error() -> None:
+    """Test that HTTPError is wrapped in CoreasonIdentityError."""
+    client = httpx.AsyncClient()
+
+    @asynccontextmanager
+    async def mock_stream(*_: Any, **__: Any) -> AsyncGenerator[MagicMock, None]:
+        raise httpx.HTTPError("Connection failed")
+        yield MagicMock()
+
+    with (
+        patch.object(client, "stream", side_effect=mock_stream),
+        pytest.raises(CoreasonIdentityError, match="HTTP error fetching"),
+    ):
+        await safe_json_fetch(client, "http://test.com")

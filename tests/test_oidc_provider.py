@@ -16,7 +16,7 @@ from unittest.mock import AsyncMock, patch
 import httpx
 import pytest
 
-from coreason_identity.exceptions import CoreasonIdentityError
+from coreason_identity.exceptions import CoreasonIdentityError, OversizedResponseError
 from coreason_identity.models_internal import OIDCConfig
 from coreason_identity.oidc_provider import OIDCProvider
 
@@ -226,3 +226,49 @@ async def test_get_jwks_double_check_locking(provider: OIDCProvider, mock_fetch:
 
     assert jwks == {"keys": ["race_winner"]}
     mock_fetch.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_fetch_oidc_config_oversized(provider: OIDCProvider, mock_fetch: AsyncMock) -> None:
+    """Test that OversizedResponseError is not retried and propagates."""
+    mock_fetch.side_effect = OversizedResponseError("Too big")
+
+    with pytest.raises(OversizedResponseError):
+        await provider.get_jwks()
+
+    # Should not retry
+    assert mock_fetch.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_fetch_jwks_oversized(provider: OIDCProvider, mock_fetch: AsyncMock) -> None:
+    """Test that OversizedResponseError during JWKS fetch is not retried."""
+    mock_fetch.side_effect = [
+        {"jwks_uri": "https://idp/jwks", "issuer": "https://idp"},
+        OversizedResponseError("Too big"),
+    ]
+
+    with pytest.raises(OversizedResponseError):
+        await provider.get_jwks()
+
+    # 1 for config + 1 for jwks = 2
+    assert mock_fetch.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_get_jwks_refresh_cooldown(provider: OIDCProvider, mock_fetch: AsyncMock) -> None:
+    """Test that forced refresh respects cooldown and logs warning."""
+    provider._jwks_cache = {"keys": ["cached"]}
+    provider._last_update = time.time()  # Very fresh
+
+    # Set cooldown to 30s
+    provider.refresh_cooldown = 30.0
+
+    with patch("coreason_identity.oidc_provider.logger") as mock_logger:
+        jwks = await provider.get_jwks(force_refresh=True)
+
+        assert jwks == {"keys": ["cached"]}
+        # No network calls should be made for fresh keys
+        mock_fetch.assert_not_called()
+        # Should warn
+        assert any("cooldown active" in str(c) for c in mock_logger.warning.call_args_list)
