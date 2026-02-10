@@ -80,7 +80,7 @@ def setup_stream_mock(mock_client: AsyncMock, responses: list[MockResponse] | Mo
     response_iter = iter(responses)
 
     @asynccontextmanager
-    async def mock_stream(method: str, url: str, **kwargs: Any) -> AsyncGenerator[MockResponse, None]:
+    async def mock_stream(_method: str, _url: str, **_kwargs: Any) -> AsyncGenerator[MockResponse, None]:
         try:
             yield next(response_iter)
         except StopIteration:

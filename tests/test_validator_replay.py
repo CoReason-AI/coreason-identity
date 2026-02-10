@@ -20,7 +20,7 @@ import pytest
 from authlib.jose import JsonWebKey, jwt
 from pydantic import SecretStr
 
-from coreason_identity.exceptions import CoreasonIdentityError, TokenReplayError
+from coreason_identity.exceptions import TokenReplayError
 from coreason_identity.oidc_provider import OIDCProvider
 from coreason_identity.validator import MemoryTokenCache, TokenValidator
 
@@ -141,7 +141,7 @@ async def test_missing_jti_allowed(validator: TokenValidator, key_pair: Any) -> 
 
 
 @pytest.mark.asyncio
-async def test_replay_cleanup(validator: TokenValidator, key_pair: Any) -> None:
+async def test_replay_cleanup(validator: TokenValidator) -> None:
     """Test that expired tokens are cleaned up from cache."""
     # This relies on MemoryTokenCache._cleanup implementation detail
     # We can manually trigger cleanup if exposed, or wait (not ideal for unit tests).
