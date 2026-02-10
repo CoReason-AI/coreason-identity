@@ -12,6 +12,7 @@
 DeviceFlowClient component for handling OAuth 2.0 Device Authorization Grant.
 """
 
+import json
 import time
 from urllib.parse import urljoin
 
@@ -19,9 +20,10 @@ import anyio
 import httpx
 from pydantic import ValidationError
 
-from coreason_identity.exceptions import CoreasonIdentityError
+from coreason_identity.exceptions import CoreasonIdentityError, OversizedResponseError
 from coreason_identity.models import DeviceFlowResponse, TokenResponse
 from coreason_identity.models_internal import OIDCConfig
+from coreason_identity.transport import safe_json_fetch
 from coreason_identity.utils.logger import logger
 
 
@@ -79,13 +81,12 @@ class DeviceFlowClient:
         discovery_url = f"{self.idp_url}/.well-known/openid-configuration"
 
         try:
-            response = await self.client.get(discovery_url)
-            response.raise_for_status()
+            data = await safe_json_fetch(self.client, discovery_url)
             try:
                 # Use strict Pydantic model but allow flexible fallback for optional fields
                 # We interpret the response as OIDCConfig. If it fails validation (e.g. missing issuer),
                 # we wrap it.
-                config = OIDCConfig(**response.json())
+                config = OIDCConfig(**data)
             except (ValueError, ValidationError) as e:
                 raise CoreasonIdentityError(f"Invalid JSON response from OIDC discovery: {e}") from e
 
@@ -98,7 +99,7 @@ class DeviceFlowClient:
                 "token_endpoint": token_endpoint,
             }
             return self._endpoints
-        except httpx.HTTPError as e:
+        except (httpx.HTTPError, OversizedResponseError, CoreasonIdentityError) as e:
             raise CoreasonIdentityError(f"Failed to discover OIDC endpoints: {e}") from e
 
     async def initiate_flow(self, audience: str | None = None) -> DeviceFlowResponse:
@@ -125,14 +126,9 @@ class DeviceFlowClient:
             data["audience"] = audience
 
         try:
-            response = await self.client.post(url, data=data)
-            response.raise_for_status()
-            try:
-                resp_data = response.json()
-            except ValueError as e:
-                raise CoreasonIdentityError(f"Invalid JSON response from initiate flow: {e}") from e
+            resp_data = await safe_json_fetch(self.client, url, method="POST", data=data)
             return DeviceFlowResponse(**resp_data)
-        except httpx.HTTPError as e:
+        except (httpx.HTTPError, OversizedResponseError, CoreasonIdentityError) as e:
             logger.error(f"Device flow initiation failed: {e}")
             raise CoreasonIdentityError(f"Failed to initiate device flow: {e}") from e
         except ValidationError as e:
@@ -172,49 +168,81 @@ class DeviceFlowClient:
             }
 
             try:
-                response = await self.client.post(url, data=data)
+                # Use safe_json_fetch for DoS protection.
+                # Note: safe_json_fetch raises HTTPError for status >= 400,
+                # BUT we need to parse the error body for standard OAuth errors
+                # like "authorization_pending" which are often 400 Bad Request.
+                # safe_json_fetch raises HTTPError before returning body.
+                # So we must modify safe_json_fetch OR handle it differently.
+                # However, safe_json_fetch calls raise_for_status().
+                # If we want to read the body on error, we can't use safe_json_fetch as is if it raises first.
+                # Actually, standard OAuth2 device flow errors (pending) are often 400.
+                # Let's inspect how httpx handles this. raise_for_status() raises.
+                # We need to catch the error, read the body SAFELY, and check content.
 
-                if response.status_code == 200:
+                # Refined strategy: Use client.stream directly here to handle 4xx bodies safely.
+                async with self.client.stream("POST", url, data=data, follow_redirects=True) as response:
+                    # DoS check
+                    content_length = response.headers.get("Content-Length")
+                    if content_length:
+                        try:
+                            if int(content_length) > 1_000_000:
+                                raise OversizedResponseError("Response too large")
+                        except ValueError:
+                            pass
+
+                    content = bytearray()
+                    async for chunk in response.aiter_bytes():
+                        content.extend(chunk)
+                        if len(content) > 1_000_000:
+                            raise OversizedResponseError("Response too large")
+
+                    # Parse JSON from content directly
                     try:
+                        # We use to_thread to avoid blocking loop if JSON is large (up to 1MB)
+                        json_data = await anyio.to_thread.run_sync(json.loads, content)
+                    except json.JSONDecodeError:
+                        # If parsing fails, and status was error, raise that status
+                        response.raise_for_status()
+                        raise CoreasonIdentityError(
+                            f"Invalid JSON response: {content.decode('utf-8', errors='ignore')}"
+                        ) from None
+
+                    if response.status_code == 200:
                         logger.info("Token retrieved successfully.")
-                        return TokenResponse(**response.json())
-                    except ValidationError as e:
-                        raise CoreasonIdentityError(f"Received invalid token response structure: {e}") from e
-                    except ValueError as e:
-                        raise CoreasonIdentityError(f"Received invalid JSON response on 200 OK: {e}") from e
+                        try:
+                            return TokenResponse(**json_data)
+                        except ValidationError as e:
+                            raise CoreasonIdentityError(f"Invalid token structure: {e}") from e
 
-                # Handle errors
-                try:
-                    error_resp = response.json()
-                except ValueError as e:
-                    # Non-JSON response, likely a server error or proxy issue
-                    response.raise_for_status()
-                    raise CoreasonIdentityError(f"Received invalid response: {response.text}") from e
+                    # Handle semantic errors (often 400 Bad Request)
+                    if not isinstance(json_data, dict):
+                        response.raise_for_status()
 
-                if not isinstance(error_resp, dict):
-                    raise CoreasonIdentityError(f"Received invalid JSON response: {error_resp}")
+                    error = json_data.get("error")
 
-                error = error_resp.get("error")
-
-                if error == "authorization_pending":
-                    pass  # Continue polling
-                elif error == "slow_down":
-                    interval += 5  # Increase interval as per spec
-                    logger.debug("Received slow_down, increasing interval.")
-                elif error == "expired_token":
-                    raise CoreasonIdentityError("Device code expired.")
-                elif error == "access_denied":
-                    raise CoreasonIdentityError("User denied access.")
-                else:
-                    response.raise_for_status()  # Raise for other 4xx/5xx
+                    if error == "authorization_pending":
+                        pass  # Continue polling
+                    elif error == "slow_down":
+                        interval += 5
+                        logger.debug("Received slow_down, increasing interval.")
+                    elif error == "expired_token":
+                        raise CoreasonIdentityError("Device code expired.")
+                    elif error == "access_denied":
+                        raise CoreasonIdentityError("User denied access.")
+                    else:
+                        response.raise_for_status()
 
             except httpx.HTTPStatusError as e:
+                # If we raised raise_for_status() above
                 logger.error(f"Polling failed with status {e.response.status_code}: {e}")
                 raise CoreasonIdentityError(f"Polling failed: {e}") from e
 
+            except CoreasonIdentityError:
+                logger.debug("Re-raising CoreasonIdentityError during polling.")
+                raise
+
             except Exception as e:
-                if isinstance(e, CoreasonIdentityError):
-                    raise
                 logger.warning(f"Polling attempt failed: {e}")
                 # Continue polling unless it's a critical error
 

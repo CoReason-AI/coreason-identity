@@ -13,11 +13,12 @@ Tests for IdentityMapper.
 """
 
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 from pydantic import SecretStr
 
-from coreason_identity.exceptions import InvalidTokenError
+from coreason_identity.exceptions import CoreasonIdentityError, IdentityMappingError
 from coreason_identity.identity_mapper import IdentityMapper
 from coreason_identity.models import CoreasonGroup, CoreasonScope
 
@@ -65,5 +66,76 @@ def test_map_claims_scopes(mapper: IdentityMapper) -> None:
 
 
 def test_map_claims_missing_required(mapper: IdentityMapper) -> None:
-    with pytest.raises(InvalidTokenError):
+    with pytest.raises(IdentityMappingError):
         mapper.map_claims({"sub": "no-email"})
+
+
+def test_map_claims_pii_sanitization_in_exception(mapper: IdentityMapper) -> None:
+    """
+    Ensure that validation errors strip PII (the 'input' field) from the exception message.
+    """
+    claims = {
+        "sub": "user123",
+        "email": "invalid-email-format",  # Invalid email
+    }
+
+    # We expect IdentityMappingError, and we want to inspect its string representation
+    with pytest.raises(IdentityMappingError) as exc_info:
+        mapper.map_claims(claims)
+
+    error_msg = str(exc_info.value)
+    # The error should contain the field name 'email' and the error type
+    assert "email" in error_msg
+    assert "value is not a valid email address" in error_msg
+    # The error should NOT contain the raw invalid value 'invalid-email-format'
+    assert "invalid-email-format" not in error_msg
+    # Check that 'input' key is not present in the stringified dict structure if any
+    assert "'input':" not in error_msg
+
+
+def test_map_claims_nested_validation_error_pii(mapper: IdentityMapper) -> None:
+    """Test PII sanitization for nested errors (e.g. invalid group enum)."""
+    claims = {
+        "sub": "user123",
+        "email": "test@example.com",
+        "groups": ["invalid_group_name"],  # Invalid enum value
+    }
+
+    with pytest.raises(IdentityMappingError) as exc_info:
+        mapper.map_claims(claims)
+
+    error_msg = str(exc_info.value)
+    assert "groups" in error_msg
+    # The raw value 'invalid_group_name' should NOT be in the error message
+    assert "invalid_group_name" not in error_msg
+
+
+def test_map_claims_massive_error_list(mapper: IdentityMapper) -> None:
+    """Test that massive validation errors don't cause DoS or expose PII."""
+    # Generate 100 invalid groups
+    invalid_groups = [f"invalid_{i}" for i in range(100)]
+    claims = {
+        "sub": "user123",
+        "email": "test@example.com",
+        "groups": invalid_groups,
+    }
+
+    with pytest.raises(IdentityMappingError) as exc_info:
+        mapper.map_claims(claims)
+
+    error_msg = str(exc_info.value)
+    # Ensure no PII leaked
+    for g in invalid_groups:
+        assert g not in error_msg
+    # Ensure it didn't crash
+    assert "groups" in error_msg
+
+
+def test_map_claims_re_raises_coreason_identity_error(mapper: IdentityMapper) -> None:
+    """Test that CoreasonIdentityError is re-raised as-is."""
+    # We mock RawIdPClaims to raise CoreasonIdentityError
+    with patch("coreason_identity.identity_mapper.RawIdPClaims") as mock_cls:
+        mock_cls.side_effect = CoreasonIdentityError("Existing error")
+
+        with pytest.raises(CoreasonIdentityError, match="Existing error"):
+            mapper.map_claims({"sub": "u1", "email": "e@m.com"})

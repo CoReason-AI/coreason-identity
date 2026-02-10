@@ -14,7 +14,8 @@ TokenValidator component for validating JWT signatures and claims.
 
 import hashlib
 import hmac
-from typing import Any, cast
+import time
+from typing import Any, Protocol, cast
 
 from authlib.jose import JsonWebToken
 from authlib.jose.errors import (
@@ -34,11 +35,52 @@ from coreason_identity.exceptions import (
     InvalidTokenError,
     SignatureVerificationError,
     TokenExpiredError,
+    TokenReplayError,
 )
 from coreason_identity.oidc_provider import OIDCProvider
 from coreason_identity.utils.logger import logger
 
 tracer = trace.get_tracer(__name__)
+
+
+class TokenCacheProtocol(Protocol):
+    """Protocol for a JTI (JWT ID) cache to prevent replay attacks."""
+
+    def is_jti_used(self, jti: str, exp: int) -> bool:
+        """
+        Checks if the JTI has already been used.
+        If not used, marks it as used atomically (if possible) until expiration.
+        """
+        ...
+
+
+class MemoryTokenCache:
+    """
+    In-memory implementation of TokenCacheProtocol.
+    Uses a dictionary with manual cleanup. Not suitable for distributed systems.
+    """
+
+    def __init__(self) -> None:
+        self._cache: dict[str, float] = {}
+
+    def is_jti_used(self, jti: str, exp: int) -> bool:
+        """
+        Checks if JTI is used. Performs lazy cleanup.
+        """
+        now = time.time()
+
+        # Lazy cleanup of expired entries
+        # Note: In a real high-throughput scenario, this should be a background task
+        expired_keys = [k for k, v in self._cache.items() if v < now]
+        for k in expired_keys:
+            del self._cache[k]
+
+        if jti in self._cache:
+            return True
+
+        # Mark as used
+        self._cache[jti] = float(exp)
+        return False
 
 
 class TokenValidator:
@@ -49,6 +91,7 @@ class TokenValidator:
         oidc_provider (OIDCProvider): The OIDCProvider instance.
         audience (str): The expected audience claim.
         issuer (str): The expected issuer claim.
+        cache (TokenCacheProtocol): The JTI cache for replay protection.
     """
 
     def __init__(
@@ -59,6 +102,7 @@ class TokenValidator:
         pii_salt: SecretStr,
         allowed_algorithms: list[str],
         leeway: int = 0,
+        cache: TokenCacheProtocol | None = None,
     ) -> None:
         """
         Initialize the TokenValidator.
@@ -70,6 +114,7 @@ class TokenValidator:
             pii_salt: Salt for anonymizing PII. REQUIRED.
             allowed_algorithms: List of allowed JWT signing algorithms. REQUIRED.
             leeway: Acceptable clock skew in seconds. Defaults to 0.
+            cache: Token cache for replay protection. Defaults to MemoryTokenCache.
         """
         self.oidc_provider = oidc_provider
         self.audience = audience
@@ -77,6 +122,7 @@ class TokenValidator:
         self.pii_salt = pii_salt
         self.allowed_algorithms = allowed_algorithms
         self.leeway = leeway
+        self.cache = cache or MemoryTokenCache()
         # Use a specific JsonWebToken instance to enforce allowed algorithms and reject others
         self.jwt = JsonWebToken(self.allowed_algorithms)
 
@@ -155,6 +201,19 @@ class TokenValidator:
 
                 payload = dict(claims)
 
+                # Replay Protection (JTI Check)
+                jti = payload.get("jti")
+                exp = payload.get("exp")
+
+                # JTI is required for replay protection.
+                # However, some tokens might not have it.
+                # SOTA requires JTI.
+                if jti and exp and self.cache.is_jti_used(jti, exp):
+                    msg = f"Replay detected: Token with JTI {jti} has already been used."
+                    logger.warning(msg)
+                    span.set_status(Status(StatusCode.ERROR, msg))
+                    raise TokenReplayError(msg)
+
                 # Log success
                 user_sub = payload.get("sub", "unknown")
                 # Hash the user ID for strict privacy logging
@@ -213,6 +272,9 @@ class TokenValidator:
                 span.record_exception(e)
                 span.set_status(Status(StatusCode.ERROR, err_str))
                 raise CoreasonIdentityError(f"Unexpected ValueError during validation: {e}") from e
+            except CoreasonIdentityError:
+                # Allow CoreasonIdentityError (like TokenReplayError) to bubble up
+                raise
             except Exception as e:
                 logger.exception("Unexpected error during token validation")
                 span.record_exception(e)
