@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Active Zero-Trust Identity Middleware for the Coreason Ecosystem"
 readme = "README.md"
 requires-python = ">=3.12"
-license = { text = "MIT" }
+license = { text = "Prosperity Public License 3.0.0" }
 dependencies = [
     "coreason-manifest>=0.26.0",
     "pydantic>=2.9.0",
