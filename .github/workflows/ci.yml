@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Clone the shared kernel so tool.uv.sources path resolution succeeds
+      - name: Checkout Shared Kernel (coreason-manifest)
+        uses: actions/checkout@v4
+        with:
+          repository: coreason-ai/coreason-manifest
+          path: ../coreason-manifest
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: "pyproject.toml"
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Code Formatting (Ruff)
+        run: uv run ruff format . --check
+
+      - name: Linting (Ruff)
+        run: uv run ruff check .
+
+      - name: Static Type Checking (Mypy)
+        run: uv run mypy src/ tests/
+
+      - name: Run Tests
+        run: uv run pytest
